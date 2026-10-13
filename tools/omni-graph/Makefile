@@ -256,12 +256,16 @@ test-examples: ## Run all examples to verify they work
 	@echo "✅ Examples complete."
 
 # ─── Database Reset ────────────────────────────────────────────────────────
-reset-db: ## Wipe SurrealDB volume (omni_surreal_data) preserving TEI model cache
+reset-db: ## Wipe SurrealDB volume (omni_surreal_data) preserving TEI model cache and restart clean
 	@echo "💥 Nuking SurrealDB volume (omni_surreal_data)..."
-	@$(COMPOSE) stop graph-db 2>/dev/null || true
+	@$(COMPOSE) stop rust-app graph-db 2>/dev/null || true
 	@$(COMPOSE) rm -f -v graph-db 2>/dev/null || true
 	@docker volume rm omni_surreal_data 2>/dev/null || true
-	@echo "✅ SurrealDB wiped clean! Next startup will bootstrap fresh tables & indexes automatically."
+	@echo "🚀 Bringing SurrealDB & Rust orchestrator back up..."
+	@$(COMPOSE) up -d graph-db
+	@sleep 2
+	@$(COMPOSE) up -d rust-app
+	@echo "✅ SurrealDB wiped clean and restarted with fresh schema bootstrap!"
 
 nuke-db: reset-db ## Alias for reset-db
 
