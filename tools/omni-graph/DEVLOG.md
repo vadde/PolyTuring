@@ -1991,5 +1991,23 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
 - **Docs Portal Test Suite**: 6/6 checks passed, Headless Chrome rendered all 4 Mermaid diagrams cleanly.
 - **Fleet Verification**: `make workspaces` displays parent `tutor-intelligence` with all 4 strategy worktrees nested, active, and live-watched.
 
+---
 
+### Session Log: 2026-10-13 — Multi-Worktree Ambient Detection & Skill Hardening
 
+#### Objectives
+1. Harden upfront worktree awareness across AI assistants (Claude, Antigravity) working in parallel Git worktrees.
+2. Ensure `hook_pre_invocation.sh` automatically detects when the current working directory `$PWD` is inside a nested Git worktree directory and injects the worktree-scoped banner.
+3. Update `.agents/skills/omni-graph/SKILL.md` with explicit multi-worktree disambiguation recipes, scoped vs. unscoped query behavior, and discovery commands.
+
+#### What Was Done
+- **Pre-Invocation Hook Enhancement (`hook_pre_invocation.sh`)**:
+  - Updated workspace matching loop to recursively inspect `w.get("worktrees", [])` returned by `GET /api/workspaces`.
+  - Added matching by candidate worktree name and worktree `root_path` prefix.
+  - Included all active worktree identifiers in `/tmp/omni_indexed_workspaces.json` cache so PreToolUse gates recognize worktrees immediately.
+- **Skill Hardening (`.agents/skills/omni-graph/SKILL.md`)**:
+  - Added documentation on `POST /api/worktrees/sync` and hierarchical discovery.
+  - Documented Scoped (`?workspace=<worktree_id>`) vs. Unscoped (global multi-worktree divergence array) query behaviors.
+  - Added **Recipe D: Working Across Parallel Git Worktrees** detailing the exact sequence for parallel branch exploration and blast radius isolation.
+- **Documentation Anonymization & Governance**:
+  - Ensured all examples in public-facing and agent docs use standard metasyntactic names (`ecommerce-core`, `wt-stripe-v3`, `wt-crypto-pay`, `wt-perf-cache`) avoiding internal repository paths or personal identifiers.
