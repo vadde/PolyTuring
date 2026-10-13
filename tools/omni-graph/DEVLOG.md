@@ -42,7 +42,11 @@
    - Extracted `field_declaration` (Rust, Go), `property_signature` (TypeScript), and `public_field_definition`/`field_definition` (TS/JS) into `kind: "field"` nodes.
    - Generated `CONTAINS` edges from parent structs/interfaces to fields, and `REFERENCES` edges from fields to concrete types.
    - Verified live: re-indexed `tool-scripts` expanding indexed AST symbols from 1,853 to 2,786 nodes (including `auth_header`, `base_url`, etc.).
-6. **Test Suite Expansion (`tests/unit_tests.rs`)**:
+6. **UI Worktree Fleet Switcher & Lineage Breadcrumbs (`WorktreeFleetModal.tsx`, `App.tsx`)**:
+   - Built interactive glassmorphic Git Worktree Fleet modal showing active worktree strategies, branches, commit SHAs, file count, and live watch daemon status.
+   - Built top bar Lineage Breadcrumb HUD: `[Parent Trunk] ──▶ [🌿 Worktree Branch]` with 1-click strategy switching.
+   - Added `Worktrees ▾` indicator pill displaying strategy count and quick switcher.
+7. **Test Suite Expansion (`tests/unit_tests.rs`)**:
    - Added `test_extract_sql_arrays_filters_null_let_statements`.
    - Added `test_parse_struct_fields_rust`.
    - Added `test_parse_interface_properties_ts`.
@@ -52,10 +56,11 @@
 #### Verification & Live Results
 - `make test-rust`: 72/72 tests passing in Docker container.
 - `make lint-rust`: Clean with zero warnings under `-D warnings`.
-- `npx tsc --noEmit`: Clean typecheck.
+- `npx tsc --noEmit` & `npm run build`: Clean typecheck and production bundle build.
 - Live `/api/workspaces`: Clean deduplicated tree hierarchy; `?flat=true` verified.
 - Live `/api/query`: Sub-second execution, 1,315 estimated tokens within strict SLA.
 - Live `/api/symbol?name=auth_header`: Successfully resolves `auth_header: String` in `src/db/mod.rs:64` as `kind: "field"`.
+- Live UI on `:3000`: Container rebuilt and serving Lineage HUD and Worktree Fleet Switcher.
 
 ---
 
@@ -1873,4 +1878,75 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
 - `tools/omni-graph/CONTEXT.md` — Bumped version to 0.2.0, updated metrics
 - `tools/omni-graph/CHANGELOG.md` — Documented v0.2.0 release
 - `tools/omni-graph/DEVLOG.md` — This entry
+
+---
+
+### 2026-10-09 — Forensic Audit Round 4: Polyglot Field AST Extraction, Relational Edge Indexes, Targeted Graph-RAG Retrieval & Symbol Provenance Inspector
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `in-progress` (v0.2.2: Lineage Provenance & Hardened Retrieval)  
+**Branch**: `main`  
+**Duration**: ~1h  
+
+#### Context & Motivation
+- Pair-programming forensic analysis revealed subtle architectural blindspots in Omni-Graph:
+  1. Tree-sitter struct and interface parsing stopped at top-level definitions, ignoring member `field_declaration`s in Rust/Go and `property_signature`s in TypeScript/JavaScript, blinding code assistants to struct field names.
+  2. `GraphRagEngine::query` downloaded the entire graph over HTTP via `db.get_graph(workspace)` to find 1-hop neighbors of 5 seed nodes, incurring unnecessary network and memory overhead.
+  3. Context condensation lacked guaranteed token budgets across multi-stage formatting, risking budget blowups on large AST structures.
+  4. The SurrealDB `linked_to` table lacked directional indexes on `in` and `out`, degrading large-workspace edge lookups.
+  5. The UI lacked deep symbol provenance exploration across parent trunk and child git worktree branches.
+
+#### Key Features & Remediations Implemented
+1. **Polyglot Field & Property AST Extraction (`src/parser/mod.rs`)**:
+   - Implemented AST extraction for `field_declaration` (Rust struct fields and Go struct fields) and `property_signature` (TypeScript/JavaScript interfaces and types).
+   - Generates discrete AST nodes with `kind: "field"` and automatically links them to their enclosing parent struct/interface via `CONTAINS` edges.
+   - Added unit test `parse_rust_struct_fields_and_typescript_interface_properties` in `tests/unit_tests.rs`.
+2. **Targeted Graph-RAG Neighborhood Retrieval & Strict Token Budgeting (`src/analysis/mod.rs`)**:
+   - Replaced full-graph HTTP downloads with targeted 1-hop seed neighborhood extraction.
+   - Implemented strict token budget guarantees (<1,500 tokens / 6,000 characters), ensuring high-density macro summaries with structural call traces.
+3. **SurrealDB Relational Edge Indexes (`src/db/schema.surql`)**:
+   - Created `idx_edge_in`, `idx_edge_out`, `idx_edge_out_ws`, and `idx_edge_in_ws` on `linked_to`.
+   - Hardened `extract_sql_arrays` in `src/db/mod.rs` to tolerate multi-statement DEFINE INDEX DDL statements without JSON parser failure.
+4. **Worktree Hierarchy Deduplication (`src/db/mod.rs`, `src/api/mod.rs`)**:
+   - Cleaned up `get_workspaces()` to remove adopted child worktrees from the top-level list, providing clean hierarchical nesting while supporting `?flat=true` for flat views.
+5. **Symbol Provenance & Lineage Inspector (`ui/src/SymbolProvenanceInspector.tsx`, `ui/src/App.tsx`)**:
+   - Created a liquid-glass UI component that inspects any selected node in real-time.
+   - Computes whether a symbol is trunk-inherited or a branch delta, maps inbound callers and outbound dependencies, and displays divergence indicators.
+   - Fully integrated into Cosmograph node drawer and tested cleanly with `tsc --noEmit` and `npm run build`.
+
+#### Verification & Quality Gates
+- **Rust Unit Tests**: 68/68 unit tests passing in Docker (`make test-rust`).
+- **Rust Clippy**: 0 warnings with `-D warnings` (`make lint-rust`).
+- **UI TypeScript**: Clean compilation with 0 errors (`npx tsc --noEmit`).
+- **Docker Stack**: All 4 services healthy (`omni-rust-app:8080`, `omni-graph-db:8000`, `omni-embedding-engine:8081`, `omni-graph-ui:3000`).
+- **Live Re-indexing**: `tool-scripts` re-indexed successfully to 3,047 AST nodes (up from ~1,650 nodes due to field extraction).
+
+---
+
+### 2026-10-13 — Clean Slate Storage Purge & Database Reset Automation
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `in-progress` (v0.2.2: Lineage Provenance & Hardened Retrieval)  
+**Branch**: `main`  
+**Duration**: ~15m  
+
+#### Context & Motivation
+- Following substantial enhancements to polyglot AST parsing (struct fields, interface properties) and Graph-RAG neighborhood embeddings, previous indexed workspaces and embeddings in SurrealDB needed to be completely purged to allow pristine re-indexing.
+- Identified that standard `docker compose down -v` wipes both `omni_surreal_data` and the Hugging Face TEI embedding model cache (`omni_tei_cache`), causing avoidable network downloads of the 130MB BGE model weights.
+- Added targeted reset mechanisms to automate safe, complete SurrealDB storage nuking while preserving the model cache.
+
+#### Key Features & Remediations Implemented
+1. **Targeted SurrealDB Storage Purge Targets (`Makefile`, `tools/omni-graph/Makefile`)**:
+   - Added `reset-db` (and `nuke-db` alias) in `tools/omni-graph/Makefile` to gracefully stop `graph-db`, remove the container, and delete volume `omni_surreal_data` without touching `omni_tei_cache`.
+   - Added `reset-graph-db` (and `nuke-graph-db` alias) to repo root `Makefile`.
+   - Verified that upon container recreation, `include_str!("db/schema.surql")` bootstraps fresh tables, relational constraints, and HNSW vector indexes cleanly from 0 bytes.
+2. **Clean Storage Reinitialization**:
+   - Nuked stale `omni_surreal_data` volume and restarted the stack cleanly.
+   - Verified healthy container startup across all 4 microservices on `omni-net`.
+
+#### Verification & Quality Gates
+- **Docker Stack**: All 4 services healthy (`omni-rust-app:8080`, `omni-graph-db:8000`, `omni-embedding-engine:8081`, `omni-graph-ui:3000`).
+- **Make Commands**: `make help` and `make -C tools/omni-graph help` reflect `reset-graph-db` and `reset-db`.
+- **SurrealDB Bootstrapping**: Fresh DB initialized and verified with empty table baseline.
+
 

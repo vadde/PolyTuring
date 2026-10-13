@@ -10,7 +10,8 @@
 .PHONY: help setup new-tool test test-tool lint lint-tool build build-tool \
         run-tool demo-tool validate-specs catalog status clean \
         session-explorer omni-graph ingest cluster workspaces search-graph query-graph \
-        graph-symbol graph-references graph-condense graph-galaxies graph-health relate-graph health
+        graph-symbol graph-references graph-condense graph-galaxies graph-health relate-graph health \
+        reset-graph-db nuke-graph-db
 
 .DEFAULT_GOAL := help
 
@@ -76,6 +77,7 @@ help: ## Show this interactive command directory
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "search-graph Q=\"...\""     "Fast vector semantic code search in knowledge hub"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "query-graph Q=\"...\""      "Hybrid Graph-RAG synthesis (<1500 tokens for agents)"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "relate-graph SRC=.. TGT=.." "Augment graph with dynamic inferred dependency"
+	@printf "  $(CYAN)%-24s$(NC) %s\n" "reset-graph-db"           "Wipe SurrealDB storage cleanly (preserves TEI model cache)"
 	@printf "\n"
 	@printf "$(BOLD)📦 Build & Compilation:$(NC)\n"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "build"                     "Build ALL tools across the monorepo"
@@ -178,6 +180,9 @@ graph-health health: ## Check health of Omni-Graph services
 
 setup-agent: ## Configure agent enforcement shield: make setup-agent [<dir>|DIR=<dir>|TARGET=<dir>|global]
 	@$(MAKE) -C $(TOOLS_DIR)/omni-graph setup-agent $(if $(SETUP_ARGS),$(SETUP_ARGS),) DIR="$(DIR)" TARGET="$(TARGET)"
+
+reset-graph-db nuke-graph-db: ## Wipe SurrealDB volume in Omni-Graph while preserving TEI model cache
+	@$(MAKE) -C $(TOOLS_DIR)/omni-graph reset-db
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Build & Packaging

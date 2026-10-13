@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.2] - 2026-10-09
 
 ### Added
+- **Targeted SurrealDB Volume Reset Automation (`make reset-graph-db` / `make reset-db`)**: One-command complete storage wipe of `omni_surreal_data` allowing clean re-indexing without deleting the Hugging Face TEI embedding model cache.
+- **UI Git Worktree Fleet Switcher & Lineage HUD (`WorktreeFleetModal.tsx`, `App.tsx`)**:
+  - Interactive glassmorphic Git Worktree Fleet modal showing active worktree strategies, branches, commit SHAs, file count, and live watch daemon status.
+  - Top bar Lineage Breadcrumb HUD: `[Parent Trunk] ──▶ [🌿 Worktree Branch]` with 1-click strategy switching.
+  - `Worktrees ▾` indicator pill in top bar displaying strategy count and quick switcher.
 - **Polyglot Struct Field & Interface Property Extraction (R-057)**: Extracted `field_declaration` (Rust, Go), `property_signature` (TypeScript), and `public_field_definition`/`field_definition` (TS/JS) into `kind: "field"` nodes linked via `CONTAINS` edges from parent structs/interfaces and `REFERENCES` edges to concrete types.
 - **Targeted Neighborhood Subgraph Retrieval (`DbClient::get_neighborhood_subgraph`)**: Localized 1-hop BFS in SurrealDB replaces full-graph HTTP downloads in `GraphRagEngine::query`.
 - **Strict Context Budgeting on Graph-RAG Synthesis**: Two-tier budgeting capping symbol definitions at 3,800 chars and reserving $\ge 1,800$ chars for call/import relationships, enforcing the <1500 token SLA.

@@ -7,7 +7,8 @@
 # ============================================================================
 
 .PHONY: help setup test test-rust test-ui lint lint-rust lint-ui run build build-rust build-ui ci clean up down logs health \
-        ingest cluster workspaces search query symbol references condense galaxies relate-graph setup-agent validate-specs
+        ingest cluster workspaces search query symbol references condense galaxies relate-graph setup-agent validate-specs \
+        reset-db nuke-db
 
 .DEFAULT_GOAL := help
 
@@ -250,6 +251,16 @@ test-examples: ## Run all examples to verify they work
 		echo "  No examples directory found."; \
 	fi
 	@echo "✅ Examples complete."
+
+# ─── Database Reset ────────────────────────────────────────────────────────
+reset-db: ## Wipe SurrealDB volume (omni_surreal_data) preserving TEI model cache
+	@echo "💥 Nuking SurrealDB volume (omni_surreal_data)..."
+	@$(COMPOSE) stop graph-db 2>/dev/null || true
+	@$(COMPOSE) rm -f -v graph-db 2>/dev/null || true
+	@docker volume rm omni_surreal_data 2>/dev/null || true
+	@echo "✅ SurrealDB wiped clean! Next startup will bootstrap fresh tables & indexes automatically."
+
+nuke-db: reset-db ## Alias for reset-db
 
 # ─── Clean ──────────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts and Docker volumes

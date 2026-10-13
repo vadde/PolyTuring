@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
 status: in-progress
-last_session: 2026-10-09
+last_session: 2026-10-13
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -30,6 +30,8 @@ blockers: []
 | Acceptance Criteria (AC-XXX) | 24 | 24 | 🟢 100% Complete |
 | Non-Functional (NF-XXX) | 11 | 11 | 🟢 100% Complete |
 | Test Coverage | 72/72 Unit & Integration Tests | 72 | 🟢 100% Verified in Docker |
+| Safe SurrealDB Volume Reset & Automation | Complete | — | 🟢 make reset-graph-db / reset-db preserving TEI cache |
+| Git Worktree Fleet Switcher & Lineage HUD | Complete | — | 🟢 Interactive Strategy Modal, Branch HUD & Top-Bar Breadcrumbs |
 | Polyglot Struct Field & Interface Properties (R-057) | Complete | — | 🟢 Rust, Go, TS, JS Field Nodes with CONTAINS & REFERENCES Edges |
 | Targeted Graph-RAG Neighborhood Subgraph | Complete | — | 🟢 Localized 1-Hop BFS in SurrealDB Eliminating Full-Graph Fetch |
 | Graph-RAG Strict Context Budgeting (<1500 tokens) | Complete | — | 🟢 Two-Tier Budgeting with Guaranteed Structural Edge Capacity |

@@ -5,7 +5,7 @@ version: 0.2.2
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-10-09
+last_updated: 2026-10-13
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
 ---
@@ -37,6 +37,7 @@ spec: ../../specs/catalog/omni-graph.md
 | 2026-10-07 | `in-progress` | `in-progress` | Second-round forensic audit: Cross-file receiver/impl scoping, cascading edge pruning, batch stale file pruning, trait/class inheritance, Rust macro indexing, clean record ID normalization, achieving 0 orphaned edges (R-039 to R-050) |
 | 2026-10-09 | `in-progress` | `in-progress` | Third-round forensic audit: Ambient live-watch auto-enrollment, polyglot multi-symbol imports (R-044), two-tier condenser token budgeting (<1500 tokens, R-028), zero-blackout live re-indexing, and ingestion path security containment |
 | 2026-10-09 | `in-progress` | `in-progress` | Fourth-round forensic audit: Polyglot struct field & interface property AST extraction (R-057), targeted neighborhood Graph-RAG retrieval, strict Graph-RAG token budgeting, worktree hierarchy deduplication, SurrealQL statement index resilience (`extract_sql_arrays`), and relational graph edge indexing (`linked_to`) |
+| 2026-10-13 | `in-progress` | `in-progress` | Safe SurrealDB volume purge automation (reset-graph-db / reset-db), storage reset preserving TEI model cache, UI worktree fleet switcher & lineage HUD integration |
 
 ---
 
