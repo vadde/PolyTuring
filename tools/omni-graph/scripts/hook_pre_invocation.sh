@@ -39,7 +39,13 @@ try:
 
     # Cache list of indexed workspace names for fast PreToolUse lookup
     try:
-        indexed_names = [w.get("workspace") for w in workspaces if w.get("total_nodes", 0) > 0]
+        indexed_names = []
+        for w in workspaces:
+            if w.get("total_nodes", 0) > 0:
+                indexed_names.append(w.get("workspace"))
+            for wt in w.get("worktrees", []):
+                if wt.get("total_nodes", 0) > 0:
+                    indexed_names.append(wt.get("workspace"))
         with open("/tmp/omni_indexed_workspaces.json", "w") as f:
             json.dump(indexed_names, f)
     except Exception:
@@ -55,6 +61,15 @@ try:
         if name.lower() == ws_candidate.lower() or (root_path and (cwd == root_path or cwd.startswith(root_path + "/"))):
             matched_ws = name
             node_count = w.get("total_nodes", 0)
+            break
+        for wt in w.get("worktrees", []):
+            wt_name = wt.get("workspace", "")
+            wt_root = wt.get("root_path", "")
+            if wt_name.lower() == ws_candidate.lower() or (wt_root and (cwd == wt_root or cwd.startswith(wt_root + "/"))):
+                matched_ws = wt_name
+                node_count = wt.get("total_nodes", 0)
+                break
+        if matched_ws:
             break
 
     if not matched_ws:
