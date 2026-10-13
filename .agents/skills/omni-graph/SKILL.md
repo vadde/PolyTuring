@@ -146,19 +146,46 @@ When coding agents operate in Git worktrees located outside the main repository 
 1. **Auto-Detection**: Omni-Graph automatically inspects `.git` gitdir pointers in $O(1)$, resolving the worktree name, current branch, and parent repository workspace.
 2. **Cluster Continuity**: During worktree ingestion, Omni-Graph inherits community seeds from the parent workspace, preventing cluster ID shifts across branches.
 3. **Auto-Watch Live Sync**: Ingestion automatically enrolls the live filesystem watcher (`watch: true`), ensuring code edits by agents are immediately re-indexed into SurrealDB within 500ms.
-4. **Inspecting Worktrees**:
+4. **Parent-Child Hierarchy**:
+   ```bash
+   curl -s http://localhost:8080/api/workspaces
+   ```
+   Returns parent repositories with their active child worktrees nested in `worktrees: [...]`, including branch names and AST node counts.
+5. **Inspecting Active Worktrees**:
    ```bash
    curl -s http://localhost:8080/api/worktrees
    ```
-5. **Ingesting a Worktree with Live Watch**:
+   Lists all registered worktrees, root paths, branch names, node counts, and live watcher status (`"is_watching": true`).
+6. **Automatic Worktree Sync (`/api/worktrees/sync`)**:
    ```bash
-   curl -s -X POST http://localhost:8080/api/ingest \
-     -H "Content-Type: application/json" \
-     -d '{"path": "/path/to/worktree", "watch": true}'
+   curl -s -X POST http://localhost:8080/api/worktrees/sync -H "Content-Type: application/json" -d '{}'
    ```
-6. **Automatic & Manual Purging**:
+   Scans `.git/worktrees`, detects any newly added worktrees (`git worktree add`), and kicks off background ingestion + live watchers automatically.
+7. **Scoped vs. Unscoped Multi-Worktree Queries**:
+   - **Scoped Query (Targeted)**: Always specify `workspace=<worktree_id>` when exploring code in a specific worktree:
+     ```bash
+     curl -s "http://localhost:8080/api/symbol?name=process_order&workspace=wt-stripe-v3"
+     curl -s "http://localhost:8080/api/references?symbol=process_order&workspace=wt-stripe-v3"
+     curl -s "http://localhost:8080/api/condense?symbol=process_order&workspace=wt-stripe-v3&hops=2"
+     ```
+     SurrealDB strictly partitions AST nodes and call graph edges (`linked_to`). Callers and dependencies from other branches will never bleed into your result.
+   - **Unscoped Query (Divergence Check)**: Omit `workspace` to inspect all diverged implementations across active worktrees:
+     ```bash
+     curl -s "http://localhost:8080/api/symbol?name=process_order"
+     ```
+     Returns an array of all distinct matches, each labeled with its respective `workspace`, `file_path`, and line bounds.
+8. **Automatic & Manual Purging**:
    - Dead worktrees whose directories have been removed are automatically swept upon `/api/workspaces` queries.
    - To manually decommission a worktree and stop its watcher:
      ```bash
      curl -s -X DELETE http://localhost:8080/api/worktree/<worktree_name>
      ```
+
+---
+
+### Recipe D: Working Across Parallel Git Worktrees
+1. Run `curl -s http://localhost:8080/api/worktrees` to see all active branches and their workspace IDs.
+2. Determine which branch you are editing. If the PreInvocation hook injected `[Omni-Graph Active | Workspace: <worktree_id>]`, use that `<worktree_id>`.
+3. Query symbol definitions and blast radiuses using the scoped parameter: `?symbol=<name>&workspace=<worktree_id>`.
+4. If checking for divergence across branches, omit `workspace` to view the cross-worktree array side-by-side.
+5. To extract call lineages without cross-branch contamination, run `make graph-condense SYM=<target> PROJECT=<worktree_id> HOPS=2`.
