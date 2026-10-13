@@ -323,6 +323,41 @@ graph TD
             <strong>Omni-Graph</strong> is a zero-telemetry, multi-container semantic graph engine that models software repositories as rich Abstract Syntax Tree (AST) graphs augmented with dense 384-dimensional vector embeddings. It solves code navigation, blast-radius analysis, and agent context starvation entirely on local hardware.
           </p>
 
+          <!-- The 60-Second Layman Pitch Card -->
+          <div class="glass-card" style="margin-bottom: 28px; border-left: 4px solid var(--accent-cyan); padding: 22px 24px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+              <span style="font-size: 1.2rem;">💡</span>
+              <h4 style="font-size: 1.12rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">The 60-Second Mental Model: Why Does Omni-Graph Exist?</h4>
+            </div>
+            <p style="font-size: 0.92rem; line-height: 1.6; color: var(--text-primary); margin-bottom: 16px;">
+              Imagine hiring a brilliant senior software engineer, but forcing them to read your <strong>entire 100,000-line codebase from top to bottom</strong> every single time you ask: <em>"Where is payment processing handled?"</em>. They would waste 30 minutes reading, blow thousands of dollars in billing fees, and lose their train of thought due to cognitive exhaustion.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 8px; padding: 14px 16px;">
+                <div style="font-weight: 700; color: #fb7185; margin-bottom: 8px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+                  <span>❌</span> The "Old Way" (Blind Agent)
+                </div>
+                <ul style="font-size: 0.82rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.55;">
+                  <li>Runs blind <code>grep</code> or <code>find</code> across the repository.</li>
+                  <li>Dumps 10,000 lines of noise, minified assets, and test logs.</li>
+                  <li>Burns 40,000+ LLM tokens per simple question.</li>
+                  <li>Blows past model context limits, triggering code hallucinations.</li>
+                </ul>
+              </div>
+              <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 16px;">
+                <div style="font-weight: 700; color: #34d399; margin-bottom: 8px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+                  <span>✅</span> The Omni-Graph Way (Instant X-Ray)
+                </div>
+                <ul style="font-size: 0.82rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.55;">
+                  <li>Pre-indexes exact syntax trees and caller relationships locally.</li>
+                  <li>Pinpoints symbol declarations, signatures, and callers in 5ms.</li>
+                  <li>Guarantees strict token budget: <strong>≤ 1,500 tokens</strong>.</li>
+                  <li>Agent gets precise context instantly and writes working code.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <h3 class="section-h2" id="sec-omni-arch">4-Tier Container Architecture</h3>
           <p>Omni-Graph runs on an isolated Docker network (<code>omni-net</code>) coordinating four decoupled microservices:</p>
 
@@ -441,6 +476,22 @@ flowchart TB
             Coding agents frequently branch or create Git worktrees to isolate experimental code and execute parallel strategies. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong> (Requirements <code>R-051</code> to <code>R-059</code>):
           </p>
 
+          <!-- Layman Explanation: Git Worktrees -->
+          <div class="callout callout-theory" style="margin-bottom: 24px;">
+            <div class="callout-header">💡 Layman's Mental Model: What is a Git Worktree?</div>
+            <div class="callout-body">
+              <strong>Think of Git Worktrees like having multiple browser tabs open for the exact same website at the same time:</strong>
+              <br><br>
+              In normal Git, if you want to switch from a payment feature to fix an urgent checkout bug, you must run <code>git stash</code>, run <code>git checkout bugfix</code>, and restart your compiler or local dev server.
+              <br><br>
+              With <strong>Git Worktrees</strong>, you have multiple physical folders on disk sharing the same underlying Git history. You (or 4 parallel AI agents) can work on <code>feat-stripe-v2</code> and <code>refactor-auth-jwt</code> <em>simultaneously</em> in separate folders without branch switching conflicts.
+              <br><br>
+              <strong>The Problem with other indexers:</strong> They get confused, treat each folder as an unrelated duplicate repository, or force you to re-index the whole project from scratch on every branch switch.
+              <br>
+              <strong>The Omni-Graph Solution:</strong> Point Omni-Graph at the main project folder once. It automatically discovers all active worktree folders, links their lineage, indexes them in parallel, and live-updates whichever folder you edit in real time!
+            </div>
+          </div>
+
           <div class="card-grid">
             <div class="glass-card">
               <h4>⚡ O(1) Worktree Pointer Peeking</h4>
@@ -487,13 +538,13 @@ flowchart TB
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TB
-    Trunk["Trunk Workspace (Parent)<br/>e.g. tutor-intelligence"]
+    Trunk["Trunk Workspace (Parent)<br/>e.g. ecommerce-platform"]
 
     subgraph GitWorktrees["Git Worktree Directory (.git/worktrees/*)"]
-        WT1[".git/worktrees/ti-strat-089"]
-        WT2[".git/worktrees/ti-strat-090"]
-        WT3[".git/worktrees/ti-strat-091"]
-        WT4[".git/worktrees/ti-strat-092"]
+        WT1[".git/worktrees/feat-stripe-v2"]
+        WT2[".git/worktrees/refactor-auth-jwt"]
+        WT3[".git/worktrees/hotfix-cart-lock"]
+        WT4[".git/worktrees/exp-graphql-mesh"]
     end
 
     subgraph EBFEngine["Omni-Graph EBF Core (Rust Axum Engine)"]
@@ -504,11 +555,11 @@ flowchart TB
     end
 
     subgraph Storage["SurrealDB v2 Isolation"]
-        DB_Trunk["workspace: tutor-intelligence"]
-        DB_WT1["workspace: ti-strat-089"]
-        DB_WT2["workspace: ti-strat-090"]
-        DB_WT3["workspace: ti-strat-091"]
-        DB_WT4["workspace: ti-strat-092"]
+        DB_Trunk["workspace: ecommerce-platform"]
+        DB_WT1["workspace: feat-stripe-v2"]
+        DB_WT2["workspace: refactor-auth-jwt"]
+        DB_WT3["workspace: hotfix-cart-lock"]
+        DB_WT4["workspace: exp-graphql-mesh"]
     end
 
     Trunk --> Peeker
@@ -527,7 +578,7 @@ flowchart TB
           <div class="callout callout-theory">
             <div class="callout-header">Multi-Worktree Concurrency & Branch Isolation</div>
             <div class="callout-body">
-              When parallel AI agents develop multiple strategies simultaneously (such as <code>ti-strat-089</code> through <code>ti-strat-092</code>), EBF enforces strict SurrealDB record-level partition isolation (<code>workspace = "&lt;worktree_id&gt;"</code>) while sharing the parent LPA community cluster seeds. Each worktree enjoys independent sub-100ms incremental file watching without cross-talk or lock contention.
+              When parallel AI agents develop multiple strategies simultaneously (such as <code>feat-stripe-v2</code>, <code>refactor-auth-jwt</code>, and <code>hotfix-cart-lock</code>), EBF enforces strict SurrealDB record-level partition isolation (<code>workspace = "&lt;worktree_id&gt;"</code>) while sharing the parent LPA community cluster seeds. Each worktree enjoys independent sub-100ms incremental file watching without cross-talk or lock contention.
             </div>
           </div>
 

@@ -805,7 +805,7 @@ function initApiPlayground() {
         cmd = `curl -s -X POST "http://localhost:8080/api/worktrees/sync"`;
         break;
       case 'ingest':
-        cmd = `curl -s -X POST http://localhost:8080/api/ingest \\\n  -H "Content-Type: application/json" \\\n  -d '{"path": "/Users/aparv/workspaces/${ws}", "refresh": true}'`;
+        cmd = `curl -s -X POST http://localhost:8080/api/ingest \\\n  -H "Content-Type: application/json" \\\n  -d '{"path": "/path/to/${ws}", "refresh": true}'`;
         break;
     }
 

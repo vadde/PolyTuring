@@ -10,9 +10,20 @@
 
 ---
 
-## 1. Overview & Architectural Thesis
+## 1. Overview & The 60-Second Mental Model
 
-Standard AI coding agents burn 50K+ tokens per task on primitive `cat` and `grep` file-walking operations. This causes severe cognitive context truncation, misses multi-hop dependency chains, and produces hallucinations about code structure.
+### 💡 Why Does Omni-Graph Exist? (In Plain English)
+
+Imagine hiring a brilliant senior software engineer, but forcing them to read your **entire 100,000-line codebase from top to bottom** every single time you ask: *"Where is payment processing handled?"*. They would waste 30 minutes reading, blow thousands of dollars in billing fees, and lose their train of thought due to cognitive exhaustion.
+
+That is exactly how standard AI coding agents behave when relying on blind `cat` and `grep` file-walking operations.
+
+| ❌ The Old Way (Blind Agent) | ✅ The Omni-Graph Way (Instant X-Ray) |
+| :--- | :--- |
+| Runs blind `grep` or `find` across the whole repo | Pre-indexes syntax trees & caller relationships locally |
+| Dumps 10,000 lines of noise, minified assets, and test logs | Pinpoints symbol declarations, signatures, and callers in 5ms |
+| Burns 40,000+ LLM tokens per simple question | Strict mathematical guarantee: **≤ 1,500 tokens per prompt slice** |
+| Blows past model context limits, triggering hallucinations | Agent gets exact context instantly and writes working code |
 
 **Omni-Graph replaces brute-force file walking with deterministic AST graphs and local vector search.**
 
@@ -93,7 +104,7 @@ Omni-Graph is architected for multi-repo and multi-workspace development. Every 
 - **Node Record**:
   ```surql
   {
-    workspace: "vadde-tool-scripts",
+    workspace: "ecommerce-platform",
     label: "ingest_directory",
     kind: "function",
     file_path: "src/ingestion/mod.rs",
@@ -107,8 +118,8 @@ Omni-Graph is architected for multi-repo and multi-workspace development. Every 
   ```
 - **Relationship Edge Record**:
   ```surql
-  RELATE node:`vadde-tool-scripts:src/main.rs:main:27`->linked_to->node:`vadde-tool-scripts:src/ingestion/mod.rs:ingest_directory:66`
-  SET workspace = 'vadde-tool-scripts', type = 'CALLS', category = 'EXTRACTED';
+  RELATE node:`ecommerce-platform:src/main.rs:main:27`->linked_to->node:`ecommerce-platform:src/ingestion/mod.rs:ingest_directory:66`
+  SET workspace = 'ecommerce-platform', type = 'CALLS', category = 'EXTRACTED';
   ```
 
 ### Partitioned Retrieval
@@ -132,56 +143,71 @@ Community Clustering solves this by applying **modularity-based community detect
 
 ---
 
-## 6. Quick Start & Unified Make Interface
+## 6. Git Worktrees: The "Browser Tabs" Mental Model
 
-Users and agents can invoke all operations with simple, intuitive Make commands without running complex scripts.
+### 💡 What is a Git Worktree? (In Plain English)
 
-### 1. Launch Stack
+**Think of Git Worktrees like having multiple browser tabs open for the exact same website at the same time:**
+
+* In normal Git, if you want to switch from developing a new feature to fix an urgent bug, you have to run `git stash`, run `git checkout bugfix`, and restart your compiler or local dev server.
+* With **Git Worktrees**, you have multiple physical folders on disk sharing the same underlying Git history. You (or 4 parallel AI coding agents) can work on `feature/stripe-v2` and `refactor/auth-jwt` *simultaneously* in separate folders without branch switching conflicts.
+
+### The Problem With Traditional Indexers:
+Traditional tools get confused, treat each folder as an unrelated duplicate repository, or force you to re-index the entire project from scratch every time a branch changes.
+
+### The Omni-Graph Solution (Ephemeral Branch Fabric):
+Point Omni-Graph at the main project folder once (`make ingest PATH=/path/to/ecommerce-platform`). It automatically discovers all active worktree folders (e.g. `.git/worktrees/*`), links their lineage, indexes them in parallel, and live-updates whichever folder you edit in real time!
+
+---
+
+## 7. The 30-Second Quick Start
+
+Users and agents can invoke all operations with simple, intuitive Make commands:
+
+### Step 1: Launch the Local Stack (Docker)
 ```bash
 make up
 ```
-Starts all 4 containers in the background. On macOS, host `/Users` is automatically mounted into the container, so any directory on your machine can be ingested directly!
+Starts all 4 containers in the background (`omni-rust-app`, `omni-graph-db`, `omni-embedding-engine`, `omni-graph-ui`). On macOS, host `/Users` is automatically mounted into the container.
 
-### 2. Ingest Codebase
+### Step 2: Point Omni-Graph at ANY Codebase on Your Machine
 ```bash
-# Ingest this monorepo
-make ingest /workspace
+# Ingest any project directory on your machine (e.g. ecommerce-platform)
+make ingest PATH=/path/to/ecommerce-platform
 
-# Ingest any directory or external codebase on your Mac
-make ingest /Users/aparv/Projects/my-app
-
-# Optionally specify a custom workspace namespace
-make ingest PATH=/Users/aparv/Projects/my-app PROJECT=my-service
+# Or optionally assign a custom project namespace
+make ingest PATH=/path/to/ecommerce-platform PROJECT=ecommerce-core
 ```
+Omni-Graph extracts AST symbols, computes 384-dim embeddings, detects child worktrees, and enrolls real-time live file watchers automatically.
 
-### 3. Compute Community Clustering (Galaxy IDs)
+### Step 3: Ask Architectural Questions or Trace Symbols
 ```bash
-# Compute galaxy clusters for all nodes
-make cluster
+# Hybrid Graph-RAG architectural question (<1500 tokens context slice):
+make query Q="Where is payment validation handled?" PROJECT=ecommerce-core
 
-# Or cluster a specific workspace
-make cluster PROJECT=my-service
-```
-
-### 4. Inspect Partitioned Workspaces
-```bash
-make workspaces
-```
-Prints a clean table of all indexed workspaces, total nodes, languages, and files.
-
-### 5. Fast Semantic Search
-```bash
-make search Q="database connection pool" [PROJECT=my-service]
-```
-
-### 6. Hybrid Graph-RAG Architectural Synthesis
-```bash
-make query Q="How does the AST ingestion pipeline work?" [PROJECT=my-service]
+# Or open the 3D visual graph in your browser:
+open http://localhost:3000
 ```
 
 ---
 
-## 7. CLI & API Reference
+## 8. Daily Cheat Sheet for Developers & Coding Agents
+
+| What You Want to Do | Command to Run | What It Does |
+| :--- | :--- | :--- |
+| **Start everything** | `make up` | Starts the 4 Docker containers in background |
+| **Index a codebase** | `make ingest PATH=/path/to/repo` | Parses AST, generates embeddings, starts live watcher |
+| **List indexed repos** | `make workspaces` | Prints table of all indexed workspaces and child worktrees |
+| **Sync parallel worktrees** | `make sync-worktrees` | Reconciles new Git branches and aligns live watchers |
+| **Find symbol definition** | `make graph-symbol SYM=OrderService` | Locates exact file, line range, and code signature in 5ms |
+| **Find who calls a symbol** | `make graph-references SYM=OrderService` | Lists all callers and dependent functions across files |
+| **Get <1500 token slice** | `make graph-condense SYM=OrderService` | Extracts 2-hop neighborhood formatted for LLM prompts |
+| **Ask architectural question** | `make query-graph Q="How does auth work?"` | Hybrid Graph-RAG synthesis using local vector + graph search |
+| **Wipe DB for clean slate** | `make reset-graph-db` | Nukes SurrealDB storage and auto-restarts with clean schema |
+
+---
+
+## 9. CLI & API Reference
 
 ### CLI Usage (`omni.sh`)
 
@@ -248,7 +274,7 @@ make setup-agent
 
 ---
 
-## 7. WebGL Visualization Dashboard
+## 10. WebGL Visualization Dashboard
 
 Open [http://localhost:3000](http://localhost:3000) to access the interactive Cosmograph WebGL visualization:
 - **GPU-accelerated force-directed layout** rendering 100K+ nodes at 60fps
@@ -257,7 +283,7 @@ Open [http://localhost:3000](http://localhost:3000) to access the interactive Co
 
 ---
 
-## 8. Specification & Verification
+## 11. Specification & Verification
 
 - **Full Specification**: [specs/catalog/omni-graph.md](../../specs/catalog/omni-graph.md)
 - **Lifecycle Status**: [STATUS.md](STATUS.md) (`in-progress`)

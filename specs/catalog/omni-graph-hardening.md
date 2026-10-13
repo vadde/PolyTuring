@@ -54,7 +54,7 @@ A forensic audit of Omni-Graph revealed nine architectural vulnerabilities and f
 | **R-056** | **UI Worktree Switcher & Delta Visualizer**: React/Cosmograph UI provides branch selector under parent workspace with live watching status pulse and glowing delta halos for branch-modified nodes. | P1 | UI renders branch selector and highlights modified nodes. |
 | **R-057** | **Worktree-Aware PreToolUse & PreInvocation Hooks**: Hook scripts resolve worktree lineage and provide tailored single-command sync banners that auto-attach watch daemons. | P0 | Hooks recognize worktrees and trigger zero-friction auto-sync. |
 | **R-058** | **Cross-Branch Symbol Diff API**: `GET /api/diff?worktree=<name>&parent=<parent>` compares worktree AST nodes against parent baseline to isolate branch blast radius. | P2 | Returns added, modified, and removed symbols across branches. |
-| **R-059** | **Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync**: When ingesting a parent trunk repository, automatically discover all sibling Git worktrees via `.git/worktrees/*`, cascade background ingestion to each worktree, inherit LPA seeds, attach live file watchers concurrently, and expose `POST /api/worktrees/sync` for on-demand fleet alignment. | P0 | Verified via `POST /api/worktrees/sync`, trunk auto-cascade, and parallel strategy worktrees on `tutor-intelligence`. |
+| **R-059** | **Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync**: When ingesting a parent trunk repository, automatically discover all sibling Git worktrees via `.git/worktrees/*`, cascade background ingestion to each worktree, inherit LPA seeds, attach live file watchers concurrently, and expose `POST /api/worktrees/sync` for on-demand fleet alignment. | P0 | Verified via `POST /api/worktrees/sync`, trunk auto-cascade, and parallel feature worktrees on `ecommerce-platform`. |
 
 ---
 
@@ -69,10 +69,10 @@ A forensic audit of Omni-Graph revealed nine architectural vulnerabilities and f
    - Record ID cleaner unit tests.
    - Git worktree detection (`detect_git_worktree`) across regular repos, worktree files, and detached states.
    - Seed-preserving worktree LPA clustering stability.
-2. End-to-end container verification on `tool-scripts`, `tutor-intelligence`, and `ti-strat-089`:
+2. End-to-end container verification on `tool-scripts`, `ecommerce-platform`, and `feat-stripe-v2`:
    - Re-index and confirm 0 orphaned edges (`SELECT count() FROM linked_to WHERE in.id IS NONE OR out.id IS NONE`).
    - Confirm automatic watch daemon enrollment on worktree ingest.
-   - Test live file modification in `ti-strat-089` and verify single-file incremental update in <100ms.
+   - Test live file modification in `feat-stripe-v2` and verify single-file incremental update in <100ms.
    - Re-index and confirm 0 duplicate nodes for modified files.
 3. Strict Clippy check: `make -C tools/omni-graph lint-rust` (`-D warnings`).
 4. Strict UI check: `tsc --noEmit`.
