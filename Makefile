@@ -11,7 +11,7 @@
         run-tool demo-tool validate-specs catalog status clean \
         session-explorer omni-graph ingest cluster workspaces search-graph query-graph \
         graph-symbol graph-references graph-condense graph-galaxies graph-health relate-graph health \
-        reset-graph-db nuke-graph-db
+        reset-graph-db nuke-graph-db sync-worktrees
 
 .DEFAULT_GOAL := help
 
@@ -78,6 +78,7 @@ help: ## Show this interactive command directory
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "query-graph Q=\"...\""      "Hybrid Graph-RAG synthesis (<1500 tokens for agents)"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "relate-graph SRC=.. TGT=.." "Augment graph with dynamic inferred dependency"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "reset-graph-db"           "Wipe SurrealDB storage cleanly (preserves TEI model cache)"
+	@printf "  $(CYAN)%-24s$(NC) %s\n" "sync-worktrees [PROJECT=]" "Auto-discover and cascade ingestion for all git worktrees"
 	@printf "\n"
 	@printf "$(BOLD)📦 Build & Compilation:$(NC)\n"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "build"                     "Build ALL tools across the monorepo"
@@ -183,6 +184,9 @@ setup-agent: ## Configure agent enforcement shield: make setup-agent [<dir>|DIR=
 
 reset-graph-db nuke-graph-db: ## Wipe SurrealDB volume in Omni-Graph while preserving TEI model cache
 	@$(MAKE) -C $(TOOLS_DIR)/omni-graph reset-db
+
+sync-worktrees: ## Auto-discover and cascade ingestion for all git worktrees: make sync-worktrees [PROJECT=name]
+	@$(MAKE) -C $(TOOLS_DIR)/omni-graph sync-worktrees PROJECT="$(PROJECT)"
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Build & Packaging

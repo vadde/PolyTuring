@@ -206,6 +206,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/watch/status/:workspace", get(watch_workspace_status_handler))
         .route("/api/watch/events", get(watch_events_sse_handler))
         .route("/api/worktrees", get(worktrees_handler))
+        .route("/api/worktrees/sync", post(worktrees_sync_handler))
         .route("/api/worktree/:name", delete(worktree_delete_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -642,6 +643,44 @@ async fn ingest_handler(
                 Err(e) => {
                     warn!("Auto-watch registration returned for '{}': {}", ingest_res.workspace, e);
                 }
+            }
+        }
+
+        // R-059: Top-Down Worktree Fleet Auto-Cascade
+        // When ingesting a parent trunk repository, automatically discover all child worktrees
+        // from .git/worktrees and cascade their ingestion in the background with auto-watching.
+        if !ingest_res.is_worktree {
+            let parent_path = std::path::PathBuf::from(&path);
+            let discovered_worktrees = crate::ingestion::discover_parent_worktrees(&parent_path);
+            if !discovered_worktrees.is_empty() {
+                info!(
+                    "Discovered {} child git worktrees for parent workspace '{}'; cascading fleet ingestion...",
+                    discovered_worktrees.len(),
+                    ingest_res.workspace
+                );
+                let pipeline_cascade = state.pipeline.clone();
+                let watcher_cascade = state.watcher.clone();
+                tokio::spawn(async move {
+                    for wt in discovered_worktrees {
+                        if let Some(ref wt_root) = wt.root_path {
+                            info!("Auto-cascading ingestion for worktree '{}' at '{}'...", wt.worktree_name, wt_root);
+                            match pipeline_cascade.ingest_directory(wt_root, None, false).await {
+                                Ok(sub_res) => {
+                                    if auto_watch {
+                                        let _ = watcher_cascade.start_watch(wt_root, &sub_res.workspace, None).await;
+                                    }
+                                    info!(
+                                        "Completed auto-cascade for worktree '{}' ({} nodes created)",
+                                        wt.worktree_name, sub_res.nodes_created
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!("Auto-cascade failed for worktree '{}': {}", wt.worktree_name, e);
+                                }
+                            }
+                        }
+                    }
+                });
             }
         }
     }
@@ -1417,6 +1456,77 @@ async fn worktree_delete_handler(
             Json(serde_json::json!({ "error": e })),
         ).into_response(),
     }
+}
+
+/// POST /api/worktrees/sync (R-059)
+/// Automatically inspects parent repositories, discovers all active git worktrees from .git/worktrees,
+/// and cascades background ingestion for any worktree not yet fully indexed or missing live-watch.
+#[derive(Debug, Deserialize)]
+struct WorktreesSyncPayload {
+    workspace: Option<String>,
+}
+
+async fn worktrees_sync_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<WorktreesSyncPayload>,
+) -> impl IntoResponse {
+    let parent_workspaces = match state.db.get_workspaces().await {
+        Ok(ws) => ws,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e })),
+            ).into_response();
+        }
+    };
+
+    let target_filter = payload.workspace.as_deref();
+    let mut cascaded = Vec::new();
+
+    for pw in parent_workspaces {
+        let is_wt = pw.get("is_worktree").and_then(|v| v.as_bool()).unwrap_or(false);
+        if is_wt {
+            continue;
+        }
+        let ws_name = pw.get("workspace").and_then(|v| v.as_str()).unwrap_or("");
+        if let Some(target) = target_filter {
+            if ws_name != target {
+                continue;
+            }
+        }
+        let root_path_str = match pw.get("root_path").and_then(|v| v.as_str()) {
+            Some(p) => p,
+            None => continue,
+        };
+
+        let parent_path = std::path::Path::new(root_path_str);
+        let discovered = crate::ingestion::discover_parent_worktrees(parent_path);
+        for wt in discovered {
+            if let Some(ref wt_root) = wt.root_path {
+                cascaded.push(serde_json::json!({
+                    "worktree": wt.worktree_name,
+                    "branch": wt.branch,
+                    "parent_workspace": wt.parent_workspace,
+                    "root_path": wt_root
+                }));
+                let pipeline_sub = state.pipeline.clone();
+                let watcher_sub = state.watcher.clone();
+                let wt_root_clone = wt_root.clone();
+                tokio::spawn(async move {
+                    if let Ok(res) = pipeline_sub.ingest_directory(&wt_root_clone, None, false).await {
+                        let _ = watcher_sub.start_watch(&wt_root_clone, &res.workspace, None).await;
+                        info!("Completed auto-sync for worktree '{}' ({})", res.workspace, wt_root_clone);
+                    }
+                });
+            }
+        }
+    }
+
+    (StatusCode::OK, Json(serde_json::json!({
+        "status": "cascading",
+        "discovered_worktrees": cascaded.len(),
+        "worktrees": cascaded
+    }))).into_response()
 }
 
 

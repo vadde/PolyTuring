@@ -1492,9 +1492,10 @@ mod worktree_tests {
         let discovered = discover_parent_worktrees(&parent_repo);
         assert_eq!(discovered.len(), 2, "Should discover two worktrees for parent repo");
 
-        let names: Vec<String> = discovered.into_iter().map(|w| w.worktree_name).collect();
+        let names: Vec<String> = discovered.iter().map(|w| w.worktree_name.clone()).collect();
         assert!(names.contains(&"branch-one".to_string()));
         assert!(names.contains(&"branch-two".to_string()));
+        assert!(discovered.iter().all(|w| w.root_path.is_some()), "All discovered worktrees must have root_path");
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

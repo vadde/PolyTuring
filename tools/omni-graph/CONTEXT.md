@@ -26,10 +26,11 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 58 | 58 | 🟢 100% Complete |
-| Acceptance Criteria (AC-XXX) | 24 | 24 | 🟢 100% Complete |
+| Spec Requirements (R-XXX) | 59 | 59 | 🟢 100% Complete |
+| Acceptance Criteria (AC-XXX) | 25 | 25 | 🟢 100% Complete |
 | Non-Functional (NF-XXX) | 11 | 11 | 🟢 100% Complete |
 | Test Coverage | 72/72 Unit & Integration Tests | 72 | 🟢 100% Verified in Docker |
+| Top-Down Worktree Auto-Cascade & Dynamic Sync (R-059) | Complete | — | 🟢 Discover .git/worktrees/*, auto-cascade ingest & watchers |
 | Safe SurrealDB Volume Reset & Automation | Complete | — | 🟢 make reset-graph-db / reset-db preserving TEI cache |
 | Git Worktree Fleet Switcher & Lineage HUD | Complete | — | 🟢 Interactive Strategy Modal, Branch HUD & Top-Bar Breadcrumbs |
 | Polyglot Struct Field & Interface Properties (R-057) | Complete | — | 🟢 Rust, Go, TS, JS Field Nodes with CONTAINS & REFERENCES Edges |

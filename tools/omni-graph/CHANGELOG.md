@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Worktree Visualizer & Branch Navigation (R-056)**: Cosmograph React UI displays worktree indicators, branch tags, and nested worktree switchers in the workspace selector.
   - **Proactive Agent Hook & Remediation (R-057)**: Pre-invocation and pre-tool hooks detect unindexed worktrees and emit one-command self-healing ingest banners.
   - **Rebase Storm Surge Suppression (R-058)**: Idempotent watch registration and event debounce windows prevent CPU thrashing during multi-file git rebases.
+  - **Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync (R-059)**: Ingesting a parent trunk automatically discovers all child worktrees in `.git/worktrees/*`, resolves sibling roots, cascades background ingestion, inherits parent LPA seeds, and enrolls concurrent watchers. Added `POST /api/worktrees/sync`, `make sync-worktrees`, and `omni.sh worktrees sync`.
 
 ## [0.1.1] - 2026-10-07
 

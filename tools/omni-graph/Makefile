@@ -122,6 +122,9 @@ cluster: ## Compute galaxy IDs: make cluster [PROJECT=name]
 workspaces: ## List all partitioned codebases and stats in SurrealDB
 	@./scripts/omni.sh workspaces
 
+sync-worktrees worktrees: ## Auto-discover and cascade ingestion for all git worktrees: make sync-worktrees [PROJECT=name]
+	@./scripts/omni.sh worktrees sync $(if $(PROJECT),$(PROJECT),)
+
 search: ## Fast vector semantic code search: make search Q="<terms>" [PROJECT=name]
 	@if [ -z "$(Q)" ]; then \
 		echo "❌ Missing query argument: make search Q=\"<keywords>\" [PROJECT=name]"; \

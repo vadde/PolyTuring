@@ -438,25 +438,96 @@ flowchart TB
 
           <h3 class="section-h2" id="sec-omni-ebf">Ephemeral Branch Fabric (EBF) & Git Worktrees</h3>
           <p>
-            Coding agents frequently branch or create Git worktrees to isolate experimental code. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong> (Requirements <code>R-051</code> to <code>R-058</code>):
+            Coding agents frequently branch or create Git worktrees to isolate experimental code and execute parallel strategies. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong> (Requirements <code>R-051</code> to <code>R-059</code>):
           </p>
 
           <div class="card-grid">
             <div class="glass-card">
               <h4>⚡ O(1) Worktree Pointer Peeking</h4>
-              <p>Instead of spawning slow subshells (<code>git rev-parse</code>), Omni-Graph reads the <code>.git</code> worktree pointer file directly in Rust in under 5 microseconds, resolving parent repository root, branch name, and lineage.</p>
+              <p>Instead of spawning slow subshells (<code>git rev-parse</code>), Omni-Graph reads the <code>.git</code> worktree pointer file directly in Rust in under 5 microseconds, resolving parent repository root, branch name, and lineage (<code>R-051</code>).</p>
+            </div>
+            <div class="glass-card">
+              <h4>🚀 Top-Down Fleet Auto-Cascade</h4>
+              <p>Ingesting a trunk parent repo automatically inspects <code>.git/worktrees/*</code>, locates all active sibling checkouts, asynchronously indexes each branch, and attaches concurrent live file watchers (<code>R-059</code>).</p>
             </div>
             <div class="glass-card">
               <h4>🌱 Prior LPA Seed Inheritance</h4>
-              <p>When clustering a new worktree, Omni-Graph inherits community IDs from the parent workspace. Only modified files shift, preserving 99% cluster visual stability across branches.</p>
+              <p>When clustering a new worktree, Omni-Graph inherits community IDs from the parent workspace. Only modified files shift, preserving 99% cluster visual stability across branches (<code>R-053</code>).</p>
+            </div>
+            <div class="glass-card">
+              <h4>🔄 Dynamic Fleet Synchronizer</h4>
+              <p><code>POST /api/worktrees/sync</code> sweeps registered workspaces, discovers newly checked-out worktrees, cascades indexing, and aligns watcher daemons without restarts (<code>R-059</code>).</p>
             </div>
             <div class="glass-card">
               <h4>🧹 Automatic Dead Worktree GC</h4>
-              <p>When an agent deletes a temporary worktree, <code>/api/workspaces</code> immediately sweeps SurrealDB and purges dead nodes and edges, eliminating zombie workspace pollution.</p>
+              <p>When an agent deletes a temporary worktree, <code>/api/workspaces</code> immediately sweeps SurrealDB and purges dead nodes, edges, and watchers, eliminating zombie workspace pollution (<code>R-054</code>).</p>
             </div>
             <div class="glass-card">
-              <h4>🌲 Worktree Tree Deduplication</h4>
-              <p>Worktrees are cleanly nested under their parent workspace (<code>worktrees: [...]</code>), omitting duplicate top-level listings while offering <code>?flat=true</code> for legacy callers.</p>
+              <h4>🌲 Worktree Hierarchy & Delta UI</h4>
+              <p>Worktrees are cleanly nested under their parent repository (<code>worktrees: [...]</code>), with branch selectors and glowing delta halos for modified AST nodes in Cosmograph (<code>R-055</code>, <code>R-056</code>).</p>
+            </div>
+          </div>
+
+          <!-- Interactive Zoomable Canvas: EBF Multi-Worktree Architecture -->
+          <div class="canvas-container">
+            <div class="canvas-header-bar">
+              <span class="canvas-type-tag">Architecture Blueprint · Ephemeral Branch Fabric (EBF)</span>
+              <div class="canvas-controls-group">
+                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                <span class="zoom-level-badge">100%</span>
+                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                  <span>Theater</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-viewport">
+              <div class="canvas-content-surface">
+                <pre class="mermaid">
+flowchart TB
+    Trunk["Trunk Workspace (Parent)<br/>e.g. tutor-intelligence"]
+
+    subgraph GitWorktrees["Git Worktree Directory (.git/worktrees/*)"]
+        WT1[".git/worktrees/ti-strat-089"]
+        WT2[".git/worktrees/ti-strat-090"]
+        WT3[".git/worktrees/ti-strat-091"]
+        WT4[".git/worktrees/ti-strat-092"]
+    end
+
+    subgraph EBFEngine["Omni-Graph EBF Core (Rust Axum Engine)"]
+        Peeker["O(1) Worktree Peeker<br/>Resolves gitdir and lineage"]
+        Cascade["Top-Down Auto-Cascade<br/>Asynchronous Background Ingestion"]
+        LPAInherit["Seed-Preserving LPA<br/>Inherits parent community IDs"]
+        WatcherPool["Notify Watcher Pool<br/>Multi-Path Concurrent Daemon"]
+    end
+
+    subgraph Storage["SurrealDB v2 Isolation"]
+        DB_Trunk["workspace: tutor-intelligence"]
+        DB_WT1["workspace: ti-strat-089"]
+        DB_WT2["workspace: ti-strat-090"]
+        DB_WT3["workspace: ti-strat-091"]
+        DB_WT4["workspace: ti-strat-092"]
+    end
+
+    Trunk --> Peeker
+    Peeker --> GitWorktrees
+    GitWorktrees --> Cascade
+    Cascade --> LPAInherit
+    Cascade --> WatcherPool
+    LPAInherit --> Storage
+    WatcherPool -.->|Live Invalidation| Storage
+                </pre>
+              </div>
+            </div>
+            <div class="canvas-caption">Figure 1.2: Ephemeral Branch Fabric (EBF) Multi-Worktree Auto-Cascade & Live-Watch Dataflow</div>
+          </div>
+
+          <div class="callout callout-theory">
+            <div class="callout-header">Multi-Worktree Concurrency & Branch Isolation</div>
+            <div class="callout-body">
+              When parallel AI agents develop multiple strategies simultaneously (such as <code>ti-strat-089</code> through <code>ti-strat-092</code>), EBF enforces strict SurrealDB record-level partition isolation (<code>workspace = "&lt;worktree_id&gt;"</code>) while sharing the parent LPA community cluster seeds. Each worktree enjoys independent sub-100ms incremental file watching without cross-talk or lock contention.
             </div>
           </div>
 
@@ -612,6 +683,7 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
                 <option value="galaxies">GET /api/galaxies (Subsystem Clustering)</option>
                 <option value="workspaces">GET /api/workspaces (Hierarchy Lineage)</option>
                 <option value="worktrees">GET /api/worktrees (Active Git Worktrees)</option>
+                <option value="sync-worktrees">POST /api/worktrees/sync (Fleet Dynamic Alignment)</option>
                 <option value="ingest">POST /api/ingest (Codebase Ingestion)</option>
               </select>
             </div>

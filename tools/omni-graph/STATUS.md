@@ -115,6 +115,7 @@ spec: ../../specs/catalog/omni-graph.md
 | R-056 | Worktree Visualizer & Branch Navigation in UI | `ui/src/App.tsx` | — | ✅ |
 | R-057 | Proactive Agent Hook & Worktree Auto-Remediation Banner | `.agents/scripts/`, `scripts/` | `tests/unit_tests.rs` | ✅ |
 | R-058 | Rebase Storm Debouncing & Surge Suppression | `src/watcher/` | `tests/unit_tests.rs` | ✅ |
+| R-059 | Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync | `src/ingestion/worktree.rs`, `src/api/` | `tests/unit_tests.rs` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

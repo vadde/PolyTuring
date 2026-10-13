@@ -54,6 +54,7 @@ A forensic audit of Omni-Graph revealed nine architectural vulnerabilities and f
 | **R-056** | **UI Worktree Switcher & Delta Visualizer**: React/Cosmograph UI provides branch selector under parent workspace with live watching status pulse and glowing delta halos for branch-modified nodes. | P1 | UI renders branch selector and highlights modified nodes. |
 | **R-057** | **Worktree-Aware PreToolUse & PreInvocation Hooks**: Hook scripts resolve worktree lineage and provide tailored single-command sync banners that auto-attach watch daemons. | P0 | Hooks recognize worktrees and trigger zero-friction auto-sync. |
 | **R-058** | **Cross-Branch Symbol Diff API**: `GET /api/diff?worktree=<name>&parent=<parent>` compares worktree AST nodes against parent baseline to isolate branch blast radius. | P2 | Returns added, modified, and removed symbols across branches. |
+| **R-059** | **Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync**: When ingesting a parent trunk repository, automatically discover all sibling Git worktrees via `.git/worktrees/*`, cascade background ingestion to each worktree, inherit LPA seeds, attach live file watchers concurrently, and expose `POST /api/worktrees/sync` for on-demand fleet alignment. | P0 | Verified via `POST /api/worktrees/sync`, trunk auto-cascade, and parallel strategy worktrees on `tutor-intelligence`. |
 
 ---
 

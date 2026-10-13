@@ -10,6 +10,7 @@ pub struct WorktreeInfo {
     pub parent_repo_path: String,
     pub parent_workspace: String,
     pub branch: Option<String>,
+    pub root_path: Option<String>,
 }
 
 /// Detect if a given directory path is a Git worktree by inspecting the `.git` file pointer.
@@ -78,6 +79,7 @@ pub fn detect_git_worktree(path: &Path) -> Option<WorktreeInfo> {
         parent_repo_path: parent_repo_path.to_string_lossy().to_string(),
         parent_workspace,
         branch,
+        root_path: Some(path.to_string_lossy().to_string()),
     })
 }
 
@@ -133,6 +135,7 @@ pub fn discover_parent_worktrees(parent_repo_path: &Path) -> Vec<WorktreeInfo> {
                         parent_repo_path: parent_repo_path.to_string_lossy().to_string(),
                         parent_workspace: parent_workspace.clone(),
                         branch,
+                        root_path: Some(target_worktree_root.to_string_lossy().to_string()),
                     });
                 }
             }

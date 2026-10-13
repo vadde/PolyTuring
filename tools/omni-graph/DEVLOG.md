@@ -1949,4 +1949,47 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
 - **Make Commands**: `make help` and `make -C tools/omni-graph help` reflect `reset-graph-db` and `reset-db`.
 - **SurrealDB Bootstrapping**: Fresh DB initialized and verified with empty table baseline.
 
+---
+
+### 2026-10-13 — Ephemeral Branch Fabric (EBF): Top-Down Fleet Auto-Cascade, Dynamic Sync & Docs Portal
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `in-progress` (v0.2.2: Ephemeral Branch Fabric Fleet Synchronization)  
+**Branch**: `main`  
+**Duration**: ~45m  
+
+#### Context & Motivation
+- Parallel development using Git worktrees (e.g. `tutor-intelligence` with multiple experimental strategy branches `ti-strat-089` through `ti-strat-092`) required a seamless, zero-friction indexing mechanism.
+- Previously, ingesting a parent trunk repository did not automatically cascade to its child worktrees unless each worktree path was manually and individually requested.
+- User-facing marketing and architecture static pages needed to document the multi-worktree parallel architecture, dynamic synchronizer, and container dataflow invariants.
+
+#### Key Features & Remediations Implemented
+1. **Top-Down Worktree Fleet Auto-Cascade (R-059)**:
+   - Enhanced `WorktreeInfo` struct in `src/ingestion/worktree.rs` with `pub root_path: Option<String>` populated in both `detect_git_worktree` and `discover_parent_worktrees`.
+   - Wired `discover_parent_worktrees` inside `ingest_handler` (`src/api/mod.rs`). When a parent trunk repository is ingested, Omni-Graph automatically inspects `<trunk>/.git/worktrees/*`, resolves sibling checkout paths, and cascades asynchronous ingestion and watcher enrollment to every child worktree in the background.
+2. **Dynamic Worktree Fleet Synchronizer Endpoint & Tooling**:
+   - Added `POST /api/worktrees/sync` endpoint in Rust Axum orchestrator to sweep registered workspaces, detect newly branched worktrees, cascade indexing, and align file watcher daemons.
+   - Added `worktrees [sync]` command to `scripts/omni.sh` and updated `workspaces` display to render nested branch tree hierarchy (`└── 🌿 <branch> (<worktree>) <nodes> nodes`).
+   - Added `sync-worktrees` make target to root `Makefile` and `tools/omni-graph/Makefile`.
+3. **Multi-Worktree Concurrency & Fleet Isolation**:
+   - Concurrently indexed and enrolled all 4 `tutor-intelligence` strategy worktrees (`ti-strat-089`, `ti-strat-090`, `ti-strat-091`, `ti-strat-092`).
+   - Verified 5 concurrent `notify` file watcher daemons operating with isolated SurrealDB partition keys (`workspace = "<worktree_id>"`), preventing cross-talk while maintaining $99\%+$ LPA cluster stability via parent seed inheritance.
+4. **Living Documentation Portal Synchronization**:
+   - Expanded Section 01 (`#sec-omni-ebf`) in `docs/site/index.html` to document R-051 through R-059 with a 6-card grid.
+   - Added Zoomable Canvas with Mermaid Architecture Blueprint (Figure 1.2) detailing EBF multi-worktree dataflow and storage partition isolation.
+   - Added `POST /api/worktrees/sync` curl generator to the interactive API Playground in `docs/site/index.html` and `docs/site/app.js`.
+   - Verified that all 4 Mermaid SVGs rendered cleanly in Headless Chrome via `.agents/skills/docs-portal/scripts/test-docs.sh` (or `make docs-test`).
+   - Built production documentation bundle via `scripts/build-docs.sh`.
+5. **SDD & Specification Tracking**:
+   - Formalized Requirement R-059 in `specs/catalog/omni-graph-hardening.md`.
+   - Updated Traceability Matrix in `STATUS.md` and Version History in `CHANGELOG.md`.
+
+#### Verification & Quality Gates
+- **Rust Unit Tests**: 72/72 tests passing in Docker (`make -C tools/omni-graph test-rust`).
+- **Clippy**: 0 warnings with `-D warnings` (`make -C tools/omni-graph lint-rust`).
+- **UI TypeScript & Bundling**: 0 errors (`npm --prefix tools/omni-graph/ui run build`).
+- **Docs Portal Test Suite**: 6/6 checks passed, Headless Chrome rendered all 4 Mermaid diagrams cleanly.
+- **Fleet Verification**: `make workspaces` displays parent `tutor-intelligence` with all 4 strategy worktrees nested, active, and live-watched.
+
+
 
