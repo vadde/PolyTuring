@@ -32,10 +32,13 @@ import {
   RotateCcw,
   CheckCircle,
   AlertCircle,
+  GitBranch,
 } from 'lucide-react';
 import AgentAnalytics from './AgentAnalytics';
 import BoundaryContractCard from './BoundaryContractCard';
 import SubsystemTopologyHub, { GalaxyRecord, GalaxyDependencyEdge } from './SubsystemTopologyHub';
+import { WorktreeFleetModal } from './WorktreeFleetModal';
+import { SymbolProvenanceInspector } from './SymbolProvenanceInspector';
 
 interface GraphNode {
   id: string;
@@ -169,10 +172,52 @@ export default function App() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const selectedWorkspaceRef = useRef<string | null>(selectedWorkspace);
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const [isWorktreeFleetOpen, setIsWorktreeFleetOpen] = useState(false);
+  const [workspaceSearchTerm, setWorkspaceSearchTerm] = useState('');
 
   useEffect(() => {
     selectedWorkspaceRef.current = selectedWorkspace;
   }, [selectedWorkspace]);
+
+  // Filtered workspaces for codebase selection search bar
+  const filteredWorkspaces = useMemo(() => {
+    if (!workspaceSearchTerm.trim()) return workspaces;
+    const term = workspaceSearchTerm.toLowerCase();
+    return workspaces.filter((ws) => {
+      const wsMatches =
+        ws.workspace.toLowerCase().includes(term) ||
+        (ws.branch && ws.branch.toLowerCase().includes(term)) ||
+        ws.languages?.some((l) => l.toLowerCase().includes(term));
+      const wtMatches = ws.worktrees?.some(
+        (wt) =>
+          wt.workspace.toLowerCase().includes(term) ||
+          wt.branch?.toLowerCase().includes(term)
+      );
+      return wsMatches || wtMatches;
+    });
+  }, [workspaces, workspaceSearchTerm]);
+
+  // Worktree Lineage & Sibling Fleet Resolution
+  const activeParentWorkspace = useMemo(() => {
+    if (!selectedWorkspace) return null;
+    return (
+      workspaces.find(
+        (w) =>
+          w.workspace === selectedWorkspace ||
+          w.worktrees?.some((wt) => wt.workspace === selectedWorkspace)
+      ) || null
+    );
+  }, [workspaces, selectedWorkspace]);
+
+  const isCurrentAWorktree = useMemo(() => {
+    if (!selectedWorkspace || !activeParentWorkspace) return false;
+    return activeParentWorkspace.workspace !== selectedWorkspace;
+  }, [selectedWorkspace, activeParentWorkspace]);
+
+  const currentWorktreeInfo = useMemo(() => {
+    if (!isCurrentAWorktree || !activeParentWorkspace) return null;
+    return activeParentWorkspace.worktrees?.find((wt) => wt.workspace === selectedWorkspace) || null;
+  }, [isCurrentAWorktree, activeParentWorkspace, selectedWorkspace]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -470,6 +515,7 @@ export default function App() {
   const handleSelectWorkspace = (ws: string | null) => {
     setSelectedWorkspace(ws);
     setIsWorkspaceDropdownOpen(false);
+    setWorkspaceSearchTerm('');
     setSelectedNode(null);
     setNodeHistory([]);
     setSelectedClusterId(null);
@@ -970,32 +1016,146 @@ export default function App() {
             </span>
           </div>
 
-          {/* Workspace Filter Dropdown */}
-          <div ref={workspaceDropdownRef} style={{ position: 'relative', marginLeft: 8 }}>
-            <button
-              type="button"
-              onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-              className="cyber-button-secondary"
-              style={{
-                borderRadius: 20,
-                padding: '5px 12px',
-                background: selectedWorkspace ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.06)',
-                borderColor: selectedWorkspace ? 'rgba(56, 189, 248, 0.5)' : 'rgba(255, 255, 255, 0.15)',
-              }}
-            >
-              <Globe size={14} color={selectedWorkspace ? 'var(--accent-cyan)' : 'var(--text-secondary)'} />
-              <span style={{ fontWeight: 600, fontSize: '0.78rem' }}>
-                {selectedWorkspace ? `📁 ${selectedWorkspace}` : '🌐 All Workspaces (Omniverse)'}
-              </span>
-              <ChevronDown
-                size={14}
-                color="var(--text-muted)"
-                style={{
-                  transform: isWorkspaceDropdownOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform 0.2s ease',
-                }}
-              />
-            </button>
+          {/* Workspace Filter & Lineage HUD */}
+          <div ref={workspaceDropdownRef} style={{ position: 'relative', marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {isCurrentAWorktree && activeParentWorkspace ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleSelectWorkspace(activeParentWorkspace.workspace)}
+                  style={{
+                    borderRadius: 16,
+                    padding: '4px 10px',
+                    background: 'rgba(168, 85, 247, 0.16)',
+                    border: '1px solid rgba(168, 85, 247, 0.45)',
+                    color: '#c084fc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={`Parent Trunk: ${activeParentWorkspace.workspace} (Click to switch to Trunk)`}
+                >
+                  <Folder size={13} color="#c084fc" />
+                  <span>{activeParentWorkspace.workspace}</span>
+                </button>
+
+                <span style={{ color: 'var(--accent-cyan)', fontSize: '0.75rem', opacity: 0.8, userSelect: 'none' }}>
+                  ──▶
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+                  style={{
+                    borderRadius: 16,
+                    padding: '4px 12px',
+                    background: 'rgba(34, 197, 94, 0.16)',
+                    border: '1px solid rgba(34, 197, 94, 0.55)',
+                    color: '#4ade80',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    boxShadow: '0 0 12px rgba(34, 197, 94, 0.2)',
+                  }}
+                  title={`Active Strategy Worktree: ${currentWorktreeInfo?.branch || selectedWorkspace}`}
+                >
+                  <span>🌿</span>
+                  <span>{selectedWorkspace}</span>
+                  <ChevronDown
+                    size={13}
+                    color="#86efac"
+                    style={{
+                      transform: isWorkspaceDropdownOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s ease',
+                    }}
+                  />
+                </button>
+
+                {activeParentWorkspace.worktrees && activeParentWorkspace.worktrees.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsWorktreeFleetOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      borderRadius: 14,
+                      padding: '4px 9px',
+                      background: 'rgba(168, 85, 247, 0.15)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      color: '#c084fc',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                    }}
+                    title="Open Git Worktree Fleet & Strategy Switcher"
+                  >
+                    <GitBranch size={13} />
+                    <span>{activeParentWorkspace.worktrees.length} Strategies ▾</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+                  className="cyber-button-secondary"
+                  style={{
+                    borderRadius: 20,
+                    padding: '5px 12px',
+                    background: selectedWorkspace ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.06)',
+                    borderColor: selectedWorkspace ? 'rgba(56, 189, 248, 0.5)' : 'rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  <Globe size={14} color={selectedWorkspace ? 'var(--accent-cyan)' : 'var(--text-secondary)'} />
+                  <span style={{ fontWeight: 600, fontSize: '0.78rem' }}>
+                    {selectedWorkspace ? `📁 ${selectedWorkspace}` : '🌐 All Workspaces (Omniverse)'}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    color="var(--text-muted)"
+                    style={{
+                      transform: isWorkspaceDropdownOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s ease',
+                    }}
+                  />
+                </button>
+
+                {activeParentWorkspace?.worktrees && activeParentWorkspace.worktrees.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsWorktreeFleetOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      borderRadius: 14,
+                      padding: '4px 9px',
+                      background: 'rgba(34, 197, 94, 0.15)',
+                      border: '1px solid rgba(34, 197, 94, 0.4)',
+                      color: '#4ade80',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                    }}
+                    title="Open Git Worktree Fleet & Strategy Switcher"
+                  >
+                    <GitBranch size={13} />
+                    <span>{activeParentWorkspace.worktrees.length} Worktrees ▾</span>
+                  </button>
+                )}
+              </>
+            )}
 
             {isWorkspaceDropdownOpen && (
               <div
@@ -1004,8 +1164,8 @@ export default function App() {
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   left: 0,
-                  width: 290,
-                  maxHeight: '70vh',
+                  width: 320,
+                  maxHeight: '75vh',
                   overflowY: 'auto',
                   zIndex: 110,
                   padding: 8,
@@ -1016,111 +1176,414 @@ export default function App() {
                   boxShadow: '0 20px 40px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.12)',
                 }}
               >
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', padding: '4px 8px', fontWeight: 600 }}>
-                  SELECT ACTIVE CODEBASE
+                {/* Search Filter Input */}
+                <div style={{ position: 'relative', marginBottom: 4, padding: '2px 4px' }}>
+                  <Search size={13} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    value={workspaceSearchTerm}
+                    onChange={(e) => setWorkspaceSearchTerm(e.target.value)}
+                    placeholder="Filter workspaces..."
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '6px 26px 6px 28px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 6,
+                      color: 'var(--text-primary)',
+                      fontSize: '0.75rem',
+                      outline: 'none',
+                    }}
+                  />
+                  {workspaceSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceSearchTerm('')}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: 7,
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSelectWorkspace(null)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    background: selectedWorkspace === null ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
-                    border: 'none',
-                    color: selectedWorkspace === null ? 'var(--accent-cyan)' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    textAlign: 'left',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedWorkspace !== null) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedWorkspace !== null) e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Globe size={14} />
-                    <span>All Workspaces (Omniverse)</span>
-                  </div>
-                  {selectedWorkspace === null && <Check size={14} />}
-                </button>
 
-                {workspaces.map((ws) => (
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', padding: '2px 8px', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>SELECT ACTIVE CODEBASE</span>
+                  {workspaceSearchTerm && (
+                    <span>{filteredWorkspaces.length} matches</span>
+                  )}
+                </div>
+
+                {(!workspaceSearchTerm || 'all workspaces (omniverse)'.includes(workspaceSearchTerm.toLowerCase())) && (
                   <button
-                    key={ws.workspace}
                     type="button"
-                    onClick={() => handleSelectWorkspace(ws.workspace)}
+                    onClick={() => handleSelectWorkspace(null)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '8px 10px',
                       borderRadius: 6,
-                      background: selectedWorkspace === ws.workspace ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
+                      background: selectedWorkspace === null ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
                       border: 'none',
-                      color: selectedWorkspace === ws.workspace ? 'var(--accent-cyan)' : 'var(--text-primary)',
+                      color: selectedWorkspace === null ? 'var(--accent-cyan)' : 'var(--text-primary)',
                       cursor: 'pointer',
                       fontSize: '0.8rem',
                       textAlign: 'left',
                       transition: 'all 0.15s ease',
                     }}
                     onMouseEnter={(e) => {
-                      if (selectedWorkspace !== ws.workspace) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                      if (selectedWorkspace !== null) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
                     }}
                     onMouseLeave={(e) => {
-                      if (selectedWorkspace !== ws.workspace) e.currentTarget.style.background = 'transparent';
+                      if (selectedWorkspace !== null) e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <div style={{ width: '100%' }}>
-                      <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{ws.is_worktree ? '🌿' : '📁'}</span>
-                        <span>{ws.workspace}</span>
-                        {ws.branch && (
-                          <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>
-                            {ws.branch}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {ws.total_nodes} nodes • {ws.languages.join(', ')}
-                        {ws.parent_workspace && ` • branch of ${ws.parent_workspace}`}
-                      </div>
-                      {ws.worktrees && ws.worktrees.length > 0 && (
-                        <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: '2px solid rgba(34, 197, 94, 0.4)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {ws.worktrees.map((wt) => (
-                            <div
-                              key={wt.workspace}
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                handleSelectWorkspace(wt.workspace);
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Globe size={14} />
+                      <span>All Workspaces (Omniverse)</span>
+                    </div>
+                    {selectedWorkspace === null && <Check size={14} />}
+                  </button>
+                )}
+
+                {filteredWorkspaces.map((ws) => {
+                  const isTrunkActive = selectedWorkspace === ws.workspace;
+                  const hasWorktrees = ws.worktrees && ws.worktrees.length > 0;
+                  const hasActiveChildWorktree = hasWorktrees && ws.worktrees!.some((wt) => selectedWorkspace === wt.workspace);
+
+                  return (
+                    <div
+                      key={ws.workspace}
+                      style={{
+                        marginBottom: 10,
+                        borderRadius: 10,
+                        background: isTrunkActive
+                          ? 'rgba(56, 189, 248, 0.08)'
+                          : hasActiveChildWorktree
+                          ? 'rgba(34, 197, 94, 0.05)'
+                          : 'rgba(255, 255, 255, 0.02)',
+                        border: isTrunkActive
+                          ? '1px solid rgba(56, 189, 248, 0.45)'
+                          : hasActiveChildWorktree
+                          ? '1px solid rgba(34, 197, 94, 0.35)'
+                          : '1px solid rgba(255, 255, 255, 0.07)',
+                        padding: '6px',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {/* Main Origin / Trunk Row */}
+                      <div
+                        onClick={() => handleSelectWorkspace(ws.workspace)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          borderRadius: 7,
+                          background: isTrunkActive ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          border: isTrunkActive ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid transparent',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isTrunkActive) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isTrunkActive) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.borderColor = 'transparent';
+                          }
+                        }}
+                        title={`Click to activate main codebase: ${ws.workspace}`}
+                      >
+                        <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
+                          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.95rem' }}>{ws.is_worktree ? '🌿' : '📁'}</span>
+                            <span style={{ color: isTrunkActive ? 'var(--accent-cyan)' : '#f8fafc', fontSize: '0.84rem' }}>
+                              {ws.workspace}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.62rem',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                background: ws.is_worktree ? 'rgba(34, 197, 94, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                                color: ws.is_worktree ? '#4ade80' : '#38bdf8',
+                                fontWeight: 600,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
                               }}
+                            >
+                              {ws.is_worktree ? 'Worktree' : 'Trunk Root'}
+                            </span>
+                            {ws.branch && (
+                              <span
+                                style={{
+                                  fontSize: '0.62rem',
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: 'rgba(34, 197, 94, 0.15)',
+                                  color: '#86efac',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {ws.branch}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                            {ws.total_nodes.toLocaleString()} AST nodes • {ws.languages.join(', ')}
+                          </div>
+                        </div>
+
+                        {/* Trunk Action Indicator */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {isTrunkActive ? (
+                            <span
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
+                                gap: 4,
                                 fontSize: '0.7rem',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                color: selectedWorkspace === wt.workspace ? 'var(--accent-cyan)' : 'var(--text-muted)',
-                                cursor: 'pointer',
-                                background: selectedWorkspace === wt.workspace ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                background: 'rgba(56, 189, 248, 0.25)',
+                                color: 'var(--accent-cyan)',
+                                fontWeight: 700,
+                                border: '1px solid rgba(56, 189, 248, 0.6)',
+                                boxShadow: '0 0 10px rgba(56, 189, 248, 0.2)',
                               }}
                             >
-                              <span>🌿 {wt.branch || wt.workspace}</span>
-                              <span style={{ fontSize: '0.65rem' }}>{wt.total_nodes} nodes</span>
-                            </div>
-                          ))}
+                              <Check size={12} /> Active Canvas
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '3px 7px',
+                                borderRadius: 5,
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'var(--text-secondary)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              Load Trunk
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Worktree Fleet Sub-Section if Present */}
+                      {hasWorktrees && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            paddingTop: 6,
+                            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                            paddingLeft: 6,
+                            paddingRight: 4,
+                            paddingBottom: 4,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                          }}
+                        >
+                          {/* Worktree Subhead Banner */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '2px 4px 4px 4px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '0.64rem',
+                                fontWeight: 700,
+                                letterSpacing: '0.04em',
+                                color: '#4ade80',
+                                textTransform: 'uppercase',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <span>🌿</span> Git Worktree Branches ({ws.worktrees!.length})
+                            </span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                              Each is an independent clickable graph
+                            </span>
+                          </div>
+
+                          {/* Individual Worktree Action Cards */}
+                          {ws.worktrees!.map((wt) => {
+                            const isWtActive = selectedWorkspace === wt.workspace;
+                            return (
+                              <div
+                                key={wt.workspace}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  handleSelectWorkspace(wt.workspace);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '7px 10px',
+                                  borderRadius: 6,
+                                  background: isWtActive
+                                    ? 'rgba(34, 197, 94, 0.18)'
+                                    : 'rgba(15, 23, 42, 0.65)',
+                                  border: isWtActive
+                                    ? '1px solid rgba(34, 197, 94, 0.6)'
+                                    : '1px solid rgba(255, 255, 255, 0.06)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  marginLeft: 6,
+                                  borderLeft: isWtActive
+                                    ? '3px solid #4ade80'
+                                    : '3px solid rgba(34, 197, 94, 0.5)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isWtActive) {
+                                    e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)';
+                                    e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+                                    e.currentTarget.style.transform = 'translateX(2px)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isWtActive) {
+                                    e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)';
+                                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+                                    e.currentTarget.style.transform = 'none';
+                                  }
+                                }}
+                                title={`Switch active 3D star map and live watcher to branch: ${wt.branch || wt.workspace}`}
+                              >
+                                <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.78rem' }}>🌿</span>
+                                    <span
+                                      style={{
+                                        fontSize: '0.76rem',
+                                        fontFamily: 'monospace',
+                                        fontWeight: 700,
+                                        color: isWtActive ? '#86efac' : '#f1f5f9',
+                                      }}
+                                    >
+                                      {wt.branch || wt.workspace}
+                                    </span>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                      ({wt.workspace})
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                    {wt.total_nodes.toLocaleString()} AST nodes • Live Sync Ready
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                  {isWtActive ? (
+                                    <span
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        fontSize: '0.68rem',
+                                        padding: '2px 8px',
+                                        borderRadius: 5,
+                                        background: 'rgba(34, 197, 94, 0.25)',
+                                        color: '#4ade80',
+                                        fontWeight: 700,
+                                        border: '1px solid rgba(34, 197, 94, 0.6)',
+                                        boxShadow: '0 0 10px rgba(34, 197, 94, 0.25)',
+                                      }}
+                                    >
+                                      <Check size={11} /> Active Worktree
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        padding: '3px 8px',
+                                        borderRadius: 5,
+                                        background: 'rgba(34, 197, 94, 0.12)',
+                                        color: '#86efac',
+                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        fontWeight: 600,
+                                        transition: 'all 0.15s ease',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 3,
+                                      }}
+                                    >
+                                      Switch Graph ↗
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Fleet Modal Quick Launcher */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 3 }}>
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setIsWorktreeFleetOpen(true);
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#c084fc',
+                                fontSize: '0.66rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <GitBranch size={11} /> Open Full Worktree Fleet Lineage ({ws.worktrees!.length} branches)...
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
-                    {selectedWorkspace === ws.workspace && <Check size={14} />}
-                  </button>
-                ))}
+                  );
+                })}
+
+                {workspaces.length > 0 && filteredWorkspaces.length === 0 && (
+                  <div style={{ padding: '12px 10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    No codebases matching "{workspaceSearchTerm}"
+                  </div>
+                )}
 
                 {workspaces.length === 0 && (
                   <div style={{ padding: '8px 10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -2305,6 +2768,26 @@ export default function App() {
               };
               setNodeHistory((prev) => [...prev, selectedNode]);
               setSelectedNode(resolvedNode);
+            }}
+          />
+
+          {/* Symbol Provenance & Lineage Inspector */}
+          <SymbolProvenanceInspector
+            symbol={selectedNode.label}
+            workspace={selectedNode.workspace || selectedWorkspace || 'tool-scripts'}
+            parentWorkspace={workspaces.find((w) => w.workspace === (selectedNode.workspace || selectedWorkspace))?.parent_workspace}
+            filePath={selectedNode.file_path}
+            lineStart={selectedNode.line_start}
+            onSelectSymbol={(symName) => {
+              const targetNode = nodes.find(
+                (n) => n.label === symName ||
+                       n.label.endsWith(`::${symName}`) ||
+                       n.label.endsWith(`.${symName}`)
+              );
+              if (targetNode) {
+                setNodeHistory((prev) => [...prev, selectedNode]);
+                setSelectedNode(targetNode);
+              }
             }}
           />
 
@@ -3911,6 +4394,19 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Git Worktree Fleet & Multi-Strategy Switcher Modal */}
+      <WorktreeFleetModal
+        isOpen={isWorktreeFleetOpen}
+        onClose={() => setIsWorktreeFleetOpen(false)}
+        parentWorkspace={activeParentWorkspace}
+        selectedWorkspace={selectedWorkspace}
+        onSelectWorkspace={(ws) => {
+          handleSelectWorkspace(ws);
+          setIsWorktreeFleetOpen(false);
+        }}
+        watchers={activeWatchers}
+      />
     </div>
   );
 }
