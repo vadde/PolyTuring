@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-//go:embed web/dist/*
+//go:embed all:web/dist
 var staticFiles embed.FS
 
 //go:embed openapi.json

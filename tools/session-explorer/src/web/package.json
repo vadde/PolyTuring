@@ -3,10 +3,12 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "export PATH=\"$HOME/.bun/bin:$PATH\" && bun build src/app.js --outfile dist/app.bundle.js --target browser --minify && cp index.html dist/index.html && cat node_modules/highlight.js/styles/github-dark.css src/styles.css > dist/styles.css"
+    "build": "export PATH=\"$HOME/.bun/bin:$PATH\" && bun build src/app.js --outfile dist/app.bundle.js --target browser --minify && cp index.html dist/index.html && mkdir -p dist/fonts && cp -r node_modules/katex/dist/fonts/* dist/fonts/ && cat node_modules/highlight.js/styles/github-dark.css node_modules/katex/dist/katex.min.css src/styles.css > dist/styles.css"
   },
   "dependencies": {
     "highlight.js": "^11.12.0",
-    "marked": "^18.0.13"
+    "katex": "^0.19.0",
+    "marked": "^18.0.13",
+    "mermaid": "^12.2.0"
   }
 }

@@ -83,6 +83,7 @@ blockers: []
 | 2026-10-14 | Dual-mode agent WIP recovery script (`wip.sh`) | Probes background daemon first; cleanly falls back to headless CLI binary if daemon is offline |
 | 2026-10-14 | Embedded OpenAPI 3.0 & interactive Swagger UI | Single-click accessibility via `/docs` and `/api/openapi.json` with zero external network dependencies |
 | 2026-10-14 | Public documentation hygiene | Strict invariant: Scrub all internal SDLC requirement tickets (`R-XXX`) from public static documentation |
+| 2026-10-14 | Multi-lens Markdown & LaTeX rendering | Embedded KaTeX (fonts + MathML) and Mermaid (client-side dark theme) with clipboard file link handling and responsive tables |
 
 ---
 

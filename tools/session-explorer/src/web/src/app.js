@@ -5,19 +5,191 @@
 
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+import katex from 'katex';
+import mermaid from 'mermaid';
 
-// Configure marked with highlight.js syntax highlighter
-const renderer = {
-  code({ text, lang }) {
-    const validLang = !!(lang && hljs.getLanguage(lang));
-    const highlighted = validLang
-      ? hljs.highlight(text, { language: lang }).value
-      : hljs.highlightAuto(text).value;
-    return `<pre><code class="hljs ${validLang ? 'language-' + lang : ''}">${highlighted}</code></pre>`;
+// Initialize Mermaid with Dark Glass theme
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'loose',
+  fontFamily: 'Inter, system-ui, sans-serif',
+  themeVariables: {
+    darkMode: true,
+    background: 'transparent',
+    primaryColor: '#38bdf8',
+    primaryTextColor: '#f8fafc',
+    primaryBorderColor: 'rgba(56, 189, 248, 0.4)',
+    lineColor: '#94a3b8',
+    secondaryColor: '#a855f7',
+    tertiaryColor: '#1e293b'
+  }
+});
+
+// Heuristic to distinguish mathematical expressions ($Y=0$, $40 \times 40$) from currency ($100, $10-$20)
+function isLikelyMath(inner) {
+  if (!inner) return false;
+  // If it contains LaTeX backslash commands (\approx, \text, \implies, etc.), it is math
+  if (/\\\w+/.test(inner)) return true;
+  // If it contains mathematical operators, subscripts, superscripts, or relations
+  if (/[\^_=<>~±×÷≠≤≥]/.test(inner)) return true;
+  // If it starts with a digit, exclude pure currency numbers or currency ranges ($100, $25.50, $10 - $20)
+  if (/^\d/.test(inner)) {
+    if (/^\d+(?:[.,]\d+)?(?:\s*[-–—]\s*\$?\d+(?:[.,]\d+)?)?$/.test(inner)) {
+      return false;
+    }
+  }
+  // Single variable (e.g. x, n, i, j, k, T, Y) or algebraic expression (e.g. n + 1)
+  if (/^[a-zA-Z]$/.test(inner) || /^[a-zA-Z]\s*[\+\-\*\/]\s*[a-zA-Z0-9]/.test(inner)) return true;
+  // Non-digit without currency words
+  if (!/^\d/.test(inner) && !/\b(dollars?|cents?|usd|eur|gbp)\b/i.test(inner)) return true;
+  return false;
+}
+
+// KaTeX Block Math Extension ($$ ... $$ and \[ ... \])
+const mathBlockExt = {
+  name: 'mathBlock',
+  level: 'block',
+  start(src) {
+    const idx1 = src.indexOf('$$');
+    const idx2 = src.indexOf('\\[');
+    if (idx1 === -1) return idx2 === -1 ? undefined : idx2;
+    if (idx2 === -1) return idx1;
+    return Math.min(idx1, idx2);
+  },
+  tokenizer(src) {
+    const match1 = /^\$\$([\s\S]+?)\$\$/.exec(src);
+    if (match1) {
+      return { type: 'mathBlock', raw: match1[0], text: match1[1].trim() };
+    }
+    const match2 = /^\\\[([\s\S]+?)\\\]/.exec(src);
+    if (match2) {
+      return { type: 'mathBlock', raw: match2[0], text: match2[1].trim() };
+    }
+  },
+  renderer(token) {
+    try {
+      const rendered = katex.renderToString(token.text, { displayMode: true, throwOnError: false, errorColor: '#f87171' });
+      return `<div class="katex-math-block">${rendered}</div>`;
+    } catch (e) {
+      return `<pre class="katex-math-error"><code>${escapeHtml(token.text)}</code></pre>`;
+    }
   }
 };
 
-marked.use({ renderer, breaks: true, gfm: true });
+// KaTeX Inline Math Extension ($ ... $ and \( ... \))
+const inlineMathExt = {
+  name: 'inlineMath',
+  level: 'inline',
+  start(src) {
+    const idx1 = src.indexOf('$');
+    const idx2 = src.indexOf('\\(');
+    if (idx1 === -1) return idx2 === -1 ? undefined : idx2;
+    if (idx2 === -1) return idx1;
+    return Math.min(idx1, idx2);
+  },
+  tokenizer(src) {
+    const match1 = /^\$([^\$\s](?:[^\$\n]*?[^\$\s])?)\$/.exec(src);
+    if (match1) {
+      const inner = match1[1].trim();
+      if (!isLikelyMath(inner)) {
+        return undefined;
+      }
+      return { type: 'inlineMath', raw: match1[0], text: inner };
+    }
+    const match2 = /^\\\(([\s\S]+?)\\\)/.exec(src);
+    if (match2) {
+      return { type: 'inlineMath', raw: match2[0], text: match2[1].trim() };
+    }
+  },
+  renderer(token) {
+    try {
+      const rendered = katex.renderToString(token.text, { displayMode: false, throwOnError: false, errorColor: '#f87171' });
+      return `<span class="katex-math-inline">${rendered}</span>`;
+    } catch (e) {
+      return `<code>${escapeHtml(token.text)}</code>`;
+    }
+  }
+};
+
+const calloutIcons = {
+  NOTE: 'ℹ️',
+  TIP: '💡',
+  IMPORTANT: '📌',
+  WARNING: '⚠️',
+  CAUTION: '🛑'
+};
+
+// Configure marked with highlight.js, rich code blocks, file links, and Mermaid diagrams
+const renderer = {
+  code({ text, lang }) {
+    if (lang === 'mermaid') {
+      const diagramId = 'mermaid-' + Math.random().toString(36).substring(2, 11);
+      return `
+        <div class="mermaid-card" id="${diagramId}-card">
+          <div class="mermaid-card-header">
+            <span class="mermaid-title">📊 Mermaid Diagram</span>
+            <div class="mermaid-actions">
+              <button class="btn-ghost-sm toggle-mermaid-src-btn" data-target="${diagramId}-src" title="View Diagram Source">Source</button>
+              <button class="btn-ghost-sm copy-mermaid-src-btn" data-code="${escapeHtml(text)}" title="Copy Diagram Code">Copy</button>
+            </div>
+          </div>
+          <div class="mermaid-viewport" id="${diagramId}-viewport">
+            <div class="mermaid-diagram" id="${diagramId}" data-code="${escapeHtml(text)}">
+              <div class="mermaid-loading"><span>⏳</span> Rendering diagram...</div>
+            </div>
+          </div>
+          <pre class="mermaid-source-pre" id="${diagramId}-src" style="display: none;"><code>${escapeHtml(text)}</code></pre>
+        </div>
+      `;
+    }
+    const cleanLang = (lang || '').trim().toLowerCase();
+    const validLang = !!(cleanLang && hljs.getLanguage(cleanLang));
+    const highlighted = validLang
+      ? hljs.highlight(text, { language: cleanLang, ignoreIllegals: true }).value
+      : escapeHtml(text);
+    return `
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="code-lang-badge">${cleanLang ? cleanLang.toUpperCase() : 'TELEMETRY'}</span>
+          <button class="btn-ghost-sm copy-code-btn" data-code="${escapeHtml(text)}" title="Copy code to clipboard">Copy</button>
+        </div>
+        <pre><code class="hljs ${validLang ? 'language-' + cleanLang : ''}">${highlighted}</code></pre>
+      </div>
+    `;
+  },
+  link(token) {
+    const textHtml = this.parser.parseInline(token.tokens);
+    const href = token.href || '';
+    if (href.startsWith('file://') || href.startsWith('/')) {
+      const cleanPath = href.replace(/^file:\/\//, '');
+      const formattedPath = cleanPath.replace(/#L(\d+)(?:-L(\d+))?$/, ':$1');
+      return `<a href="${href}" class="file-path-link" data-filepath="${formattedPath}" title="Click to copy path: ${formattedPath}"><span>📄</span> ${textHtml}</a>`;
+    }
+    const titleAttr = token.title ? ` title="${token.title}"` : '';
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer"${titleAttr}>${textHtml}</a>`;
+  }
+};
+
+marked.use({
+  extensions: [mathBlockExt, inlineMathExt],
+  renderer,
+  breaks: true,
+  gfm: true,
+  hooks: {
+    postprocess(html) {
+      // Responsive table scrolling wrapper
+      html = html.replace(/<table>/g, '<div class="table-responsive"><table>').replace(/<\/table>/g, '</table></div>');
+      // GitHub alerts callouts (> [!NOTE], > [!TIP], etc.)
+      html = html.replace(/<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s*<br\s*\/?>)?([\s\S]*?)<\/blockquote>/gi, (match, type, content) => {
+        const uType = type.toUpperCase();
+        const icon = calloutIcons[uType] || 'ℹ️';
+        return `<div class="callout-card callout-${uType.toLowerCase()}"><div class="callout-header"><span class="callout-icon">${icon}</span> <strong class="callout-title">${uType}</strong></div><div class="callout-body"><p>${content}</div>`;
+      });
+      return html;
+    }
+  }
+});
 
 // App State
 const state = {
@@ -1589,6 +1761,86 @@ function renderTimelineMessages() {
       copyToClipboard(btn.dataset.args, 'Tool arguments copied to clipboard!');
     });
   });
+
+  // Render all unrendered Mermaid diagrams asynchronously
+  renderAllMermaidDiagrams(el.timelineContainer);
+
+  // Attach toggle and copy listeners for Mermaid diagrams
+  el.timelineContainer.querySelectorAll('.toggle-mermaid-src-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetId = btn.dataset.target;
+      const srcEl = document.getElementById(targetId);
+      if (srcEl) {
+        const isHidden = srcEl.style.display === 'none';
+        srcEl.style.display = isHidden ? 'block' : 'none';
+        btn.textContent = isHidden ? 'Hide Source' : 'Source';
+        btn.classList.toggle('active', isHidden);
+      }
+    });
+  });
+
+  el.timelineContainer.querySelectorAll('.copy-mermaid-src-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.code, 'Diagram code copied to clipboard!');
+    });
+  });
+
+  // Attach copy listeners for code blocks
+  el.timelineContainer.querySelectorAll('.copy-code-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.code, 'Code copied to clipboard!');
+    });
+  });
+
+  // Attach click listener for file path links
+  el.timelineContainer.querySelectorAll('.file-path-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const path = link.dataset.filepath || link.getAttribute('href');
+      copyToClipboard(path, `Copied path to clipboard: ${path}`);
+    });
+  });
+}
+
+// Asynchronously render all pending Mermaid diagrams
+async function renderAllMermaidDiagrams(container = document) {
+  const diagrams = container.querySelectorAll('.mermaid-diagram[data-code]:not([data-rendered="true"])');
+  if (!diagrams.length) return;
+
+  for (const diag of diagrams) {
+    diag.setAttribute('data-rendered', 'true');
+    const rawCode = diag.getAttribute('data-code');
+    const id = diag.id;
+    if (!rawCode || !id) continue;
+
+    try {
+      const cleanCode = rawCode
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+
+      const { svg, bindFunctions } = await mermaid.render(`${id}-svg`, cleanCode);
+      diag.innerHTML = svg;
+      if (typeof bindFunctions === 'function') {
+        bindFunctions(diag);
+      }
+    } catch (err) {
+      console.warn('Mermaid render error for', id, err);
+      diag.innerHTML = `
+        <div class="mermaid-error-banner">
+          <span>⚠️ Diagram rendering error: ${escapeHtml(err.message || 'Invalid syntax')}</span>
+        </div>
+      `;
+      const srcEl = document.getElementById(`${id}-src`);
+      if (srcEl) srcEl.style.display = 'block';
+    }
+  }
 }
 
 // Export Session (R-021)
