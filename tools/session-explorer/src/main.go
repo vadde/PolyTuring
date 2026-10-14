@@ -10,6 +10,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -26,10 +27,16 @@ const (
 )
 
 func main() {
-	// CLI flag parsing — Implements: R-023, R-024
 	homeDir, _ := os.UserHomeDir()
 	defaultDataDir := filepath.Join(homeDir, ".gemini", "antigravity-ide", "brain")
 
+	// Support 'session-explorer wip' subcommand — Implements: R-034
+	if len(os.Args) > 1 && (os.Args[1] == "wip" || os.Args[1] == "--wip") {
+		handleWIPSubcommand(os.Args[2:], defaultDataDir)
+		return
+	}
+
+	// CLI flag parsing — Implements: R-023, R-024
 	var cfg Config
 	flag.StringVar(&cfg.DataDir, "data-dir", defaultDataDir, "Path to Antigravity brain directory")
 	flag.StringVar(&cfg.DataDir, "d", defaultDataDir, "Path to Antigravity brain directory (shorthand)")
@@ -109,3 +116,118 @@ func openBrowser(url string) error {
 
 	return cmd.Start()
 }
+
+// handleWIPSubcommand processes headless CLI invocations of 'session-explorer wip'.
+// Implements: R-034 (Headless CLI Subcommand)
+func handleWIPSubcommand(args []string, defaultDataDir string) {
+	wipFlags := flag.NewFlagSet("wip", flag.ExitOnError)
+	workspace := wipFlags.String("workspace", "", "Workspace or repository name")
+	wipFlags.StringVar(workspace, "w", "", "Workspace or repository name (shorthand)")
+	sessionID := wipFlags.String("session", "", "Target exact session UUID")
+	wipFlags.StringVar(sessionID, "s", "", "Target exact session UUID (shorthand)")
+	dataDir := wipFlags.String("data-dir", defaultDataDir, "Path to brain directory")
+	wipFlags.StringVar(dataDir, "d", defaultDataDir, "Path to brain directory (shorthand)")
+	limit := wipFlags.Int("limit", 5, "Candidate limit")
+	forceLatest := wipFlags.Bool("latest", false, "Force selection of newest session")
+	wipFlags.BoolVar(forceLatest, "f", false, "Force selection of newest session (shorthand)")
+	outputJSON := wipFlags.Bool("json", false, "Output structured JSON instead of Markdown")
+
+	_ = wipFlags.Parse(args)
+
+	// If workspace is empty, detect from current working directory
+	targetWS := *workspace
+	if targetWS == "" && *sessionID == "" {
+		cwd, err := os.Getwd()
+		if err == nil {
+			targetWS = filepath.Base(cwd)
+		}
+	}
+
+	index := NewSessionIndex(*dataDir, false)
+	if err := index.ScanAll(); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error scanning sessions: %v\n", err)
+		os.Exit(1)
+	}
+
+	resp, err := index.GetWorkspaceWIP(targetWS, *sessionID, *forceLatest, *limit)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error retrieving WIP: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *outputJSON {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(resp)
+		return
+	}
+
+	// Markdown rendering
+	if resp.Status == "not_found" {
+		fmt.Printf("❌ No conversation sessions found for workspace %q.\n", targetWS)
+		return
+	}
+
+	if resp.Multiple {
+		fmt.Printf("🛑 MANDATORY AGENT HALT: Multiple sessions found for workspace %q.\n\n", targetWS)
+		fmt.Println("You MUST stop immediately and ask the user which session they wish to resume:")
+		fmt.Println()
+		fmt.Println("| # | Session ID | Last Active | Steps | Prompts | Last Prompt Preview |")
+		fmt.Println("|---|---|---|---|---|---|")
+		for i, c := range resp.Candidates {
+			fmt.Printf("| %d | `%s` | %s | %d | %d | %s |\n",
+				i+1, c.SessionID, c.RelativeTime, c.StepCount, c.UserMessageCount, c.LastPromptPreview)
+		}
+		fmt.Println()
+		fmt.Printf("Please ask the user: \"I found %d recent sessions for workspace %s. Which session should I resume?\"\n", len(resp.Candidates), targetWS)
+		return
+	}
+
+	act := resp.ActiveSession
+	if act == nil {
+		fmt.Println("No active session data available.")
+		return
+	}
+
+	fmt.Printf("### 🧭 Session WIP Summary: %s\n\n", act.ProjectName)
+	fmt.Printf("- **Session ID**: `%s`\n", act.SessionID)
+	fmt.Printf("- **Last Active**: %s (%s)\n", act.RelativeTime, act.LastMessageAt.Format(time.RFC3339))
+	fmt.Printf("- **Steps**: %d | **Prompts**: %d | **Errors**: %d\n\n", act.StepCount, act.UserMessageCount, act.ErrorCount)
+
+	if len(act.RecentPrompts) > 0 {
+		fmt.Println("#### 📝 Recent User Prompts:")
+		for i, p := range act.RecentPrompts {
+			fmt.Printf("%d. %s\n", i+1, p)
+		}
+		fmt.Println()
+	}
+
+	if len(act.ModifiedFiles) > 0 {
+		fmt.Println("#### 🛠️ Modified Files:")
+		for _, f := range act.ModifiedFiles {
+			fmt.Printf("- `%s`\n", f)
+		}
+		fmt.Println()
+	}
+
+	if len(act.ExecutedCommands) > 0 {
+		fmt.Println("#### ⚡ Executed Shell Commands:")
+		for _, cmd := range act.ExecutedCommands {
+			fmt.Printf("- `%s`\n", cmd)
+		}
+		fmt.Println()
+	}
+
+	if len(act.UnresolvedErrors) > 0 {
+		fmt.Println("#### ⚠️ Recent Errors / Blockers:")
+		for _, e := range act.UnresolvedErrors {
+			fmt.Printf("- %s\n", e)
+		}
+		fmt.Println()
+	}
+
+	if act.SuggestedContinuation != "" {
+		fmt.Printf("#### 🎯 Suggested Continuation:\n%s\n", act.SuggestedContinuation)
+	}
+}
+

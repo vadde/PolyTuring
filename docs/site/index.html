@@ -152,6 +152,8 @@
         <div class="nav-tree-children">
           <a href="#ch2-session-explorer" class="nav-tree-link">Trajectory Intelligence</a>
           <a href="#sec-session-arch" class="nav-tree-link">Go + Bun Standalone Binary</a>
+          <a href="#sec-session-wip" class="nav-tree-link">Agent WIP Recovery & Disambiguation</a>
+          <a href="#sec-session-swagger" class="nav-tree-link">OpenAPI 3.0 & Swagger UI</a>
           <a href="#sec-session-usage" class="nav-tree-link">Telemetry & CLI Quickstart</a>
         </div>
       </div>
@@ -223,7 +225,7 @@
           <div>
             <div class="chapter-badge">Chapter 00 · Section 01</div>
             <h2 class="chapter-title" style="margin-bottom: 4px; font-size: 1.8rem;">Spec-Driven Development (SDD) & SDLC Constitution</h2>
-            <div style="font-size: 0.85rem; color: var(--text-dim);">Contract before code, numbered requirements (R-XXX), status verification gates</div>
+            <div style="font-size: 0.85rem; color: var(--text-dim);">Contract before code, verifiable functional requirements, status verification gates</div>
           </div>
           <div class="chapter-toggle-indicator">
             <div class="chapter-toggle-icon">▼</div>
@@ -238,7 +240,7 @@
           <div class="card-grid">
             <div class="glass-card">
               <h4>📋 Contract Before Code</h4>
-              <p>Every tool, script, and workflow begins with an airtight specification in <code>specs/catalog/&lt;tool&gt;.md</code> defining numbered requirements (<code>R-XXX</code>), acceptance criteria (<code>AC-XXX</code>), and non-functional guarantees (<code>NF-XXX</code>).</p>
+              <p>Every tool, script, and workflow begins with an airtight specification in <code>specs/catalog/&lt;tool&gt;.md</code> defining verifiable functional requirements, testable acceptance criteria, and non-functional guarantees.</p>
             </div>
             <div class="glass-card">
               <h4>🔄 SDLC Lifecycle Finite State Machine</h4>
@@ -473,7 +475,7 @@ flowchart TB
 
           <h3 class="section-h2" id="sec-omni-ebf">Ephemeral Branch Fabric (EBF) & Git Worktrees</h3>
           <p>
-            Coding agents frequently branch or create Git worktrees to isolate experimental code and execute parallel strategies. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong> (Requirements <code>R-051</code> to <code>R-059</code>):
+            Coding agents frequently branch or create Git worktrees to isolate experimental code and execute parallel strategies. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong>:
           </p>
 
           <!-- Layman Explanation: Git Worktrees -->
@@ -495,27 +497,27 @@ flowchart TB
           <div class="card-grid">
             <div class="glass-card">
               <h4>⚡ O(1) Worktree Pointer Peeking</h4>
-              <p>Instead of spawning slow subshells (<code>git rev-parse</code>), Omni-Graph reads the <code>.git</code> worktree pointer file directly in Rust in under 5 microseconds, resolving parent repository root, branch name, and lineage (<code>R-051</code>).</p>
+              <p>Instead of spawning slow subshells (<code>git rev-parse</code>), Omni-Graph reads the <code>.git</code> worktree pointer file directly in Rust in under 5 microseconds, resolving parent repository root, branch name, and lineage.</p>
             </div>
             <div class="glass-card">
               <h4>🚀 Top-Down Fleet Auto-Cascade</h4>
-              <p>Ingesting a trunk parent repo automatically inspects <code>.git/worktrees/*</code>, locates all active sibling checkouts, asynchronously indexes each branch, and attaches concurrent live file watchers (<code>R-059</code>).</p>
+              <p>Ingesting a trunk parent repo automatically inspects <code>.git/worktrees/*</code>, locates all active sibling checkouts, asynchronously indexes each branch, and attaches concurrent live file watchers.</p>
             </div>
             <div class="glass-card">
               <h4>🌱 Prior LPA Seed Inheritance</h4>
-              <p>When clustering a new worktree, Omni-Graph inherits community IDs from the parent workspace. Only modified files shift, preserving 99% cluster visual stability across branches (<code>R-053</code>).</p>
+              <p>When clustering a new worktree, Omni-Graph inherits community IDs from the parent workspace. Only modified files shift, preserving 99% cluster visual stability across branches.</p>
             </div>
             <div class="glass-card">
               <h4>🔄 Dynamic Fleet Synchronizer</h4>
-              <p><code>POST /api/worktrees/sync</code> sweeps registered workspaces, discovers newly checked-out worktrees, cascades indexing, and aligns watcher daemons without restarts (<code>R-059</code>).</p>
+              <p><code>POST /api/worktrees/sync</code> sweeps registered workspaces, discovers newly checked-out worktrees, cascades indexing, and aligns watcher daemons without restarts.</p>
             </div>
             <div class="glass-card">
               <h4>🧹 Automatic Dead Worktree GC</h4>
-              <p>When an agent deletes a temporary worktree, <code>/api/workspaces</code> immediately sweeps SurrealDB and purges dead nodes, edges, and watchers, eliminating zombie workspace pollution (<code>R-054</code>).</p>
+              <p>When an agent deletes a temporary worktree, <code>/api/workspaces</code> immediately sweeps SurrealDB and purges dead nodes, edges, and watchers, eliminating zombie workspace pollution.</p>
             </div>
             <div class="glass-card">
               <h4>🌲 Worktree Hierarchy & Delta UI</h4>
-              <p>Worktrees are cleanly nested under their parent repository (<code>worktrees: [...]</code>), with branch selectors and glowing delta halos for modified AST nodes in Cosmograph (<code>R-055</code>, <code>R-056</code>).</p>
+              <p>Worktrees are cleanly nested under their parent repository (<code>worktrees: [...]</code>), with branch selectors and glowing delta halos for modified AST nodes in Cosmograph.</p>
             </div>
           </div>
 
@@ -833,6 +835,78 @@ flowchart LR
             </div>
           </div>
 
+          <h3 class="section-h2" id="sec-session-wip">Agent Work-in-Progress (WIP) Recovery & Disambiguation</h3>
+          <p>
+            Autonomous coding companions occasionally suffer from context window resets, token ceiling truncations, IDE crashes, or system reboots. Without telemetry, an assistant entering a codebase has no recollection of recent file modifications, pending tasks, or error blockers.
+          </p>
+          <p>
+            Session Explorer introduces the <strong>Agent WIP Recovery System</strong> (<code>/most-recent-wip</code> and <code>make session-wip</code>). It extracts recent user prompts, modified files, executed commands, and error logs directly from local JSONL transcripts.
+          </p>
+
+          <!-- The Multi-Session Disambiguation Invariant Callout -->
+          <div class="callout callout-theory" style="margin-bottom: 24px;">
+            <div class="callout-header">🛑 The Multi-Session Disambiguation Invariant</div>
+            <div class="callout-body">
+              <strong>What happens when a codebase has multiple parallel sessions?</strong>
+              <br><br>
+              If a developer has three parallel sessions open (e.g. one for backend refactoring, another for CSS polishing, and another for CI debugging), a recovering assistant must <strong>NEVER guess</strong> or blindly assume the latest session is the target. Doing so leads to catastrophic context corruption!
+              <br><br>
+              <strong>The Invariant:</strong> When multiple sessions match a workspace, the engine automatically halts, returns a structured candidate table with timestamps and prompt previews, and requires the coding assistant to <strong>STOP and ask the human user</strong> which session to resume.
+            </div>
+          </div>
+
+          <!-- Interactive Zoomable Canvas: Agent WIP Recovery & Disambiguation Protocol -->
+          <div class="canvas-container">
+            <div class="canvas-header-bar">
+              <span class="canvas-type-tag">Agent Protocol Blueprint · WIP Recovery & Halting Lifecycle</span>
+              <div class="canvas-controls-group">
+                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                <span class="zoom-level-badge">100%</span>
+                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                  <span>Theater</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-viewport">
+              <div class="canvas-content-surface">
+                <pre class="mermaid">
+flowchart TD
+    Trigger["Coding Assistant Runs /most-recent-wip (or wip.sh)"] --> QueryAPI["Query Session Explorer Engine (GET /api/wip)"]
+    QueryAPI --> ScanIndex["Scan Brain Transcripts &amp; Correlate Workspace"]
+    ScanIndex --> Decision{"Multiple Active Sessions Found?"}
+    Decision -- "Yes (&gt;1 Candidates)" --> HaltAgent["🛑 MANDATORY AGENT HALT: Present Candidates &amp; Ask User"]
+    Decision -- "No (1 Match or Forced)" --> LoadDigest["🚀 Auto-Resume: Extract Recent Prompts, Diffed Files &amp; Commands"]
+    HaltAgent --> UserPicks["User Selects Target Session UUID"]
+    UserPicks --> LoadDigest
+    LoadDigest --> ContinueWork["Assistant Resumes Task Seamlessly Without Context Loss"]
+                </pre>
+              </div>
+            </div>
+            <div class="canvas-caption">Figure 2.2: Autonomous Agent WIP Recovery & Multi-Session Disambiguation Protocol</div>
+          </div>
+
+          <h3 class="section-h2" id="sec-session-swagger">Embedded OpenAPI 3.0 & Swagger UI</h3>
+          <p>
+            Session Explorer embeds an interactive, 100% offline OpenAPI 3.0 specification and Swagger-compatible documentation explorer directly inside the compiled binary:
+          </p>
+          <div class="card-grid">
+            <div class="glass-card">
+              <h4>📖 Interactive Explorer</h4>
+              <p>Navigate to <code>http://localhost:9876/docs</code> to view all endpoints, schema definitions, and execute live API requests with real-time response latency indicators.</p>
+            </div>
+            <div class="glass-card">
+              <h4>📄 Raw OpenAPI 3.0 JSON</h4>
+              <p>Fetch <code>GET /api/openapi.json</code> to import the machine-readable contract into Postman, Insomnia, or automated SDK generators.</p>
+            </div>
+            <div class="glass-card">
+              <h4>⚡ One-Click Skill Installer</h4>
+              <p>Deploy the <code>session-wip</code> agent skill to your workspace (<code>.agents/</code>) or globally (<code>~/.gemini/config/</code>) with one click from the UI or via <code>make setup-session-wip</code>.</p>
+            </div>
+          </div>
+
           <h3 class="section-h2" id="sec-session-usage">CLI Commands & Quickstart</h3>
           <div class="code-container">
             <div class="code-header">
@@ -842,8 +916,18 @@ flowchart LR
             <pre><code id="session-cmds"># Launch Session Explorer (auto-opens browser at http://localhost:9876)
 make session-explorer
 
-# Launch on custom port
-make run-tool T=session-explorer ARGS="--port 8080"
+# Launch interactive OpenAPI/Swagger Documentation in browser
+open http://localhost:9876/docs
+
+# Recover Agent WIP status for current repository
+make session-wip
+
+# Force selection of newest session
+make session-wip LATEST=1
+
+# Install session-wip skill into local workspace or global system
+make setup-session-wip TARGET=workspace
+make setup-session-wip TARGET=global
 
 # Headless mode (no auto-opening browser)
 cd tools/session-explorer && make run-headless

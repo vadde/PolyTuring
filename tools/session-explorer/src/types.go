@@ -165,4 +165,74 @@ type Config struct {
 	NoOpen        bool
 	Verbose       bool
 	WatchInterval int // seconds between background auto-rescans (0 = disabled)
+	Command       string
+	WorkspaceArg  string
+	SessionIDArg  string
+	ForceLatest   bool
+	OutputJSON    bool
 }
+
+// SessionCandidate represents a summary of a session when resolving ambiguous multi-session targets.
+// Implements: R-031 (Multi-Session Disambiguation Invariant)
+type SessionCandidate struct {
+	SessionID          string    `json:"session_id"`
+	CreatedAt          time.Time `json:"created_at"`
+	LastMessageAt      time.Time `json:"last_message_at"`
+	RelativeTime       string    `json:"relative_time"`
+	Workspace          string    `json:"workspace"`
+	ProjectName        string    `json:"project_name"`
+	StepCount          int       `json:"step_count"`
+	UserMessageCount   int       `json:"user_message_count"`
+	ErrorCount         int       `json:"error_count"`
+	FirstPromptPreview string    `json:"first_prompt_preview"`
+	LastPromptPreview  string    `json:"last_prompt_preview"`
+}
+
+// WIPDigest represents the synthesized work-in-progress state for an active session.
+// Implements: R-030 (Agent WIP Recovery API)
+type WIPDigest struct {
+	SessionID             string            `json:"session_id"`
+	Workspace             string            `json:"workspace"`
+	ProjectName           string            `json:"project_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	LastMessageAt         time.Time         `json:"last_message_at"`
+	RelativeTime          string            `json:"relative_time"`
+	StepCount             int               `json:"step_count"`
+	UserMessageCount      int               `json:"user_message_count"`
+	ErrorCount            int               `json:"error_count"`
+	RecentPrompts         []string          `json:"recent_prompts"`
+	RecentResponses       []string          `json:"recent_responses"`
+	ModifiedFiles         []string          `json:"modified_files"`
+	ExecutedCommands      []string          `json:"executed_commands"`
+	LastToolCalls         []ToolCallDisplay `json:"last_tool_calls"`
+	UnresolvedErrors      []string          `json:"unresolved_errors"`
+	SuggestedContinuation string            `json:"suggested_continuation,omitempty"`
+}
+
+// WIPResponse is the JSON response for GET /api/wip.
+// Implements: R-030, R-031
+type WIPResponse struct {
+	Status         string             `json:"status"` // "resolved", "ambiguous_multi_session", "not_found"
+	Multiple       bool               `json:"multiple"`
+	Workspace      string             `json:"workspace"`
+	CandidateCount int                `json:"candidate_count"`
+	Candidates     []SessionCandidate `json:"candidates,omitempty"`
+	ActiveSession  *WIPDigest         `json:"active_session,omitempty"`
+	Instruction    string             `json:"instruction,omitempty"`
+}
+
+// InstallSkillRequest is the payload for POST /api/skill/install.
+// Implements: R-033
+type InstallSkillRequest struct {
+	Target string `json:"target"` // "workspace" or "global"
+}
+
+// InstallSkillResponse is the response for POST /api/skill/install.
+// Implements: R-033
+type InstallSkillResponse struct {
+	Success       bool   `json:"success"`
+	Target        string `json:"target"`
+	InstalledPath string `json:"installed_path"`
+	Message       string `json:"message"`
+}
+

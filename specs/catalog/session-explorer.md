@@ -88,6 +88,11 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-027 | Lazy loading / virtual scrolling for large conversation timelines | Should | ✅ | 🧪 | src/web/src/app.js DOM rendering |
 | R-028 | Project and repository clustering: dynamically identify repos from tool paths and prompts | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
 | R-029 | Flexible user-driven grouping modes: Project Hub, Date Timeline, or Flat List | Must | ✅ | 🧪 | src/web/src/app.js renderView(), index.html segmented control |
+| R-030 | Agent Work-In-Progress (WIP) Recovery API (`/api/wip`) | Must | 🔨 | ⬜ | scanner.go GetWorkspaceWIP(), api.go HandleWIP |
+| R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | 🔨 | ⬜ | api.go, scripts/wip.sh, session-wip skill |
+| R-032 | Embedded OpenAPI 3.0 Contract & Offline Swagger UI (`/docs`, `/api/openapi.json`) | Must | 🔨 | ⬜ | openapi.json, server.go, api.go |
+| R-033 | One-Click GUI Skill Installer Modal & CLI Command (`make setup-session-wip`) | Should | 🔨 | ⬜ | src/web/src/app.js, setup-skill.sh, api.go HandleInstallSkill |
+| R-034 | Headless CLI Subcommand (`session-explorer wip`) & Fallback Companion Script | Should | 🔨 | ⬜ | main.go, scripts/wip.sh |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -218,6 +223,92 @@ Full-text search across all sessions.
   "query": "kubernetes deployment"
 }
 ```
+
+#### `GET /api/wip`
+
+Extracts recent work-in-progress (WIP) session status for a workspace or exact session ID. Implements R-030 and R-031.
+
+**Query Parameters:**
+- `workspace` (string): Workspace name, repository name, or path.
+- `session_id` (string, optional): Specific session ID.
+- `limit` (int, optional, default: 5): Number of candidates or steps to retrieve.
+- `force_latest` (bool, optional, default: false): If true, skips multi-session halt and selects newest session.
+
+**Response (Single Resolved Session):**
+```json
+{
+  "status": "resolved",
+  "multiple": false,
+  "workspace": "tool-scripts",
+  "active_session": {
+    "session_id": "952f3203-4fe9-4e6c-9edb-a93984b1f3f0",
+    "workspace": "tool-scripts",
+    "project_name": "tool-scripts",
+    "created_at": "2026-09-18T15:47:39Z",
+    "last_message_at": "2026-09-18T16:31:30Z",
+    "relative_time": "12 minutes ago",
+    "step_count": 42,
+    "user_message_count": 5,
+    "error_count": 0,
+    "recent_prompts": ["Add OpenAPI swagger documentation to session explorer"],
+    "recent_responses": ["I have added openapi.json and embedded the swagger viewer."],
+    "modified_files": ["tools/session-explorer/src/server.go", "tools/session-explorer/src/api.go"],
+    "executed_commands": ["make test-tool T=session-explorer"],
+    "last_tool_calls": [{"name": "replace_file_content", "args_preview": "..."}],
+    "unresolved_errors": []
+  }
+}
+```
+
+**Response (Multiple Ambiguous Sessions — Agent Halt Invariant):**
+```json
+{
+  "status": "ambiguous_multi_session",
+  "multiple": true,
+  "workspace": "tool-scripts",
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "session_id": "952f3203-4fe9-4e6c-9edb-a93984b1f3f0",
+      "created_at": "2026-09-18T15:47:39Z",
+      "last_message_at": "2026-09-18T16:31:30Z",
+      "relative_time": "12 minutes ago",
+      "step_count": 42,
+      "user_message_count": 5,
+      "error_count": 0,
+      "first_prompt_preview": "Refactor session explorer API...",
+      "last_prompt_preview": "Add OpenAPI swagger documentation..."
+    }
+  ],
+  "instruction": "MANDATORY: Multiple sessions found. STOP and prompt the user with candidates."
+}
+```
+
+#### `POST /api/skill/install`
+
+Installs the `session-wip` recovery skill and lifecycle hooks to the workspace or user global directory.
+
+**Request Body:**
+```json
+{
+  "target": "workspace" // or "global"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "target": "workspace",
+  "installed_path": "/Users/aparv/Library/.../tool-scripts/.agents/skills/session-wip",
+  "message": "Skill installed successfully."
+}
+```
+
+#### `GET /api/openapi.json` & `GET /docs`
+
+Serves the offline OpenAPI 3.0 specification JSON and the embedded interactive Swagger API explorer.
+
 
 ### 3.3 Data Source Specification
 

@@ -438,3 +438,59 @@
 6. Update tool README with full documentation
 
 ---
+
+## Session 2026-10-14 — Agent Memory Recovery, Multi-Session Disambiguation & OpenAPI Integration (v0.2.0)
+
+**Agent**: Antigravity  
+**Goal**: Implement autonomous Agent Work-in-Progress (WIP) recovery system (`/most-recent-wip`, script/hook) for context wipes and memory loss, enforce strict multi-session halting disambiguation, embed OpenAPI 3.0 & Swagger UI, add one-click skill installation, clean public docs of internal tickets, and establish 100% test coverage.
+
+### What Was Done
+
+1. **Specification & SDLC Governance (R-030 to R-034)**:
+   - Added requirements `R-030` through `R-034`, acceptance criteria `AC-018` through `AC-022`, and REST API contracts to `specs/catalog/session-explorer.md`.
+   - Updated SDLC status matrix in `STATUS.md` and `CONTEXT.md`.
+
+2. **Core Engine & Data Structures (`src/types.go`, `src/scanner.go`)**:
+   - Defined `WIPDigest`, `WIPResponse`, `SessionCandidate`, `InstallSkillRequest`, and `InstallSkillResponse`.
+   - Implemented `GetWorkspaceWIP(workspace, sessionID string, forceLatest bool, limit int) (*WIPResponse, error)`.
+   - Implemented `buildWIPDigest()` synthesizing: active document, recent prompts, executed commands, modified files, tool calls, and unresolved errors.
+   - Enforced **Mandatory Multi-Session Halting Invariant (R-031)**: When $>1$ candidate sessions exist for a workspace and `forceLatest=false`, the engine returns `status: "ambiguous_multi_session"` and candidate snippets, instructing the agent to hard-stop and prompt the user.
+
+3. **REST API & Embedded Swagger / OpenAPI (`src/api.go`, `src/server.go`, `src/openapi.json`)**:
+   - Added `HandleWIP` (`GET /api/wip?workspace=...&latest=...&session_id=...`).
+   - Added `HandleInstallSkill` (`POST /api/skill/install`).
+   - Authored complete OpenAPI 3.0.3 specification (`src/openapi.json`) embedded in binary.
+   - Built a 100% offline, self-contained interactive liquid-glass Swagger UI at `/docs` and `/swagger` with live `Try It Out` runners and zero external CDN dependencies.
+
+4. **Headless CLI & Dual-Mode Recovery Script (`src/main.go`, `scripts/wip.sh`, `scripts/setup-skill.sh`)**:
+   - Implemented `session-explorer wip [-workspace] [-session] [-latest] [-json]` CLI subcommand.
+   - Authored dual-mode `scripts/wip.sh` that probes background daemon on port 9876 and falls back cleanly to the CLI binary if offline.
+   - Added `scripts/setup-skill.sh` supporting `--workspace` (`.agents/skills/session-wip`) and `--global` (`~/.gemini/config/skills/session-wip`).
+   - Created `.agents/skills/session-wip/SKILL.md` with explicit instructions for coding assistants on memory loss recovery and multi-session disambiguation.
+   - Wired root `Makefile` targets: `make session-wip` and `make setup-session-wip`.
+
+5. **Web UI & Bun Bundling (`src/web/`)**:
+   - Added "⚡ Install Skill" button, "📖 API Docs" link, and interactive installation modal `#installSkillModal` in `index.html`.
+   - Updated `app.js` with modal logic, scope selection, clipboard commands, and REST triggering.
+   - Re-bundled frontend with Bun into `src/web/dist/` (22ms, 198 modules) and recompiled Go binary into `bin/session-explorer`.
+
+6. **Documentation Portal Hygiene & Expansion (`docs/site/index.html`)**:
+   - **Scrubbed all internal SDLC ticket markers** (`R-051`, etc.) from user-facing public documentation.
+   - Expanded Chapter 02 with Section 2.1 (`#sec-session-wip`) on Agent Memory Recovery & Multi-Session Disambiguation Protocol.
+   - Added Figure 2.2 Mermaid architectural sequence diagram.
+   - Added Section 2.2 (`#sec-session-swagger`) on Embedded OpenAPI 3.0 & Swagger UI.
+   - Verified via `make docs-test` (Headless Chrome render test passed with 0 errors).
+
+7. **Unit Test Suite & Verification (`src/scanner_test.go`, `src/api_test.go`)**:
+   - Added unit tests for R-030 (single session WIP recovery, active session digest).
+   - Added unit tests for R-031 (multi-session ambiguous halt, candidates, forceLatest, direct sessionID).
+   - Added unit tests for R-032 / R-033 (OpenAPI spec validation, Swagger HTML rendering, skill installer API).
+   - All 25 unit tests passed in 0.58s (`make test-tool T=session-explorer`).
+
+### Decisions Made
+- **Hard-Stop Halting Invariant**: Assistants must NEVER guess or assume which session to pick up when multiple candidates exist; they must present candidates with relative timestamps and prompt snippets to the user.
+- **Dual-Mode Recovery**: `wip.sh` attempts fast query against live daemon first, transparently falling back to standalone CLI binary.
+- **100% Offline Documentation**: Self-contained Swagger UI explorer embedded directly into binary without CDN links.
+- **Public Documentation Purity**: Internal requirements IDs (`R-XXX`) belong strictly in specs, devlogs, and status files—never in public customer-facing docs.
+
+---

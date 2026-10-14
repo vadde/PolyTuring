@@ -68,6 +68,8 @@ help: ## Show this interactive command directory
 	@printf "\n"
 	@printf "$(BOLD)⚙️ Setup & Maintenance:$(NC)\n"
 	@printf "  $(CYAN)%-22s$(NC) %s\n" "setup"        "Install dependencies (Go modules + Bun packages)"
+	@printf "  $(CYAN)%-22s$(NC) %s\n" "setup-skill"  "Deploy session-wip agent skill (TARGET=workspace|global)"
+	@printf "  $(CYAN)%-22s$(NC) %s\n" "wip"          "Recover agent WIP: make wip [PROJECT=name] [LATEST=1]"
 	@printf "  $(CYAN)%-22s$(NC) %s\n" "clean"        "Remove build artifacts (bin/, src/web/dist/)"
 	@printf "\n"
 	@printf "  $(DIM)Custom parameters:$(NC)\n"
@@ -181,4 +183,11 @@ setup: ## Install dependencies (Go + Bun)
 clean: ## Clean build artifacts
 	@echo "$(YELLOW)🧹 Cleaning build artifacts...$(NC)"
 	@rm -rf bin/ src/web/dist/
+
+setup-skill: ## Install session-wip agent recovery skill: make setup-skill [TARGET=workspace|global]
+	@./scripts/setup-skill.sh $(TARGET)
+
+wip: ## Inspect recent session WIP: make wip [PROJECT=name] [LATEST=1] [SESSION=id]
+	@./scripts/wip.sh $(if $(PROJECT),-w "$(PROJECT)",) $(if $(SESSION),-s "$(SESSION)",) $(if $(LATEST),-l,)
+
 	@echo "$(GREEN)✅ Clean complete.$(NC)"

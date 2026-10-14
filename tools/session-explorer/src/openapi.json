@@ -1,0 +1,398 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Session Explorer REST API",
+    "description": "High-performance REST API for Antigravity IDE conversation telemetry, agent work-in-progress (WIP) recovery, and trajectory analysis.",
+    "version": "0.1.0",
+    "contact": {
+      "name": "vadde/tool-scripts",
+      "url": "https://vadde.github.io/tool-scripts/"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:9876",
+      "description": "Local Session Explorer daemon"
+    }
+  ],
+  "paths": {
+    "/api/sessions": {
+      "get": {
+        "summary": "List conversation sessions",
+        "description": "Retrieve all indexed sessions with metadata, filtering, and sorting options.",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "description": "Filter by workspace or project name",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort criterion: date, date_asc, steps, messages, size",
+            "required": false,
+            "schema": { "type": "string", "default": "date" }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order: desc or asc",
+            "required": false,
+            "schema": { "type": "string", "default": "desc" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Start date filter (YYYY-MM-DD or RFC3339)",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "End date filter (YYYY-MM-DD or RFC3339)",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sessions and aggregate statistics",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionsResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}": {
+      "get": {
+        "summary": "Get session conversation timeline",
+        "description": "Retrieve full conversation trajectory with user prompts, agent reasoning, tool calls, and execution errors.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Unique UUID of the conversation session",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detailed session conversation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionDetailResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    },
+    "/api/wip": {
+      "get": {
+        "summary": "Agent Work-in-Progress (WIP) recovery",
+        "description": "Inspect recent session activity for a workspace. Enforces the Multi-Session Disambiguation Invariant (R-031): if multiple sessions exist, returns candidates and halts.",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "required": false,
+            "description": "Workspace or project name/path to inspect",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "description": "Target exact session ID",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of candidate sessions to return",
+            "schema": { "type": "integer", "default": 5 }
+          },
+          {
+            "name": "force_latest",
+            "in": "query",
+            "required": false,
+            "description": "Force selection of newest session even if multiple exist",
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WIP state or disambiguation candidates",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WIPResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Full-text search transcripts",
+        "description": "Search user prompts and transcripts across all sessions with contextual highlights.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Keywords or search term",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "required": false,
+            "description": "Filter by workspace",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Filter by message type",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results matching query",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "summary": "Get aggregate system statistics",
+        "description": "Retrieve total session counts, top tool invocations, common prompt patterns, and project distributions.",
+        "responses": {
+          "200": {
+            "description": "Aggregate statistics",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Stats" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refresh": {
+      "post": {
+        "summary": "Trigger immediate index re-scan",
+        "description": "Re-scans the Antigravity IDE brain directory and refreshes in-memory indices.",
+        "responses": {
+          "200": {
+            "description": "Refresh acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "message": { "type": "string", "example": "Index refreshed successfully" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/skill/install": {
+      "post": {
+        "summary": "Install Agent WIP Recovery Skill",
+        "description": "Installs the session-wip agent skill, companion script, and lifecycle hooks into the current workspace or user global directory.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InstallSkillRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Skill installation confirmation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InstallSkillResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_message_at": { "type": "string", "format": "date-time" },
+          "workspace": { "type": "string" },
+          "project_name": { "type": "string" },
+          "step_count": { "type": "integer" },
+          "user_message_count": { "type": "integer" },
+          "agent_response_count": { "type": "integer" },
+          "tool_call_count": { "type": "integer" },
+          "error_count": { "type": "integer" },
+          "transcript_size_bytes": { "type": "integer" },
+          "first_user_prompt_preview": { "type": "string" }
+        }
+      },
+      "SessionsResponse": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Session" }
+          },
+          "stats": { "$ref": "#/components/schemas/Stats" }
+        }
+      },
+      "SessionDetailResponse": {
+        "type": "object",
+        "properties": {
+          "session": { "$ref": "#/components/schemas/Session" },
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MessageDisplay" }
+          }
+        }
+      },
+      "MessageDisplay": {
+        "type": "object",
+        "properties": {
+          "step_index": { "type": "integer" },
+          "source": { "type": "string" },
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "content": { "type": "string" },
+          "has_thinking": { "type": "boolean" },
+          "thinking": { "type": "string" }
+        }
+      },
+      "SessionCandidate": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_message_at": { "type": "string", "format": "date-time" },
+          "relative_time": { "type": "string", "example": "14 minutes ago" },
+          "workspace": { "type": "string" },
+          "project_name": { "type": "string" },
+          "step_count": { "type": "integer" },
+          "user_message_count": { "type": "integer" },
+          "error_count": { "type": "integer" },
+          "first_prompt_preview": { "type": "string" },
+          "last_prompt_preview": { "type": "string" }
+        }
+      },
+      "WIPDigest": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "workspace": { "type": "string" },
+          "project_name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_message_at": { "type": "string", "format": "date-time" },
+          "relative_time": { "type": "string" },
+          "step_count": { "type": "integer" },
+          "user_message_count": { "type": "integer" },
+          "error_count": { "type": "integer" },
+          "recent_prompts": { "type": "array", "items": { "type": "string" } },
+          "recent_responses": { "type": "array", "items": { "type": "string" } },
+          "modified_files": { "type": "array", "items": { "type": "string" } },
+          "executed_commands": { "type": "array", "items": { "type": "string" } },
+          "unresolved_errors": { "type": "array", "items": { "type": "string" } },
+          "suggested_continuation": { "type": "string" }
+        }
+      },
+      "WIPResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["resolved", "ambiguous_multi_session", "not_found"] },
+          "multiple": { "type": "boolean" },
+          "workspace": { "type": "string" },
+          "candidate_count": { "type": "integer" },
+          "candidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SessionCandidate" }
+          },
+          "active_session": { "$ref": "#/components/schemas/WIPDigest" },
+          "instruction": { "type": "string" }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_id": { "type": "string" },
+                "step_index": { "type": "integer" },
+                "content_preview": { "type": "string" },
+                "workspace": { "type": "string" }
+              }
+            }
+          },
+          "total_count": { "type": "integer" },
+          "query": { "type": "string" }
+        }
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "total_sessions": { "type": "integer" },
+          "total_user_messages": { "type": "integer" },
+          "total_agent_responses": { "type": "integer" },
+          "total_tool_calls": { "type": "integer" },
+          "total_errors": { "type": "integer" },
+          "workspaces": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "InstallSkillRequest": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "enum": ["workspace", "global"], "default": "workspace" }
+        }
+      },
+      "InstallSkillResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "target": { "type": "string" },
+          "installed_path": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

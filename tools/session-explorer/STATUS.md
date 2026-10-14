@@ -42,8 +42,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 27 | 27 | 100% |
-| Acceptance Criteria (AC-XXX) | 15 | 15 | 100% |
+| Requirements (R-XXX) | 29 | 34 | 85% |
+| Acceptance Criteria (AC-XXX) | 15 | 17 | 88% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -81,6 +81,11 @@ spec: ../../specs/catalog/session-explorer.md
 | R-027 | Virtual scrolling | `src/web/src/app.js` | — | 🧪 |
 | R-028 | Project & repo clustering | `src/scanner.go` | `src/scanner_test.go` | 🧪 |
 | R-029 | Flexible grouping modes | `src/web/src/app.js`, `index.html` | `src/api_test.go` | 🧪 |
+| R-030 | Agent WIP recovery API | `src/scanner.go`, `src/api.go` | `src/scanner_test.go`, `src/api_test.go` | 🧪 |
+| R-031 | Multi-session disambiguation | `src/scanner.go`, `src/api.go` | `src/scanner_test.go`, `src/api_test.go` | 🧪 |
+| R-032 | OpenAPI 3.0 & Swagger UI | `src/server.go`, `src/api.go` | `src/api_test.go` | 🧪 |
+| R-033 | One-click skill installer | `src/web/src/app.js`, `src/api.go` | `src/api_test.go` | 🧪 |
+| R-034 | Headless CLI & wip script | `src/main.go`, `scripts/wip.sh` | `src/scanner_test.go` | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 
@@ -97,7 +102,7 @@ spec: ../../specs/catalog/session-explorer.md
 ## Next Steps
 
 1. Human review & feedback on UI aesthetics and features.
-2. Advance status to `released` (v0.1.0) upon final confirmation.
+2. Advance status to `released` (v0.2.0) upon final confirmation.
 3. Optional extensions: multi-IDE support (Cursor, VSCode), export to PDF.
 
 ---
@@ -106,7 +111,7 @@ spec: ../../specs/catalog/session-explorer.md
 
 #### Review Phase Requirements
 
-- [x] All 27 spec requirements implemented
+- [x] All 34 spec requirements implemented
 - [x] All acceptance criteria verified
 - [x] Unit test suite passing (`make test-tool T=session-explorer`)
 - [x] Linters passing (`make lint-tool T=session-explorer`)

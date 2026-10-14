@@ -1,7 +1,7 @@
 ---
 tool: session-explorer
 status: review
-last_session: 2026-09-30
+last_session: 2026-10-14
 last_agent: "Antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `review`
-- **Version**: 0.1.0
+- **Version**: 0.2.0
 - **Language**: Go 1.22+ (backend) + vanilla HTML/CSS/JS (frontend, Bun-bundled)
 - **Category**: GenAI & ML
 
@@ -25,10 +25,10 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 29 | 29 | 🧪 100% Implemented & Tested |
-| Acceptance Criteria (AC-XXX) | 17 | 17 | 🧪 100% Verified |
+| Spec Requirements (R-XXX) | 34 | 34 | 🧪 100% Implemented & Tested |
+| Acceptance Criteria (AC-XXX) | 22 | 22 | 🧪 100% Verified |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 15 unit tests passing + live demo |
+| Test Coverage | 100% | 100% | 🧪 25 unit tests passing + live demo |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -37,14 +37,15 @@ blockers: []
 
 | Resource | Path | Notes |
 |----------|------|-------|
-| Specification | [`specs/catalog/session-explorer.md`](../../specs/catalog/session-explorer.md) | 27 requirements, 15 ACs, 9 NFRs |
+| Specification | [`specs/catalog/session-explorer.md`](../../specs/catalog/session-explorer.md) | 34 requirements, 22 ACs, 9 NFRs |
 | Status | [`STATUS.md`](STATUS.md) | `review` phase |
 | Dev Log | [`DEVLOG.md`](DEVLOG.md) | Session history |
-| Changelog | [`CHANGELOG.md`](CHANGELOG.md) | Initial v0.1.0 release pending |
-| Source (Go) | [`src/`](src/) | main.go, types.go, scanner.go, api.go, server.go |
+| Changelog | [`CHANGELOG.md`](CHANGELOG.md) | v0.2.0 WIP & OpenAPI addition |
+| Source (Go) | [`src/`](src/) | main.go, types.go, scanner.go, api.go, server.go, openapi.json |
 | Source (Web) | [`src/web/`](src/web/) | index.html, src/styles.css, src/app.js, package.json |
 | Tests | [`src/`](src/) | scanner_test.go, api_test.go |
 | Examples | [`examples/`](examples/) | demo.sh (automated test script) |
+| Scripts | [`scripts/`](scripts/) | wip.sh, setup-skill.sh |
 
 ---
 
@@ -52,8 +53,8 @@ blockers: []
 
 > _What to do when you pick this tool up._
 
-1. **User Review**: Solicit user feedback on UI styling, timeline experience, and search speed.
-2. **Release v0.1.0**: Advance SDLC status to `released` and tag version.
+1. **User Review**: Solicit user feedback on agent memory recovery (`/most-recent-wip`) and OpenAPI docs.
+2. **Release v0.2.0**: Advance SDLC status to `released` and tag version.
 3. **Future enhancements**: Multi-IDE log support (Cursor, Claude Code, VSCode).
 
 ---
@@ -74,17 +75,21 @@ blockers: []
 | 2026-09-18 | Vanilla HTML/CSS/JS for frontend | No heavy UI framework overhead, full liquid-glass control, embedded in binary |
 | 2026-09-18 | Bun for frontend bundling | User requested modern blazing-fast tooling; 20ms bundle time |
 | 2026-09-18 | Port 9876 default | Uncommon port, unlikely to conflict, configurable via --port |
-| 2026-09-18 | 100% offline self-contained | Highlight.js and marked embedded; no external CDNs required |
+| 2026-09-18 | 100% offline self-contained | Highlight.js, marked, and Swagger UI embedded; no external CDNs required |
 | 2026-09-20 | In-project toolbar & search | Isolated from global search, reactive sort/search/date range within project hub |
 | 2026-09-20 | Dynamic timeline node width | Auto-expanding capsule pill centered on rail for indices in the millions |
 | 2026-09-20 | Interrelated in-session sort & search | Unified pipeline for message filtering, searching, and sorting with instant reactivity |
+| 2026-10-14 | Hard-stop halting invariant for multi-session ambiguity | Coding assistants MUST NOT guess or assume when multiple sessions exist; require explicit user selection |
+| 2026-10-14 | Dual-mode agent WIP recovery script (`wip.sh`) | Probes background daemon first; cleanly falls back to headless CLI binary if daemon is offline |
+| 2026-10-14 | Embedded OpenAPI 3.0 & interactive Swagger UI | Single-click accessibility via `/docs` and `/api/openapi.json` with zero external network dependencies |
+| 2026-10-14 | Public documentation hygiene | Strict invariant: Scrub all internal SDLC requirement tickets (`R-XXX`) from public static documentation |
 
 ---
 
 ## Traceability Summary
 
-> _27 functional requirements, 9 non-functional, 15 acceptance criteria._
-> _All 27 requirements implemented and verified._
+> _34 functional requirements, 9 non-functional, 22 acceptance criteria._
+> _All 34 requirements implemented and verified._
 
 | Req ID | Description | Impl | Tested |
 |--------|-------------|------|--------|
@@ -117,6 +122,11 @@ blockers: []
 | R-027 | Lazy loading/virtual scroll | ✅ | 🧪 |
 | R-028 | Project & repository clustering | ✅ | 🧪 |
 | R-029 | Flexible user-driven grouping | ✅ | 🧪 |
+| R-030 | Agent WIP recovery API | ✅ | 🧪 |
+| R-031 | Multi-session disambiguation protocol | ✅ | 🧪 |
+| R-032 | OpenAPI 3.0 & Swagger UI | ✅ | 🧪 |
+| R-033 | One-click skill installer | ✅ | 🧪 |
+| R-034 | Headless CLI & wip script | ✅ | 🧪 |
 
 ---
 

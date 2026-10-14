@@ -9,7 +9,7 @@
 
 .PHONY: help setup new-tool test test-tool lint lint-tool build build-tool \
         run-tool demo-tool validate-specs catalog status clean \
-        session-explorer omni-graph ingest cluster workspaces search-graph query-graph \
+        session-explorer session-wip setup-session-wip omni-graph ingest cluster workspaces search-graph query-graph \
         graph-symbol graph-references graph-condense graph-galaxies graph-health relate-graph health \
         reset-graph-db nuke-graph-db sync-worktrees
 
@@ -68,6 +68,8 @@ help: ## Show this interactive command directory
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "run-tool T=<name>"         "Launch a tool (e.g. make run-tool T=session-explorer)"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "demo-tool T=<name>"        "Run automated demo for a tool (e.g. make demo-tool T=session-explorer)"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "session-explorer"          "Quick launcher: build and run Session Explorer web UI"
+	@printf "  $(CYAN)%-24s$(NC) %s\n" "session-wip"               "Recover agent WIP: make session-wip [PROJECT=name] [LATEST=1]"
+	@printf "  $(CYAN)%-24s$(NC) %s\n" "setup-session-wip"         "Deploy session-wip agent recovery skill (TARGET=workspace|global)"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "omni-graph"                "Quick launcher: start Omni-Graph semantic knowledge stack"
 	@printf "\n"
 	@printf "$(BOLD)🧠 Omni-Graph Semantic Hub & Graph RAG:$(NC)\n"
@@ -142,6 +144,12 @@ demo-tool: ## Run automated demo for a tool (T=tool-name)
 
 session-explorer: ## Quick launcher for Session Explorer
 	@$(MAKE) run-tool T=session-explorer ARGS="$(ARGS)"
+
+session-wip: ## Recover agent WIP state: make session-wip [PROJECT=name] [LATEST=1] [SESSION=id]
+	@$(MAKE) -C $(TOOLS_DIR)/session-explorer wip PROJECT="$(PROJECT)" LATEST="$(LATEST)" SESSION="$(SESSION)"
+
+setup-session-wip: ## Install session-wip recovery skill: make setup-session-wip [TARGET=workspace|global]
+	@$(MAKE) -C $(TOOLS_DIR)/session-explorer setup-skill TARGET="$(TARGET)"
 
 omni-graph: ## Quick launcher: start Omni-Graph semantic knowledge stack
 	@$(MAKE) -C $(TOOLS_DIR)/omni-graph up

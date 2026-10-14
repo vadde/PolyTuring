@@ -390,3 +390,129 @@ func TestExtractProjectName_Sanitization(t *testing.T) {
 	}
 }
 
+// TestR030_GetWorkspaceWIP_SingleSession tests WIP recovery when exactly 1 session exists
+func TestR030_GetWorkspaceWIP_SingleSession(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-14T10:00:00Z","content":"<USER_REQUEST>Implement feature X</USER_REQUEST>\n<ADDITIONAL_METADATA>\nActive Document: /Users/test/workspace/app/main.go\n</ADDITIONAL_METADATA>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-14T10:01:00Z","content":"I am editing the file now","tool_calls":[{"name":"write_to_file","args":{"TargetFile":"/Users/test/workspace/app/main.go","CodeContent":"package main\n"}},{"name":"run_command","args":{"CommandLine":"go test ./..."}}]}
+{"step_index":2,"source":"SYSTEM","type":"ERROR_MESSAGE","status":"ERROR","created_at":"2026-10-14T10:02:00Z","content":"compile error: undefined foo"}`
+
+	createMockSession(t, tmpDir, "session-wip-1", content)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	wip, err := idx.GetWorkspaceWIP("app", "", false, 5)
+	if err != nil {
+		t.Fatalf("GetWorkspaceWIP failed: %v", err)
+	}
+
+	if wip.Status != "resolved" {
+		t.Errorf("expected status 'resolved', got %q", wip.Status)
+	}
+	if wip.ActiveSession == nil {
+		t.Fatalf("expected non-nil ActiveSession")
+	}
+	if wip.ActiveSession.SessionID != "session-wip-1" {
+		t.Errorf("expected session-wip-1, got %s", wip.ActiveSession.SessionID)
+	}
+	if len(wip.ActiveSession.RecentPrompts) != 1 {
+		t.Errorf("expected 1 recent prompt, got %d", len(wip.ActiveSession.RecentPrompts))
+	}
+	if len(wip.ActiveSession.ModifiedFiles) != 1 || wip.ActiveSession.ModifiedFiles[0] != "/Users/test/workspace/app/main.go" {
+		t.Errorf("expected modified file /Users/test/workspace/app/main.go, got %v", wip.ActiveSession.ModifiedFiles)
+	}
+	if len(wip.ActiveSession.ExecutedCommands) != 1 || wip.ActiveSession.ExecutedCommands[0] != "go test ./..." {
+		t.Errorf("expected executed command 'go test ./...', got %v", wip.ActiveSession.ExecutedCommands)
+	}
+	if len(wip.ActiveSession.UnresolvedErrors) != 1 {
+		t.Errorf("expected 1 unresolved error, got %d", len(wip.ActiveSession.UnresolvedErrors))
+	}
+}
+
+// TestR031_GetWorkspaceWIP_MultiSession_AmbiguousHalt tests mandatory halt when multiple sessions exist
+func TestR031_GetWorkspaceWIP_MultiSession_AmbiguousHalt(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	contentOld := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-10T10:00:00Z","content":"<USER_REQUEST>Old session prompt</USER_REQUEST>\n<ADDITIONAL_METADATA>\nActive Document: /Users/test/workspace/app/old.go\n</ADDITIONAL_METADATA>"}`
+	contentNew := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-14T10:00:00Z","content":"<USER_REQUEST>New session prompt</USER_REQUEST>\n<ADDITIONAL_METADATA>\nActive Document: /Users/test/workspace/app/new.go\n</ADDITIONAL_METADATA>"}`
+
+	createMockSession(t, tmpDir, "session-old-100", contentOld)
+	createMockSession(t, tmpDir, "session-new-200", contentNew)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	// 1. Without forceLatest and without sessionID -> MUST return ambiguous_multi_session and candidates
+	wip, err := idx.GetWorkspaceWIP("app", "", false, 5)
+	if err != nil {
+		t.Fatalf("GetWorkspaceWIP failed: %v", err)
+	}
+
+	if wip.Status != "ambiguous_multi_session" {
+		t.Fatalf("expected status 'ambiguous_multi_session', got %q", wip.Status)
+	}
+	if wip.ActiveSession != nil {
+		t.Errorf("expected nil ActiveSession on ambiguous halt")
+	}
+	if len(wip.Candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(wip.Candidates))
+	}
+	// Verify candidates are sorted newest first
+	if wip.Candidates[0].SessionID != "session-new-200" {
+		t.Errorf("expected newest candidate first (session-new-200), got %s", wip.Candidates[0].SessionID)
+	}
+	if wip.Candidates[1].SessionID != "session-old-100" {
+		t.Errorf("expected older candidate second (session-old-100), got %s", wip.Candidates[1].SessionID)
+	}
+	if wip.Instruction == "" {
+		t.Errorf("expected instruction to halt and prompt user")
+	}
+
+	// 2. With forceLatest=true -> Must resolve directly to session-new-200
+	wipLatest, err := idx.GetWorkspaceWIP("app", "", true, 5)
+	if err != nil {
+		t.Fatalf("GetWorkspaceWIP with forceLatest failed: %v", err)
+	}
+	if wipLatest.Status != "resolved" {
+		t.Fatalf("expected status 'resolved' with forceLatest, got %q", wipLatest.Status)
+	}
+	if wipLatest.ActiveSession.SessionID != "session-new-200" {
+		t.Errorf("expected session-new-200, got %s", wipLatest.ActiveSession.SessionID)
+	}
+
+	// 3. With direct sessionID -> Must resolve directly to selected session
+	wipExplicit, err := idx.GetWorkspaceWIP("app", "session-old-100", false, 5)
+	if err != nil {
+		t.Fatalf("GetWorkspaceWIP with sessionID failed: %v", err)
+	}
+	if wipExplicit.Status != "resolved" {
+		t.Fatalf("expected status 'resolved' with explicit sessionID, got %q", wipExplicit.Status)
+	}
+	if wipExplicit.ActiveSession.SessionID != "session-old-100" {
+		t.Errorf("expected session-old-100, got %s", wipExplicit.ActiveSession.SessionID)
+	}
+}
+
+// TestR030_GetWorkspaceWIP_NotFound tests behavior when workspace has no sessions
+func TestR030_GetWorkspaceWIP_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	wip, err := idx.GetWorkspaceWIP("nonexistent-project", "", false, 5)
+	if err != nil {
+		t.Fatalf("GetWorkspaceWIP failed: %v", err)
+	}
+	if wip.Status != "not_found" {
+		t.Errorf("expected status 'not_found', got %q", wip.Status)
+	}
+}
+

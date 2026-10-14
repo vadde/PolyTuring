@@ -1042,3 +1042,363 @@ func createSearchPreview(content, queryLower string, maxLen int) string {
 
 	return preview
 }
+
+// formatRelativeTime converts a duration into a human-friendly string.
+func formatRelativeTime(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	secs := int(d.Seconds())
+	if secs < 60 {
+		return "just now"
+	}
+	mins := secs / 60
+	if mins < 60 {
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	}
+	hours := mins / 60
+	if hours < 24 {
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	}
+	days := hours / 24
+	if days == 1 {
+		return "yesterday"
+	}
+	return fmt.Sprintf("%d days ago", days)
+}
+
+// GetWorkspaceWIP resolves the recent work-in-progress state for a workspace or session ID.
+// Implements: R-030 (Agent WIP Recovery API), R-031 (Multi-Session Disambiguation Invariant)
+func (idx *SessionIndex) GetWorkspaceWIP(workspace, sessionID string, forceLatest bool, limit int) (*WIPResponse, error) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	// 1. Direct Session ID lookup
+	if sessionID != "" {
+		for _, s := range idx.sessions {
+			if s.ID == sessionID {
+				digest, err := idx.buildWIPDigest(&s)
+				if err != nil {
+					return nil, err
+				}
+				return &WIPResponse{
+					Status:         "resolved",
+					Multiple:       false,
+					Workspace:      s.Workspace,
+					CandidateCount: 1,
+					ActiveSession:  digest,
+				}, nil
+			}
+		}
+		return &WIPResponse{
+			Status:         "not_found",
+			Multiple:       false,
+			Workspace:      workspace,
+			CandidateCount: 0,
+			Instruction:    fmt.Sprintf("Session ID %q was not found.", sessionID),
+		}, nil
+	}
+
+	// 2. Filter matching sessions by workspace
+	matches := make([]Session, 0)
+	wsTarget := strings.TrimSpace(workspace)
+	wsTargetClean := extractProjectName(wsTarget)
+
+	for _, s := range idx.sessions {
+		if wsTarget == "" {
+			matches = append(matches, s)
+			continue
+		}
+
+		wsLower := strings.ToLower(wsTarget)
+		cleanLower := strings.ToLower(wsTargetClean)
+
+		matched := strings.EqualFold(s.ProjectName, wsTarget) ||
+			strings.EqualFold(s.ProjectName, wsTargetClean) ||
+			strings.Contains(strings.ToLower(s.Workspace), wsLower) ||
+			strings.Contains(strings.ToLower(s.ProjectName), wsLower) ||
+			(cleanLower != "default" && strings.EqualFold(s.ProjectName, cleanLower))
+
+		if !matched {
+			for _, pt := range s.ProjectsTouched {
+				if strings.EqualFold(pt, wsTarget) || strings.EqualFold(pt, wsTargetClean) ||
+					strings.Contains(strings.ToLower(pt), wsLower) {
+					matched = true
+					break
+				}
+			}
+		}
+
+		if matched {
+			matches = append(matches, s)
+		}
+	}
+
+	if len(matches) == 0 {
+		return &WIPResponse{
+			Status:         "not_found",
+			Multiple:       false,
+			Workspace:      workspace,
+			CandidateCount: 0,
+			Instruction:    fmt.Sprintf("No active sessions found for workspace %q.", workspace),
+		}, nil
+	}
+
+	// Sort matching sessions by LastMessageAt (descending)
+	sort.Slice(matches, func(i, j int) bool {
+		ti := matches[i].LastMessageAt
+		if ti.IsZero() {
+			ti = matches[i].CreatedAt
+		}
+		tj := matches[j].LastMessageAt
+		if tj.IsZero() {
+			tj = matches[j].CreatedAt
+		}
+		return ti.After(tj)
+	})
+
+	now := time.Now()
+
+	// 3. Multi-Session Disambiguation Invariant (R-031):
+	// If multiple sessions exist and caller did not explicitly force the latest,
+	// agent MUST STOP and ask the user to disambiguate.
+	if len(matches) > 1 && !forceLatest {
+		candCount := len(matches)
+		if candCount > limit {
+			candCount = limit
+		}
+
+		candidates := make([]SessionCandidate, 0, candCount)
+		for i := 0; i < candCount; i++ {
+			s := matches[i]
+			lastAt := s.LastMessageAt
+			if lastAt.IsZero() {
+				lastAt = s.CreatedAt
+			}
+
+			// Get last prompt preview
+			lastPrompt := s.FirstUserPromptPreview
+			entries, ok := idx.entryCache[s.ID]
+			if ok {
+				for j := len(entries) - 1; j >= 0; j-- {
+					if entries[j].Type == "USER_INPUT" && entries[j].Source == "USER_EXPLICIT" {
+						clean := extractUserPrompt(entries[j].Content)
+						if clean != "" {
+							if len(clean) > 80 {
+								lastPrompt = clean[:80] + "..."
+							} else {
+								lastPrompt = clean
+							}
+							break
+						}
+					}
+				}
+			}
+
+			candidates = append(candidates, SessionCandidate{
+				SessionID:          s.ID,
+				CreatedAt:          s.CreatedAt,
+				LastMessageAt:      lastAt,
+				RelativeTime:       formatRelativeTime(now.Sub(lastAt)),
+				Workspace:          s.Workspace,
+				ProjectName:        s.ProjectName,
+				StepCount:          s.StepCount,
+				UserMessageCount:   s.UserMessageCount,
+				ErrorCount:         s.ErrorCount,
+				FirstPromptPreview: s.FirstUserPromptPreview,
+				LastPromptPreview:  lastPrompt,
+			})
+		}
+
+		return &WIPResponse{
+			Status:         "ambiguous_multi_session",
+			Multiple:       true,
+			Workspace:      workspace,
+			CandidateCount: len(matches),
+			Candidates:     candidates,
+			Instruction:    "MANDATORY: Multiple sessions found for this workspace. You MUST STOP immediately and ask the user which session they wish to resume. Present the options with their timestamps and prompt previews.",
+		}, nil
+	}
+
+	// 4. Single session resolved (or forced latest)
+	target := matches[0]
+	digest, err := idx.buildWIPDigest(&target)
+	if err != nil {
+		return nil, err
+	}
+
+	return &WIPResponse{
+		Status:         "resolved",
+		Multiple:       false,
+		Workspace:      target.Workspace,
+		CandidateCount: len(matches),
+		ActiveSession:  digest,
+	}, nil
+}
+
+// buildWIPDigest constructs the detailed work-in-progress summary for a single session.
+func (idx *SessionIndex) buildWIPDigest(session *Session) (*WIPDigest, error) {
+	// Prefer full transcript if available
+	transcriptPath := filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript.jsonl")
+	if session.HasFullTranscript {
+		fullPath := filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript_full.jsonl")
+		if _, err := os.Stat(fullPath); err == nil {
+			transcriptPath = fullPath
+		}
+	}
+
+	file, err := os.Open(transcriptPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open transcript: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	entries := make([]TranscriptEntry, 0)
+	for scanner.Scan() {
+		var entry TranscriptEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+
+	lastAt := session.LastMessageAt
+	if lastAt.IsZero() {
+		lastAt = session.CreatedAt
+	}
+
+	digest := &WIPDigest{
+		SessionID:        session.ID,
+		Workspace:        session.Workspace,
+		ProjectName:      session.ProjectName,
+		CreatedAt:        session.CreatedAt,
+		LastMessageAt:    lastAt,
+		RelativeTime:     formatRelativeTime(time.Since(lastAt)),
+		StepCount:        session.StepCount,
+		UserMessageCount: session.UserMessageCount,
+		ErrorCount:       session.ErrorCount,
+		RecentPrompts:    make([]string, 0),
+		RecentResponses:  make([]string, 0),
+		ModifiedFiles:    make([]string, 0),
+		ExecutedCommands: make([]string, 0),
+		LastToolCalls:    make([]ToolCallDisplay, 0),
+		UnresolvedErrors: make([]string, 0),
+	}
+
+	modifiedFilesSet := make(map[string]bool)
+	commandsSet := make(map[string]bool)
+
+	// Collect from entries in reverse chronological order
+	promptCount := 0
+	responseCount := 0
+
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+
+		// 1. Recent user prompts
+		if entry.Type == "USER_INPUT" && entry.Source == "USER_EXPLICIT" && promptCount < 3 {
+			clean := extractUserPrompt(entry.Content)
+			if clean != "" {
+				digest.RecentPrompts = append(digest.RecentPrompts, clean)
+				promptCount++
+			}
+		}
+
+		// 2. Recent planner responses
+		if entry.Type == "PLANNER_RESPONSE" && responseCount < 3 {
+			cleanResp := strings.TrimSpace(entry.Content)
+			if cleanResp != "" {
+				// Strip overly verbose outputs if needed, keeping up to 1000 characters
+				if len(cleanResp) > 1000 {
+					cleanResp = cleanResp[:1000] + "..."
+				}
+				digest.RecentResponses = append(digest.RecentResponses, cleanResp)
+				responseCount++
+			}
+		}
+
+		// 3. Tool calls inspection (modified files and shell commands)
+		for _, tc := range entry.ToolCalls {
+			if len(digest.LastToolCalls) < 5 {
+				argsJSON, _ := json.Marshal(tc.Args)
+				preview := string(argsJSON)
+				if len(preview) > 120 {
+					preview = preview[:120] + "..."
+				}
+				digest.LastToolCalls = append(digest.LastToolCalls, ToolCallDisplay{
+					Name:        tc.Name,
+					ArgsPreview: preview,
+					Args:        tc.Args,
+				})
+			}
+
+			// File modifications
+			if tc.Name == "write_to_file" || tc.Name == "replace_file_content" || tc.Name == "multi_replace_file_content" {
+				if tf, ok := tc.Args["TargetFile"].(string); ok && tf != "" {
+					if !modifiedFilesSet[tf] {
+						modifiedFilesSet[tf] = true
+						digest.ModifiedFiles = append(digest.ModifiedFiles, tf)
+					}
+				}
+			}
+
+			// Executed commands
+			if tc.Name == "run_command" {
+				if cmd, ok := tc.Args["CommandLine"].(string); ok && cmd != "" {
+					if !commandsSet[cmd] {
+						commandsSet[cmd] = true
+						digest.ExecutedCommands = append(digest.ExecutedCommands, cmd)
+					}
+				}
+			}
+		}
+
+		// 4. Unresolved errors in recent steps
+		if (entry.Status == "ERROR" || entry.Type == "ERROR_MESSAGE") && len(digest.UnresolvedErrors) < 3 {
+			errMsg := entry.Content
+			if len(errMsg) > 250 {
+				errMsg = errMsg[:250] + "..."
+			}
+			digest.UnresolvedErrors = append(digest.UnresolvedErrors, errMsg)
+		}
+	}
+
+	// Reverse recent prompts and responses so they are in forward chronological order
+	for i, j := 0, len(digest.RecentPrompts)-1; i < j; i, j = i+1, j-1 {
+		digest.RecentPrompts[i], digest.RecentPrompts[j] = digest.RecentPrompts[j], digest.RecentPrompts[i]
+	}
+	for i, j := 0, len(digest.RecentResponses)-1; i < j; i, j = i+1, j-1 {
+		digest.RecentResponses[i], digest.RecentResponses[j] = digest.RecentResponses[j], digest.RecentResponses[i]
+	}
+
+	// Construct concise suggested continuation
+	if len(digest.RecentPrompts) > 0 {
+		lastPrompt := digest.RecentPrompts[len(digest.RecentPrompts)-1]
+		if len(lastPrompt) > 100 {
+			lastPrompt = lastPrompt[:100] + "..."
+		}
+		digest.SuggestedContinuation = fmt.Sprintf("Last prompt was: %q. %d files modified.", lastPrompt, len(digest.ModifiedFiles))
+	} else {
+		digest.SuggestedContinuation = "Ready to resume work on active workspace."
+	}
+
+	return digest, nil
+}
+

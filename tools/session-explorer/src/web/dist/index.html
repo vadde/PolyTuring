@@ -50,6 +50,12 @@
         <span class="last-sync-label" id="lastSyncLabel">Synced just now</span>
       </div>
 
+      <button class="btn-pill" id="installSkillBtn" title="Install Agent WIP Recovery Skill">
+        <span>⚡</span> Install Skill
+      </button>
+      <a href="/docs" target="_blank" class="btn-pill" id="apiDocsBtn" title="OpenAPI 3.0 & Interactive Swagger UI" style="text-decoration: none; color: inherit;">
+        <span>📖</span> API Docs
+      </a>
       <button class="btn-pill" id="insightsBtn" title="Prompt Frequency & Tool Call Analytics">
         <span>📊</span> Insights
       </button>
@@ -252,6 +258,50 @@
           </h4>
           <div id="topPromptsList">
             <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTALL SKILL MODAL -->
+  <div class="modal-overlay" id="installSkillModal">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <div class="modal-title">⚡ Install Session WIP Recovery Skill</div>
+        <button class="btn-icon" id="closeInstallModalBtn">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.25rem;">
+          Equip autonomous AI coding companions with the <strong style="color: var(--accent-cyan);">session-wip</strong> skill. Enables assistants to pick up slack after context wipes or crashes, inspect recent prompt histories, and adhere to the <strong>Multi-Session Disambiguation Invariant</strong>.
+        </p>
+
+        <div style="margin-bottom: 1.5rem;">
+          <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.5rem;">Installation Target:</label>
+          <div style="display: flex; gap: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; cursor: pointer;">
+              <input type="radio" name="skillTarget" value="workspace" checked>
+              <span>Current Workspace (<code style="color: var(--accent-cyan);">.agents/skills/</code>)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; cursor: pointer;">
+              <input type="radio" name="skillTarget" value="global">
+              <span>Global System (<code style="color: var(--accent-cyan);">~/.gemini/config/</code>)</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.5rem;">
+          <button class="btn-pill" id="doInstallSkillBtn" style="background: linear-gradient(135deg, rgba(0,242,254,0.3), rgba(168,85,247,0.3)); border-color: var(--accent-cyan); padding: 0.65rem 1.4rem; font-weight: 700; font-size: 0.9rem;">
+            ⚡ One-Click Install
+          </button>
+          <span id="installStatusText" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 1.25rem;">
+          <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem;">Or install via Terminal Command:</div>
+          <div style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <code style="font-family: monospace; font-size: 0.85rem; color: var(--accent-cyan);">make setup-session-wip</code>
+            <button class="btn-ghost-sm" id="copyInstallCmdBtn">Copy</button>
           </div>
         </div>
       </div>

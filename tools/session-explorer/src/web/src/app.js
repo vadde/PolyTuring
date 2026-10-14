@@ -95,6 +95,12 @@ const el = {
   closeInsightsModalBtn: document.getElementById('closeInsightsModalBtn'),
   topToolsList: document.getElementById('topToolsList'),
   topPromptsList: document.getElementById('topPromptsList'),
+  installSkillBtn: document.getElementById('installSkillBtn'),
+  installSkillModal: document.getElementById('installSkillModal'),
+  closeInstallModalBtn: document.getElementById('closeInstallModalBtn'),
+  doInstallSkillBtn: document.getElementById('doInstallSkillBtn'),
+  copyInstallCmdBtn: document.getElementById('copyInstallCmdBtn'),
+  installStatusText: document.getElementById('installStatusText'),
   toast: document.getElementById('toastNotification')
 };
 
@@ -239,6 +245,17 @@ function initEventListeners() {
   if (el.insightsBtn) el.insightsBtn.addEventListener('click', openInsightsModal);
   if (el.closeInsightsModalBtn) el.closeInsightsModalBtn.addEventListener('click', closeInsightsModal);
 
+  // Install Skill Modal (R-033)
+  if (el.installSkillBtn) el.installSkillBtn.addEventListener('click', openInstallModal);
+  if (el.closeInstallModalBtn) el.closeInstallModalBtn.addEventListener('click', closeInstallModal);
+  if (el.copyInstallCmdBtn) {
+    el.copyInstallCmdBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText('make setup-session-wip');
+      showToast('Command copied: make setup-session-wip');
+    });
+  }
+  if (el.doInstallSkillBtn) el.doInstallSkillBtn.addEventListener('click', executeInstallSkill);
+
   // Global search triggers
   if (el.globalSearchInput) {
     el.globalSearchInput.addEventListener('focus', () => {
@@ -277,6 +294,8 @@ function initEventListeners() {
         closeSearchModal();
       } else if (el.insightsModal && el.insightsModal.classList.contains('active')) {
         closeInsightsModal();
+      } else if (el.installSkillModal && el.installSkillModal.classList.contains('active')) {
+        closeInstallModal();
       } else if (state.currentView === 'detail') {
         showDashboard();
       }
@@ -1738,6 +1757,45 @@ function openInsightsModal() {
 function closeInsightsModal() {
   if (!el.insightsModal) return;
   el.insightsModal.classList.remove('active');
+}
+
+// Install Skill Modal (R-033)
+function openInstallModal() {
+  if (!el.installSkillModal) return;
+  el.installSkillModal.classList.add('active');
+  if (el.installStatusText) el.installStatusText.textContent = '';
+}
+
+function closeInstallModal() {
+  if (!el.installSkillModal) return;
+  el.installSkillModal.classList.remove('active');
+}
+
+async function executeInstallSkill() {
+  const selectedTarget = document.querySelector('input[name="skillTarget"]:checked')?.value || 'workspace';
+  if (el.installStatusText) el.installStatusText.textContent = '⏳ Installing skill...';
+  if (el.doInstallSkillBtn) el.doInstallSkillBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/skill/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: selectedTarget })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (el.installStatusText) el.installStatusText.textContent = '✅ ' + data.message;
+      showToast('✅ Skill installed: ' + selectedTarget);
+    } else {
+      if (el.installStatusText) el.installStatusText.textContent = '❌ ' + (data.message || 'Installation failed');
+      showToast('❌ Installation error');
+    }
+  } catch (err) {
+    if (el.installStatusText) el.installStatusText.textContent = '❌ ' + err.message;
+    showToast('❌ ' + err.message);
+  } finally {
+    if (el.doInstallSkillBtn) el.doInstallSkillBtn.disabled = false;
+  }
 }
 
 // Helpers
