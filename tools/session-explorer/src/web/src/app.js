@@ -238,6 +238,7 @@ const state = {
   followStream: true,
   tailEventSource: null,
   tailStreaming: true,
+  pendingStepsBuffer: [], // buffered incoming steps when user is detached (followStream: false)
   renderedStepMap: new Map() // step_index -> HTMLElement
 };
 
@@ -655,13 +656,7 @@ function initEventListeners() {
       state.followStream = !state.followStream;
       el.toggleFollowStreamBtn.classList.toggle('active', state.followStream);
       if (state.followStream) {
-        const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
-        if (isDesc) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }
-        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+        flushPendingSteps();
       }
     });
   }
@@ -669,15 +664,7 @@ function initEventListeners() {
   // Floating "New steps arrived" Click Listener
   if (el.newStepsFloatingBtn) {
     el.newStepsFloatingBtn.addEventListener('click', () => {
-      state.followStream = true;
-      if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.add('active');
-      el.newStepsFloatingBtn.style.display = 'none';
-      const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
-      if (isDesc) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      }
+      flushPendingSteps();
     });
   }
 
@@ -685,27 +672,19 @@ function initEventListeners() {
   window.addEventListener('scroll', () => {
     if (state.currentView !== 'detail') return;
     const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
-    if (isDesc) {
-      // In Latest First, stream arrives at the top
-      if (window.scrollY <= 150) {
-        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
-      } else {
-        if (state.followStream) {
-          state.followStream = false;
-          if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.remove('active');
-        }
+    const isAtHead = isDesc
+      ? window.scrollY <= 150
+      : (window.innerHeight + window.scrollY >= document.body.offsetHeight - 150);
+
+    if (!isAtHead) {
+      if (state.followStream) {
+        state.followStream = false;
+        if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.remove('active');
       }
     } else {
-      // In Oldest First, stream arrives at the bottom
-      const scrollBottom = window.innerHeight + window.scrollY;
-      const threshold = document.body.offsetHeight - 150;
-      if (scrollBottom >= threshold) {
+      // At stream head: if there are no pending buffered steps, hide the floating button
+      if (!state.pendingStepsBuffer || state.pendingStepsBuffer.length === 0) {
         if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
-      } else {
-        if (state.followStream) {
-          state.followStream = false;
-          if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.remove('active');
-        }
       }
     }
   }, { passive: true });
@@ -1579,6 +1558,10 @@ function showDetailView(detail) {
   state.sessionStepSearch = '';
   state.sessionStepSort = 'step_desc';
   state.messageFilter = 'ALL';
+  state.followStream = true;
+  state.pendingStepsBuffer = [];
+  if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.add('active');
+  if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 
   if (el.sessionStepSearchInput) el.sessionStepSearchInput.value = '';
   if (el.clearSessionStepSearchBtn) el.clearSessionStepSearchBtn.style.display = 'none';
@@ -1627,6 +1610,8 @@ function showDashboard(updateHash = true) {
   state.selectedSessionId = null;
   state.activeTimelineSessionId = null;
   state.renderedStepMap.clear();
+  state.pendingStepsBuffer = [];
+  if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 
   if (el.detailView) el.detailView.classList.remove('active');
   if (el.dashboardView) el.dashboardView.style.display = 'block';
@@ -1681,6 +1666,8 @@ function resetSessionStepFilters() {
   state.sessionStepSearch = '';
   state.sessionStepSort = 'step_desc';
   state.messageFilter = 'ALL';
+  state.pendingStepsBuffer = [];
+  if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 
   if (el.sessionStepSearchInput) el.sessionStepSearchInput.value = '';
   if (el.clearSessionStepSearchBtn) el.clearSessionStepSearchBtn.style.display = 'none';
@@ -1826,6 +1813,8 @@ function renderTimelineMessages() {
   if (hasActiveStepFilters || !isDefaultDesc || childCount === 0 || state.renderedStepMap.size === 0) {
     el.timelineContainer.innerHTML = '';
     state.renderedStepMap.clear();
+    state.pendingStepsBuffer = [];
+    if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 
     const fragment = document.createDocumentFragment();
     for (const msg of filteredAndSorted) {
@@ -2049,6 +2038,51 @@ function stepMatchesActiveFilters(step) {
   return false;
 }
 
+// Atomically mount buffered incoming steps and glide smoothly to stream head
+function flushPendingSteps() {
+  const buffered = state.pendingStepsBuffer || [];
+  state.pendingStepsBuffer = [];
+
+  if (el.newStepsFloatingBtn) {
+    el.newStepsFloatingBtn.style.display = 'none';
+  }
+
+  state.followStream = true;
+  if (el.toggleFollowStreamBtn) {
+    el.toggleFollowStreamBtn.classList.add('active');
+  }
+
+  const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+
+  if (buffered.length > 0) {
+    // Sort in ascending order of step_index so prepend/append maintains chronological integrity
+    buffered.sort((a, b) => a.step_index - b.step_index);
+    for (const step of buffered) {
+      if (!stepMatchesActiveFilters(step)) continue;
+      if (state.renderedStepMap.has(step.step_index)) continue;
+
+      const temp = document.createElement('div');
+      temp.innerHTML = buildStepHtml(step);
+      const newNode = temp.firstElementChild;
+      newNode.classList.add('step-enter');
+      state.renderedStepMap.set(step.step_index, newNode);
+
+      if (isDesc) {
+        el.timelineContainer.prepend(newNode);
+      } else {
+        el.timelineContainer.appendChild(newNode);
+      }
+      attachStepInteractivity(newNode);
+    }
+  }
+
+  if (isDesc) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+}
+
 // Real-Time Incremental Append & Patch (O(Δ) Keyed DOM Reconciliation)
 function appendOrPatchStep(step) {
   if (!state.selectedSessionDetail) return;
@@ -2068,7 +2102,7 @@ function appendOrPatchStep(step) {
     el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
   }
 
-  // Keyed DOM: check if node already exists
+  // Keyed DOM: check if node already exists in DOM (e.g. status transition RUNNING -> DONE)
   if (state.renderedStepMap.has(step.step_index)) {
     const existingNode = state.renderedStepMap.get(step.step_index);
     if (existingNode.dataset.status !== step.status) {
@@ -2088,13 +2122,39 @@ function appendOrPatchStep(step) {
     return;
   }
 
+  // Determine if user is currently watching the live stream head
+  const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+  const isAtStreamHead = isDesc
+    ? window.scrollY <= 150
+    : (window.innerHeight + window.scrollY >= document.body.offsetHeight - 150);
+
+  // If detached from stream head or follow is disabled:
+  // Buffer the step into memory to prevent viewport shifts / layout jumping while reading.
+  if (!state.followStream || !isAtStreamHead) {
+    const bufIdx = state.pendingStepsBuffer.findIndex(s => s.step_index === step.step_index);
+    if (bufIdx !== -1) {
+      state.pendingStepsBuffer[bufIdx] = step;
+    } else {
+      state.pendingStepsBuffer.push(step);
+    }
+
+    const count = state.pendingStepsBuffer.length;
+    if (el.newStepsFloatingBtn) {
+      el.newStepsFloatingBtn.innerHTML = isDesc
+        ? `<span class="new-steps-count-badge">${count}</span> new step${count > 1 ? 's' : ''} arrived <span>↑</span>`
+        : `<span class="new-steps-count-badge">${count}</span> new step${count > 1 ? 's' : ''} arrived <span>↓</span>`;
+      el.newStepsFloatingBtn.style.display = 'inline-flex';
+    }
+    return;
+  }
+
+  // User is actively following stream at head: mount directly
   const temp = document.createElement('div');
   temp.innerHTML = buildStepHtml(step);
   const newNode = temp.firstElementChild;
   newNode.classList.add('step-enter');
   state.renderedStepMap.set(step.step_index, newNode);
 
-  const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
   if (isDesc) {
     el.timelineContainer.prepend(newNode);
   } else {
@@ -2102,19 +2162,12 @@ function appendOrPatchStep(step) {
   }
   attachStepInteractivity(newNode);
 
-  if (state.followStream) {
-    if (isDesc) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      newNode.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-    if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+  if (isDesc) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
-    if (el.newStepsFloatingBtn) {
-      el.newStepsFloatingBtn.innerHTML = isDesc ? '<span>↑</span> New steps arrived' : '<span>↓</span> New steps arrived';
-      el.newStepsFloatingBtn.style.display = 'inline-flex';
-    }
+    newNode.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
+  if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 }
 
 // Real-Time SSE Log Tailer Management

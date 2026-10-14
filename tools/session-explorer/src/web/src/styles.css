@@ -2059,6 +2059,17 @@ body {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 28px rgba(6, 182, 212, 0.5);
 }
 
+.new-steps-floating-btn .new-steps-count-badge {
+  background: var(--accent-cyan);
+  color: #0a0d14;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.12rem 0.5rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+}
+
 @keyframes floatBounce {
   0%, 100% {
     transform: translateX(-50%) translateY(0);

@@ -627,3 +627,32 @@
 
 ---
 
+### 2026-10-14 — Layout Shift Retrospective: Zero-Shift Staged Buffer Live Tailing & Viewport Pinning
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (UI/UX Engineering & Viewport Stability)  
+**Duration**: ~15m
+
+#### Retrospective & Multi-Lens Root Cause Analysis
+1. **Principal Engineer Lens (Layout Geometry & DOM Mutation Invariants)**:
+   - *The Flaw*: In `step_desc` (Latest First) mode, the stream head is at the top of the `#timelineContainer`. Previously, `appendOrPatchStep(step)` called `el.timelineContainer.prepend(newNode)` immediately upon SSE arrival regardless of whether `state.followStream` was enabled or where the user was looking.
+   - *The Geometry*: In standard CSS box layout flow, prepending an element of height $\Delta h$ (200–500px) above the current scroll offset shifts all content below it downward by $\Delta h$. Even though `window.scrollTo` was guarded by `if (state.followStream)`, the DOM mutation itself physically shifted the element the user was reading, causing violent screen jumping.
+   - *The Principle*: When detached (`!followStream` or `scrollY > 150`), DOM mutations must not perturb layout geometry. The correct architectural pattern is **Zero DOM Mutation via In-Memory Staging**.
+2. **Frontend Engineer Lens (Staged Queue & Keyed In-Place Patching)**:
+   - When detached, new steps are held in an in-memory queue (`state.pendingStepsBuffer`).
+   - If an incoming event is a status update to an *existing* node already in the DOM (e.g. `RUNNING` to `DONE`), it updates in place via `replaceWith`, preserving viewport position.
+   - When the user reconnects / re-engages follow (via clicking the floating pill or toggling the Follow button), the queue is flushed in a single atomic batch, prepended in correct order, and the viewport smoothly glides to the stream head.
+3. **UX / Product Designer Lens (Feedback & Cognitive Focus)**:
+   - The floating indicator at the bottom now features an acrylic pill badge with an exact counter (`↑ 3 new steps arrived`).
+   - The user's screen remains 100% frozen ($\Delta y = 0$) while examining earlier steps, eliminating disorientation.
+   - Seamless transition: clicking the badge flushes the buffered steps, resets the badge, and scrolls to top.
+
+#### Files Changed
+- `src/web/src/styles.css` — Added `.new-steps-floating-btn .new-steps-count-badge` with glowing cyan badge styling.
+- `src/web/src/app.js` — Added `pendingStepsBuffer`, `flushPendingSteps()`, detached staging logic in `appendOrPatchStep`, updated click handlers for `#newStepsFloatingBtn` and `#toggleFollowStreamBtn`, and buffer cleanups on view transitions.
+- `src/web/dist/` — Rebuilt and verified with Bun (`bun run build`).
+- `bin/session-explorer` — Recompiled standalone Go binary.
+- `CONTEXT.md` & `DEVLOG.md` — Updated with Staged Buffer layout stability decision and retrospective.
+
+---
+
