@@ -580,3 +580,50 @@
 - **Public Documentation Purity**: Internal requirements IDs (`R-XXX`) belong strictly in specs, devlogs, and status files—never in public customer-facing docs.
 
 ---
+
+## Session 2026-10-14 — Real-Time Live Tailing, Dynamic Interval Sync, Keyed DOM Reconciliation & Route Persistence (v0.2.1)
+
+**Agent**: Antigravity  
+**Goal**: Implement real-time live tailing for active IDE coding assistant sessions; eliminate full DOM rebuilds via Keyed DOM Reconciliation; add hash-based client-side routing for reload persistence; coordinate backend polling interval dynamically with the UI; and deliver a state-of-the-art live stream cockpit UI without pushing to remote.
+
+### What Was Done
+
+1. **Go Backend Real-Time Streaming & Dynamic Watch Coordination (`src/types.go`, `src/scanner.go`, `src/api.go`, `src/server.go`)**:
+   - **`mtime` & Size Delta Caching**: Added `fileCache map[string]cachedSessionInfo` in `scanner.go`. Files are statted prior to opening; unchanged files return cached data instantly, slashing incremental rescan times from ~950µs to ~50µs (~19x speedup).
+   - **Dynamic Watch Interval Sync**: Added `SetWatchInterval(sec)` and `GetWatchInterval()` with thread-safe mutex and ticker restart channel. Replaced static 10s ticker in `server.go` with dynamic adaptive goroutine responding immediately to client preference changes (`POST /api/watch-interval`), including full pause (`interval_seconds: 0`).
+   - **Server-Sent Events (SSE) Live Tailer**: Implemented `HandleSessionTail(w, r)` at `/api/sessions/{id}/tail`. Supports `?last_step=N` for seamless initial catch-up and 250ms byte-offset delta seeking on active JSONL log files. Emits `event: connected`, `event: step`, and 15s comment heartbeat (`: ping\n\n`) to prevent proxy timeouts.
+
+2. **Keyed DOM Reconciliation Engine (`src/web/src/app.js`)**:
+   - Replaced full DOM rebuilds (`timelineContainer.innerHTML = ...`) with an in-memory `renderedStepMap` (Map<step_index, HTMLElement>).
+   - In default sorting order (`step_asc`), existing steps are never destroyed or re-rendered, preserving rendered Mermaid SVGs, KaTeX DOM equations, and expanded tool call details without visual flicker.
+   - Incoming steps from the SSE stream invoke `appendOrPatchStep(step)` with $O(1)$ markdown parsing, attach fine-grained event listeners, and animate into place using `.step-enter`.
+
+3. **Client-Side Hash Router & Deep-Link Route Persistence (`src/web/src/app.js`)**:
+   - Implemented hash router (`#/session/:id`, `#/project/:name`, `#/`, `#/dashboard`).
+   - Browser reloads (`Cmd+R` / `F5`) now parse the URL hash during `DOMContentLoaded` and immediately restore the active session or repository drilldown.
+   - Updated all navigation touchpoints (session cards, project cards, brand logo, back buttons) to mutate `window.location.hash`, supporting native browser history (Back/Forward).
+
+4. **Live Tail Cockpit UI & Liquid-Glass Enhancements (`src/web/index.html`, `src/web/src/styles.css`)**:
+   - Added `#tailStreamControl` pill in session detail header with live status label (`Live Tailing` / `Connected (Live ⚡)`), pulsating emerald dot, and Auto-Follow switch (`#toggleFollowStreamBtn`).
+   - Created floating glassmorphic "↓ New steps arrived" indicator (`#newStepsFloatingBtn`) with subtle float bounce animation when user scrolls up to inspect previous steps.
+   - Implemented smart scroll tracking: automatically disengages Auto-Follow when the user scrolls away from the bottom; re-engages and smoothly scrolls to the bottom when clicked.
+   - Styled `.timeline-item.step-enter` with smooth slide-up glow keyframe animations.
+
+5. **Build, Tests & Verification (`src/web/dist/`, `bin/session-explorer`)**:
+   - Bundled frontend assets using Bun (`bun run build`) in 135ms.
+   - Added unit tests `TestAPI_WatchInterval` and `TestAPI_SessionTail_InitialReplay` in `src/api_test.go`.
+   - All 27 Go unit tests passed cleanly (`go test -v .`).
+   - Recompiled standalone Go binary into `bin/session-explorer`.
+   - Verified live server daemon: tested `GET /api/watch-interval`, `POST /api/watch-interval` (pause, 60s, 10s), and live SSE stream `/api/sessions/{id}/tail` via `curl`.
+   - Updated `openapi.json` contract with new routes and schemas.
+
+### Decisions Made
+- **Keyed DOM Reconciliation over Heavy Virtual DOM**: Session Explorer relies on third-party imperative rendering engines (**Mermaid.js**, **KaTeX**, **Highlight.js**). React's virtual DOM would conflict with Mermaid SVG replacements and KaTeX DOM mutations on every state change, while adding 140KB bundle overhead. Keyed DOM with an in-memory `renderedStepMap` achieves direct $O(\Delta)$ incremental appends with zero re-rendering of past steps.
+- **Hash Routing (`#/session/:id`)**: Single-binary Go app with embedded `http.FileServer` would require 404 rewrite fallbacks for HTML5 pushState routes. Hash routing works instantly without server rewrites, preserves URL on reload, and supports deep-linking.
+- **Byte-Offset SSE Seeking**: Polling file size and seeking directly to the previous byte offset allows $O(\text{new bytes})$ streaming without reparsing entire 10MB JSONL transcripts.
+- **Zero Remote Push Constraint**: Changes are strictly kept local until the user tests them locally.
+- **De Facto "Latest First" Sorting Default**: Both initial session loading and live tailing now default to `step_desc` (Latest First), placing active work immediately at the top of the viewport. Incremental reconciliation prepends incoming steps at the top without scrolling jumping, and the floating indicator dynamically adapts (`↑ New steps arrived`).
+- **In-Session Sort Simplification & Live Stream Play/Pause Toggle**: Removed redundant timestamp sort duplicates (`Newest First` / `Oldest First`) from the in-session sort menu, keeping 4 distinct options (`Latest Steps First`, `Oldest Steps First`, `Most Tool Calls`, `Longest Content`). Converted the session live stream pill into an interactive Play/Pause button (`🟢 Live Stream` ⇄ `⏸️ Stream Paused`) with amber/green visual states while keeping Auto-Follow intact.
+
+---
+

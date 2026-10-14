@@ -97,6 +97,76 @@
         }
       }
     },
+    "/api/sessions/{id}/tail": {
+      "get": {
+        "summary": "Real-time Server-Sent Events (SSE) session log tailer",
+        "description": "Streams newly written conversation steps in real time via Server-Sent Events (text/event-stream) with heartbeat pings and delta seeking.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Session UUID",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "last_step",
+            "in": "query",
+            "required": false,
+            "description": "Highest known step_index in client cache. Events with step_index > last_step are replayed immediately.",
+            "schema": { "type": "integer", "default": -1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watch-interval": {
+      "get": {
+        "summary": "Get background Live Watch interval",
+        "description": "Retrieve current background scan interval in seconds and status (active or paused).",
+        "responses": {
+          "200": {
+            "description": "Current watch interval configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WatchIntervalResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Dynamically update background Live Watch interval",
+        "description": "Update background scan interval in seconds. Setting interval to 0 pauses the background ticker immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WatchIntervalRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated watch interval configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WatchIntervalResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wip": {
       "get": {
         "summary": "Agent Work-in-Progress (WIP) recovery",
@@ -390,6 +460,21 @@
           "success": { "type": "boolean" },
           "target": { "type": "string" },
           "installed_path": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "WatchIntervalRequest": {
+        "type": "object",
+        "required": ["interval_seconds"],
+        "properties": {
+          "interval_seconds": { "type": "integer", "description": "Seconds between background rescans (0 to pause)" }
+        }
+      },
+      "WatchIntervalResponse": {
+        "type": "object",
+        "properties": {
+          "interval_seconds": { "type": "integer" },
+          "status": { "type": "string", "enum": ["active", "paused"] },
           "message": { "type": "string" }
         }
       }

@@ -170,10 +170,8 @@
           <div class="filter-group session-sort-group">
             <span class="filter-label">Sort:</span>
             <select id="sessionStepSortSelect" class="select-custom select-custom-sm" aria-label="Sort steps in session">
-              <option value="step_asc">Step (0 → Latest)</option>
-              <option value="step_desc">Step (Latest → 0)</option>
-              <option value="time_desc">Newest First</option>
-              <option value="time_asc">Oldest First</option>
+              <option value="step_desc" selected>Latest Steps First (Latest → 0)</option>
+              <option value="step_asc">Oldest Steps First (0 → Latest)</option>
               <option value="tools_desc">Most Tool Calls</option>
               <option value="length_desc">Longest Content</option>
             </select>
@@ -186,6 +184,17 @@
             <button class="chip msg-filter-chip" data-filter="PLANNER_RESPONSE">Agent</button>
             <button class="chip msg-filter-chip" data-filter="TOOL_CALLS">Tools</button>
             <button class="chip msg-filter-chip" data-filter="ERROR">Errors</button>
+          </div>
+
+          <!-- Live Tail Stream Control -->
+          <div class="tail-stream-control" id="tailStreamControl">
+            <button class="stream-toggle-btn" id="toggleStreamBtn" title="Click to Pause or Resume Live Streaming">
+              <span class="live-dot pulsing active" id="detailLiveDot"></span>
+              <span class="tail-status-label" id="tailStatusLabel">Live Stream</span>
+            </button>
+            <button class="btn-ghost-sm active" id="toggleFollowStreamBtn" title="Auto-scroll to latest step as it arrives">
+              <span>⬇️</span> Follow
+            </button>
           </div>
 
           <!-- In-session Step Summary & Reset -->
@@ -205,6 +214,11 @@
           </div>
         </div>
       </div>
+
+      <!-- Floating Jump to Newest Steps Button -->
+      <button class="new-steps-floating-btn" id="newStepsFloatingBtn" style="display: none;" title="Jump to latest steps">
+        <span>⚡ New steps received</span> <span>↓ Jump</span>
+      </button>
 
       <!-- Timeline Container -->
       <div class="timeline-container" id="timelineContainer">

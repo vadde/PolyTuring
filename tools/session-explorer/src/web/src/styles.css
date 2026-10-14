@@ -1945,3 +1945,149 @@ body {
     padding-left: 1.5rem;
   }
 }
+
+/* ==========================================================================
+   Live Tailing, Keyed Reconciler & Cockpit Stream Enhancements
+   ========================================================================== */
+
+.tail-stream-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-glass-active);
+  border: 1px solid var(--border-glass);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.tail-stream-control.streaming {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.tail-stream-control.paused {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.tail-stream-control.paused .live-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  animation: none;
+}
+
+.stream-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-size: inherit;
+  transition: all 0.2s ease;
+}
+
+.stream-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tail-status-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+#toggleFollowStreamBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  transition: all 0.2s ease;
+}
+
+#toggleFollowStreamBtn.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.5);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+  font-weight: 600;
+}
+
+/* Floating "New Steps Arrived" Button */
+.new-steps-floating-btn {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(6, 182, 212, 0.5);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(6, 182, 212, 0.35);
+  cursor: pointer;
+  animation: floatBounce 2s ease-in-out infinite;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.new-steps-floating-btn:hover {
+  transform: translateX(-50%) translateY(-2px);
+  background: rgba(30, 41, 59, 0.95);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 28px rgba(6, 182, 212, 0.5);
+}
+
+@keyframes floatBounce {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-4px);
+  }
+}
+
+/* Incremental Step Entrance Animation */
+.timeline-item.step-enter {
+  animation: stepSlideGlow 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes stepSlideGlow {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+    box-shadow: 0 0 28px rgba(6, 182, 212, 0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1);
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    box-shadow: var(--shadow-sm);
+  }
+}
+

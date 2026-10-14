@@ -224,7 +224,7 @@ const state = {
   theme: localStorage.getItem('se_theme') || 'dark',
   drilledProject: null, // active project when drilled into a repository
   sessionStepSearch: '', // search query for steps within active session detail
-  sessionStepSort: 'step_asc', // sort mode for steps within active session detail ('step_asc', 'step_desc', 'time_desc', 'time_asc', 'tools_desc', 'length_desc')
+  sessionStepSort: 'step_desc', // sort mode for steps within active session detail ('step_desc' by default, 'step_asc', 'time_desc', 'time_asc', 'tools_desc', 'length_desc')
   projectFilters: {
     search: '',
     sort: 'date_desc',
@@ -233,7 +233,12 @@ const state = {
     datePreset: 'all'
   },
   liveInterval: parseInt(localStorage.getItem('se_live_interval') || '10000', 10),
-  lastSynced: new Date()
+  lastSynced: new Date(),
+  activeTimelineSessionId: null,
+  followStream: true,
+  tailEventSource: null,
+  tailStreaming: true,
+  renderedStepMap: new Map() // step_index -> HTMLElement
 };
 
 // DOM Elements
@@ -266,6 +271,12 @@ const el = {
   exportMdBtn: document.getElementById('exportMdBtn'),
   exportJsonBtn: document.getElementById('exportJsonBtn'),
   timelineContainer: document.getElementById('timelineContainer'),
+  tailStreamControl: document.getElementById('tailStreamControl'),
+  toggleStreamBtn: document.getElementById('toggleStreamBtn'),
+  detailLiveDot: document.getElementById('detailLiveDot'),
+  tailStatusLabel: document.getElementById('tailStatusLabel'),
+  toggleFollowStreamBtn: document.getElementById('toggleFollowStreamBtn'),
+  newStepsFloatingBtn: document.getElementById('newStepsFloatingBtn'),
   msgFilterChips: document.querySelectorAll('.msg-filter-chip'),
   sessionStepSearchInput: document.getElementById('sessionStepSearchInput'),
   clearSessionStepSearchBtn: document.getElementById('clearSessionStepSearchBtn'),
@@ -295,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initEventListeners();
   initLiveWatch();
+  initRouter();
   applyDatePreset('7d');
 });
 
@@ -351,6 +363,14 @@ function setLiveInterval(ms) {
   }
   state.liveInterval = ms;
   localStorage.setItem('se_live_interval', String(ms));
+
+  // Dynamically synchronize watch interval with Go backend daemon
+  const sec = Math.floor(ms / 1000);
+  fetch('/api/watch-interval', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ interval_seconds: sec })
+  }).catch(() => {});
 
   if (el.liveDot) {
     if (ms > 0) {
@@ -617,6 +637,79 @@ function initEventListeners() {
     });
   }
 
+  // Live Stream Play/Pause Toggle
+  if (el.toggleStreamBtn) {
+    el.toggleStreamBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.tailStreaming) {
+        stopSessionLiveTail(true);
+      } else if (state.selectedSessionId) {
+        startSessionLiveTail(state.selectedSessionId);
+      }
+    });
+  }
+
+  // Live Tail Auto-Follow Toggle
+  if (el.toggleFollowStreamBtn) {
+    el.toggleFollowStreamBtn.addEventListener('click', () => {
+      state.followStream = !state.followStream;
+      el.toggleFollowStreamBtn.classList.toggle('active', state.followStream);
+      if (state.followStream) {
+        const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+        if (isDesc) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+      }
+    });
+  }
+
+  // Floating "New steps arrived" Click Listener
+  if (el.newStepsFloatingBtn) {
+    el.newStepsFloatingBtn.addEventListener('click', () => {
+      state.followStream = true;
+      if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.add('active');
+      el.newStepsFloatingBtn.style.display = 'none';
+      const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+      if (isDesc) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Window scroll listener: auto-detect if user scrolled away from the stream head/tail
+  window.addEventListener('scroll', () => {
+    if (state.currentView !== 'detail') return;
+    const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+    if (isDesc) {
+      // In Latest First, stream arrives at the top
+      if (window.scrollY <= 150) {
+        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+      } else {
+        if (state.followStream) {
+          state.followStream = false;
+          if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.remove('active');
+        }
+      }
+    } else {
+      // In Oldest First, stream arrives at the bottom
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 150;
+      if (scrollBottom >= threshold) {
+        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+      } else {
+        if (state.followStream) {
+          state.followStream = false;
+          if (el.toggleFollowStreamBtn) el.toggleFollowStreamBtn.classList.remove('active');
+        }
+      }
+    }
+  }, { passive: true });
+
   // Brand button resets drilldown and returns to main view
   const brandBtn = document.getElementById('brandBtn');
   if (brandBtn) {
@@ -624,6 +717,7 @@ function initEventListeners() {
       state.drilledProject = null;
       state.filterWorkspace = '';
       if (el.workspaceSelect) el.workspaceSelect.value = '';
+      window.location.hash = '#/';
       showDashboard();
       loadSessions();
     });
@@ -1034,7 +1128,7 @@ function renderProjectHub() {
         state.filterWorkspace = '';
         state.projectFilters = { search: '', sort: 'date_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
         if (el.workspaceSelect) el.workspaceSelect.value = '';
-        loadSessions();
+        window.location.hash = '#/';
       });
 
       // In-Project Search Input Listener (Reactive, maintains input focus)
@@ -1325,10 +1419,7 @@ function renderProjectHub() {
   container.querySelectorAll('.project-card').forEach(card => {
     card.addEventListener('click', () => {
       const proj = card.dataset.project;
-      state.drilledProject = proj;
-      state.filterWorkspace = proj;
-      if (el.workspaceSelect) el.workspaceSelect.value = proj;
-      loadSessions();
+      window.location.hash = `#/project/${encodeURIComponent(proj)}`;
     });
   });
 }
@@ -1471,7 +1562,7 @@ function renderSessionCardsHtml(sessions) {
 function attachSessionCardClicks(container) {
   container.querySelectorAll('.session-card').forEach(card => {
     card.addEventListener('click', () => {
-      loadSessionDetail(card.dataset.id);
+      window.location.hash = `#/session/${card.dataset.id}`;
     });
   });
 }
@@ -1483,14 +1574,15 @@ function showDetailView(detail) {
   if (el.detailView) el.detailView.classList.add('active');
 
   const s = detail.session;
+  state.selectedSessionId = s.id;
   state.selectedSessionDetail = detail;
   state.sessionStepSearch = '';
-  state.sessionStepSort = 'step_asc';
+  state.sessionStepSort = 'step_desc';
   state.messageFilter = 'ALL';
 
   if (el.sessionStepSearchInput) el.sessionStepSearchInput.value = '';
   if (el.clearSessionStepSearchBtn) el.clearSessionStepSearchBtn.style.display = 'none';
-  if (el.sessionStepSortSelect) el.sessionStepSortSelect.value = 'step_asc';
+  if (el.sessionStepSortSelect) el.sessionStepSortSelect.value = 'step_desc';
   if (el.resetSessionStepFiltersBtn) el.resetSessionStepFiltersBtn.style.display = 'none';
 
   document.querySelectorAll('.msg-filter-chip').forEach(c => {
@@ -1502,24 +1594,97 @@ function showDetailView(detail) {
   if (el.detailWorkspaceBadge) el.detailWorkspaceBadge.textContent = `📁 ${s.project_name || 'Default'}`;
   if (el.detailTime) el.detailTime.textContent = formatDateTime(s.created_at, true);
 
+  if (!window.location.hash.includes(s.id)) {
+    window.location.hash = `#/session/${s.id}`;
+  }
+
+  if (state.activeTimelineSessionId !== s.id) {
+    state.renderedStepMap.clear();
+    state.activeTimelineSessionId = s.id;
+    if (el.timelineContainer) el.timelineContainer.innerHTML = '';
+  }
+
   renderTimelineMessages();
+
+  startSessionLiveTail(s.id);
+
+  const hash = window.location.hash;
+  const stepMatch = hash.match(/step=(\d+)/);
+  if (stepMatch) {
+    const targetStep = parseInt(stepMatch[1], 10);
+    const node = state.renderedStepMap.get(targetStep);
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showDashboard() {
+function showDashboard(updateHash = true) {
+  stopSessionLiveTail();
   state.currentView = 'dashboard';
+  state.selectedSessionId = null;
+  state.activeTimelineSessionId = null;
+  state.renderedStepMap.clear();
+
   if (el.detailView) el.detailView.classList.remove('active');
   if (el.dashboardView) el.dashboardView.style.display = 'block';
+
+  if (updateHash && window.location.hash.startsWith('#/session')) {
+    window.location.hash = '#/';
+  }
+}
+
+// Hash-based Client-Side Router
+function initRouter() {
+  window.addEventListener('hashchange', handleRoute);
+  handleRoute();
+}
+
+function handleRoute() {
+  const hash = window.location.hash || '#/';
+  const clean = hash.replace(/^#\/?/, '');
+
+  if (clean.startsWith('session/')) {
+    const rawTarget = clean.slice('session/'.length);
+    const [sessionId] = rawTarget.split('?');
+    if (sessionId) {
+      if (state.selectedSessionId !== sessionId || state.currentView !== 'detail') {
+        loadSessionDetail(sessionId);
+      }
+      return;
+    }
+  }
+
+  if (clean.startsWith('project/')) {
+    const projName = decodeURIComponent(clean.slice('project/'.length));
+    if (projName) {
+      if (state.currentView === 'detail') {
+        showDashboard(false);
+      }
+      state.drilledProject = projName;
+      state.filterWorkspace = projName;
+      if (el.workspaceSelect) el.workspaceSelect.value = projName;
+      loadSessions();
+      return;
+    }
+  }
+
+  // Dashboard route
+  if (state.currentView === 'detail') {
+    showDashboard(false);
+  }
 }
 
 function resetSessionStepFilters() {
   state.sessionStepSearch = '';
-  state.sessionStepSort = 'step_asc';
+  state.sessionStepSort = 'step_desc';
   state.messageFilter = 'ALL';
 
   if (el.sessionStepSearchInput) el.sessionStepSearchInput.value = '';
   if (el.clearSessionStepSearchBtn) el.clearSessionStepSearchBtn.style.display = 'none';
-  if (el.sessionStepSortSelect) el.sessionStepSortSelect.value = 'step_asc';
+  if (el.sessionStepSortSelect) el.sessionStepSortSelect.value = 'step_desc';
   if (el.resetSessionStepFiltersBtn) el.resetSessionStepFiltersBtn.style.display = 'none';
 
   document.querySelectorAll('.msg-filter-chip').forEach(c => {
@@ -1563,14 +1728,14 @@ function getFilteredAndSortedMessages() {
   }
 
   // 3. In-Session Step Sort (Interrelated with search results and type filters)
-  const sortMode = state.sessionStepSort || 'step_asc';
+  const sortMode = state.sessionStepSort || 'step_desc';
   list.sort((a, b) => {
     const stepA = typeof a.step_index === 'number' ? a.step_index : 0;
     const stepB = typeof b.step_index === 'number' ? b.step_index : 0;
 
     switch (sortMode) {
-      case 'step_desc':
-        return stepB - stepA;
+      case 'step_asc':
+        return stepA - stepB;
       case 'time_desc': {
         const timeA = a.created_at ? (new Date(a.created_at).getTime() || 0) : 0;
         const timeB = b.created_at ? (new Date(b.created_at).getTime() || 0) : 0;
@@ -1591,9 +1756,9 @@ function getFilteredAndSortedMessages() {
         const lenB = (b.content || '').length + (b.thinking || '').length;
         return (lenB - lenA) || (stepA - stepB);
       }
-      case 'step_asc':
+      case 'step_desc':
       default:
-        return stepA - stepB;
+        return stepB - stepA;
     }
   });
 
@@ -1606,10 +1771,10 @@ function renderTimelineMessages() {
   const filteredAndSorted = getFilteredAndSortedMessages();
 
   const stepQuery = (state.sessionStepSearch || '').trim();
-  const sortMode = state.sessionStepSort || 'step_asc';
+  const sortMode = state.sessionStepSort || 'step_desc';
   const hasActiveStepFilters = Boolean(
     stepQuery ||
-    sortMode !== 'step_asc' ||
+    sortMode !== 'step_desc' ||
     state.messageFilter !== 'ALL'
   );
 
@@ -1653,135 +1818,177 @@ function renderTimelineMessages() {
     return;
   }
 
-  el.timelineContainer.innerHTML = filteredAndSorted.map(msg => {
-    const isUser = msg.type === 'USER_INPUT';
-    const isAgent = msg.type === 'PLANNER_RESPONSE';
-    const isToolOutput = !isUser && !isAgent && msg.type !== 'ERROR_MESSAGE';
-    const isError = msg.type === 'ERROR_MESSAGE' || msg.status === 'ERROR';
+  // Keyed DOM Reconciliation:
+  // Full rebuild is only required if active filter/sort is non-default, or if container is empty
+  const isDefaultDesc = sortMode === 'step_desc';
+  const childCount = el.timelineContainer.children.length;
 
-    const authorName = isUser ? 'User' : isAgent ? 'Agent' : isError ? 'Error' : msg.type;
-    const authorIcon = isUser ? '👤' : isAgent ? '🤖' : isError ? '⚠️' : '⚙️';
-    const timeStr = formatDateTime(msg.created_at, true);
-    const relTimeStr = formatRelativeTime(msg.created_at);
+  if (hasActiveStepFilters || !isDefaultDesc || childCount === 0 || state.renderedStepMap.size === 0) {
+    el.timelineContainer.innerHTML = '';
+    state.renderedStepMap.clear();
 
-    // Markdown rendered content for both User and Agent
-    let bodyHtml = '';
-    let toolOutputHtml = '';
-
-    if (isUser || isAgent) {
-      if (msg.content && msg.content.trim()) {
-        try {
-          bodyHtml = marked.parse(msg.content);
-        } catch (e) {
-          bodyHtml = `<p style="white-space: pre-wrap;">${escapeHtml(msg.content)}</p>`;
+    const fragment = document.createDocumentFragment();
+    for (const msg of filteredAndSorted) {
+      const temp = document.createElement('div');
+      temp.innerHTML = buildStepHtml(msg);
+      const node = temp.firstElementChild;
+      state.renderedStepMap.set(msg.step_index, node);
+      fragment.appendChild(node);
+    }
+    el.timelineContainer.appendChild(fragment);
+    attachStepInteractivity(el.timelineContainer);
+  } else {
+    // Fine-grained incremental sync for default step_desc view without tearing down past DOM nodes!
+    for (const msg of filteredAndSorted) {
+      if (state.renderedStepMap.has(msg.step_index)) {
+        const existingNode = state.renderedStepMap.get(msg.step_index);
+        if (existingNode.dataset.status !== msg.status) {
+          existingNode.dataset.status = msg.status;
+          const temp = document.createElement('div');
+          temp.innerHTML = buildStepHtml(msg);
+          const updatedNode = temp.firstElementChild;
+          existingNode.replaceWith(updatedNode);
+          state.renderedStepMap.set(msg.step_index, updatedNode);
+          attachStepInteractivity(updatedNode);
         }
+      } else {
+        const temp = document.createElement('div');
+        temp.innerHTML = buildStepHtml(msg);
+        const newNode = temp.firstElementChild;
+        newNode.classList.add('step-enter');
+        state.renderedStepMap.set(msg.step_index, newNode);
+        el.timelineContainer.prepend(newNode);
+        attachStepInteractivity(newNode);
       }
-    } else if (isToolOutput) {
-      // Render tool outputs in clean collapsible accordion with code block
-      const contentLen = msg.content ? msg.content.length : 0;
-      const sizeStr = contentLen > 1024 ? `${Math.round(contentLen / 1024)}KB` : `${contentLen}B`;
-      toolOutputHtml = `
-        <details class="tool-output-accordion">
-          <summary class="tool-output-summary">
-            <span>⚙️ <strong>${escapeHtml(msg.type)}</strong> output (${sizeStr})</span>
-            <span style="font-size: 0.72rem; opacity: 0.7;">Click to toggle output</span>
-          </summary>
-          <pre class="tool-output-pre"><code>${escapeHtml(msg.content || '')}</code></pre>
-        </details>
-      `;
-    } else if (isError) {
-      bodyHtml = `<div class="error-banner" style="padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); color: #f87171;">⚠️ ${escapeHtml(msg.content || 'Unknown error')}</div>`;
     }
+  }
+}
 
-    // Thinking section rendered with Markdown
-    let thinkingHtml = '';
-    if (msg.has_thinking && msg.thinking) {
-      let thinkingParsed = '';
+// Construct HTML string for a single message step (O(1) Markdown & syntax processing)
+function buildStepHtml(msg) {
+  const isUser = msg.type === 'USER_INPUT';
+  const isAgent = msg.type === 'PLANNER_RESPONSE';
+  const isToolOutput = !isUser && !isAgent && msg.type !== 'ERROR_MESSAGE';
+  const isError = msg.type === 'ERROR_MESSAGE' || msg.status === 'ERROR';
+
+  const authorName = isUser ? 'User' : isAgent ? 'Agent' : isError ? 'Error' : msg.type;
+  const authorIcon = isUser ? '👤' : isAgent ? '🤖' : isError ? '⚠️' : '⚙️';
+  const timeStr = formatDateTime(msg.created_at, true);
+  const relTimeStr = formatRelativeTime(msg.created_at);
+
+  let bodyHtml = '';
+  let toolOutputHtml = '';
+
+  if (isUser || isAgent) {
+    if (msg.content && msg.content.trim()) {
       try {
-        thinkingParsed = marked.parse(msg.thinking);
-      } catch (_) {
-        thinkingParsed = escapeHtml(msg.thinking);
+        bodyHtml = marked.parse(msg.content);
+      } catch (e) {
+        bodyHtml = `<p style="white-space: pre-wrap;">${escapeHtml(msg.content)}</p>`;
       }
-      thinkingHtml = `
-        <details class="thinking-accordion">
-          <summary class="thinking-summary">🧠 Reasoning / Inner Monologue (${msg.thinking.length} chars)</summary>
-          <div class="thinking-content">${thinkingParsed}</div>
-        </details>
-      `;
     }
+  } else if (isToolOutput) {
+    const contentLen = msg.content ? msg.content.length : 0;
+    const sizeStr = contentLen > 1024 ? `${Math.round(contentLen / 1024)}KB` : `${contentLen}B`;
+    toolOutputHtml = `
+      <details class="tool-output-accordion">
+        <summary class="tool-output-summary">
+          <span>⚙️ <strong>${escapeHtml(msg.type)}</strong> output (${sizeStr})</span>
+          <span style="font-size: 0.72rem; opacity: 0.7;">Click to toggle output</span>
+        </summary>
+        <pre class="tool-output-pre"><code>${escapeHtml(msg.content || '')}</code></pre>
+      </details>
+    `;
+  } else if (isError) {
+    bodyHtml = `<div class="error-banner" style="padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); color: #f87171;">⚠️ ${escapeHtml(msg.content || 'Unknown error')}</div>`;
+  }
 
-    // Tool calls collapsible cards (R-015)
-    let toolCallsHtml = '';
-    if (msg.tool_calls && msg.tool_calls.length > 0) {
-      toolCallsHtml = `
-        <div class="tool-calls-container">
-          <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem;">
-            ⚡ Invoked Tools (${msg.tool_calls.length})
-          </div>
-          ${msg.tool_calls.map(tc => {
-            const argsPretty = tc.args ? JSON.stringify(tc.args, null, 2) : (tc.args_preview || '{}');
-            return `
-              <details class="tool-call-card">
-                <summary class="tool-call-header">
-                  <span class="tool-call-name">🛠️ ${escapeHtml(tc.name)}</span>
-                  <button class="copy-tool-args-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem;" title="Copy Args" data-args="${escapeHtml(argsPretty)}">📋</button>
-                </summary>
-                <pre class="tool-call-args"><code>${escapeHtml(argsPretty)}</code></pre>
-              </details>
-            `;
-          }).join('')}
-        </div>
-      `;
+  let thinkingHtml = '';
+  if (msg.has_thinking && msg.thinking) {
+    let thinkingParsed = '';
+    try {
+      thinkingParsed = marked.parse(msg.thinking);
+    } catch (_) {
+      thinkingParsed = escapeHtml(msg.thinking);
     }
+    thinkingHtml = `
+      <details class="thinking-accordion">
+        <summary class="thinking-summary">🧠 Reasoning / Inner Monologue (${msg.thinking.length} chars)</summary>
+        <div class="thinking-content">${thinkingParsed}</div>
+      </details>
+    `;
+  }
 
-    const formattedStep = typeof msg.step_index === 'number' ? msg.step_index.toLocaleString() : (msg.step_index ?? '0');
-
-    return `
-      <div class="message-item ${isUser ? 'user' : isAgent ? 'agent' : 'tool-result'}" data-step="${msg.step_index}">
-        <div class="timeline-node" title="Step ${formattedStep}">${formattedStep}</div>
-        <div class="message-card">
-          <div class="message-header">
-            <span class="message-author">${authorIcon} ${authorName}</span>
-            <div class="message-meta">
-              <span>Step ${formattedStep}</span>
-              <span>•</span>
-              <span class="step-timestamp" title="${timeStr}">
-                <span class="exact-time">📅 ${timeStr}</span>
-                ${relTimeStr ? `<span class="relative-time">(${relTimeStr})</span>` : ''}
-              </span>
-              ${msg.content ? `<button class="copy-msg-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem;" title="Copy Content" data-content="${escapeHtml(msg.content)}">📋</button>` : ''}
-            </div>
-          </div>
-          ${thinkingHtml}
-          ${bodyHtml ? `<div class="message-body">${bodyHtml}</div>` : ''}
-          ${toolOutputHtml}
-          ${toolCallsHtml}
+  let toolCallsHtml = '';
+  if (msg.tool_calls && msg.tool_calls.length > 0) {
+    toolCallsHtml = `
+      <div class="tool-calls-container">
+        <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          ⚡ Invoked Tools (${msg.tool_calls.length})
         </div>
+        ${msg.tool_calls.map(tc => {
+          const argsPretty = tc.args ? JSON.stringify(tc.args, null, 2) : (tc.args_preview || '{}');
+          return `
+            <details class="tool-call-card">
+              <summary class="tool-call-header">
+                <span class="tool-call-name">🛠️ ${escapeHtml(tc.name)}</span>
+                <button class="copy-tool-args-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem;" title="Copy Args" data-args="${escapeHtml(argsPretty)}">📋</button>
+              </summary>
+              <pre class="tool-call-args"><code>${escapeHtml(argsPretty)}</code></pre>
+            </details>
+          `;
+        }).join('')}
       </div>
     `;
-  }).join('');
+  }
 
-  // Attach copy listeners (R-026)
-  el.timelineContainer.querySelectorAll('.copy-msg-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  const formattedStep = typeof msg.step_index === 'number' ? msg.step_index.toLocaleString() : (msg.step_index ?? '0');
+
+  return `
+    <div class="message-item ${isUser ? 'user' : isAgent ? 'agent' : 'tool-result'}" data-step="${msg.step_index}" data-status="${escapeHtml(msg.status || '')}">
+      <div class="timeline-node" title="Step ${formattedStep}">${formattedStep}</div>
+      <div class="message-card">
+        <div class="message-header">
+          <span class="message-author">${authorIcon} ${authorName}</span>
+          <div class="message-meta">
+            <span>Step ${formattedStep}</span>
+            <span>•</span>
+            <span class="step-timestamp" title="${timeStr}">
+              <span class="exact-time">📅 ${timeStr}</span>
+              ${relTimeStr ? `<span class="relative-time">(${relTimeStr})</span>` : ''}
+            </span>
+            ${msg.content ? `<button class="copy-msg-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem;" title="Copy Content" data-content="${escapeHtml(msg.content)}">📋</button>` : ''}
+          </div>
+        </div>
+        ${thinkingHtml}
+        ${bodyHtml ? `<div class="message-body">${bodyHtml}</div>` : ''}
+        ${toolOutputHtml}
+        ${toolCallsHtml}
+      </div>
+    </div>
+  `;
+}
+
+// Attach interactive listeners specifically to given container or step node
+function attachStepInteractivity(container) {
+  if (!container) return;
+
+  container.querySelectorAll('.copy-msg-btn').forEach(btn => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(btn.dataset.content, 'Message copied to clipboard!');
-    });
+    };
   });
 
-  el.timelineContainer.querySelectorAll('.copy-tool-args-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('.copy-tool-args-btn').forEach(btn => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(btn.dataset.args, 'Tool arguments copied to clipboard!');
-    });
+    };
   });
 
-  // Render all unrendered Mermaid diagrams asynchronously
-  renderAllMermaidDiagrams(el.timelineContainer);
-
-  // Attach toggle and copy listeners for Mermaid diagrams
-  el.timelineContainer.querySelectorAll('.toggle-mermaid-src-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('.toggle-mermaid-src-btn').forEach(btn => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       const targetId = btn.dataset.target;
       const srcEl = document.getElementById(targetId);
@@ -1791,34 +1998,190 @@ function renderTimelineMessages() {
         btn.textContent = isHidden ? 'Hide Source' : 'Source';
         btn.classList.toggle('active', isHidden);
       }
-    });
+    };
   });
 
-  el.timelineContainer.querySelectorAll('.copy-mermaid-src-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('.copy-mermaid-src-btn').forEach(btn => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(btn.dataset.code, 'Diagram code copied to clipboard!');
-    });
+    };
   });
 
-  // Attach copy listeners for code blocks
-  el.timelineContainer.querySelectorAll('.copy-code-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('.copy-code-btn').forEach(btn => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(btn.dataset.code, 'Code copied to clipboard!');
-    });
+    };
   });
 
-  // Attach click listener for file path links
-  el.timelineContainer.querySelectorAll('.file-path-link').forEach(link => {
-    link.addEventListener('click', (e) => {
+  container.querySelectorAll('.file-path-link').forEach(link => {
+    link.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
       const path = link.dataset.filepath || link.getAttribute('href');
       copyToClipboard(path, `Copied path to clipboard: ${path}`);
-    });
+    };
   });
+
+  renderAllMermaidDiagrams(container);
 }
+
+// Test if an incoming step matches currently selected filters
+function stepMatchesActiveFilters(step) {
+  if (state.messageFilter === 'USER_INPUT' && step.type !== 'USER_INPUT') return false;
+  if (state.messageFilter === 'PLANNER_RESPONSE' && step.type !== 'PLANNER_RESPONSE') return false;
+  if (state.messageFilter === 'TOOL_CALLS' && (!step.tool_calls || step.tool_calls.length === 0)) return false;
+  if (state.messageFilter === 'ERROR' && step.type !== 'ERROR_MESSAGE' && step.status !== 'ERROR') return false;
+
+  const q = (state.sessionStepSearch || '').trim().toLowerCase();
+  if (!q) return true;
+
+  if (step.content && step.content.toLowerCase().includes(q)) return true;
+  if (step.thinking && step.thinking.toLowerCase().includes(q)) return true;
+  if (step.type && step.type.toLowerCase().includes(q)) return true;
+  if (step.tool_calls) {
+    for (const tc of step.tool_calls) {
+      if (tc.name && tc.name.toLowerCase().includes(q)) return true;
+      if (tc.args_preview && tc.args_preview.toLowerCase().includes(q)) return true;
+    }
+  }
+  return false;
+}
+
+// Real-Time Incremental Append & Patch (O(Δ) Keyed DOM Reconciliation)
+function appendOrPatchStep(step) {
+  if (!state.selectedSessionDetail) return;
+  if (!state.selectedSessionDetail.messages) {
+    state.selectedSessionDetail.messages = [];
+  }
+
+  const existingIdx = state.selectedSessionDetail.messages.findIndex(m => m.step_index === step.step_index);
+  if (existingIdx !== -1) {
+    state.selectedSessionDetail.messages[existingIdx] = step;
+  } else {
+    state.selectedSessionDetail.messages.push(step);
+  }
+
+  const allMessages = state.selectedSessionDetail.messages;
+  if (el.detailStepCountBadge) {
+    el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
+  }
+
+  // Keyed DOM: check if node already exists
+  if (state.renderedStepMap.has(step.step_index)) {
+    const existingNode = state.renderedStepMap.get(step.step_index);
+    if (existingNode.dataset.status !== step.status) {
+      existingNode.dataset.status = step.status;
+      const temp = document.createElement('div');
+      temp.innerHTML = buildStepHtml(step);
+      const updatedNode = temp.firstElementChild;
+      existingNode.replaceWith(updatedNode);
+      state.renderedStepMap.set(step.step_index, updatedNode);
+      attachStepInteractivity(updatedNode);
+    }
+    return;
+  }
+
+  // Check if step matches active search/filter
+  if (!stepMatchesActiveFilters(step)) {
+    return;
+  }
+
+  const temp = document.createElement('div');
+  temp.innerHTML = buildStepHtml(step);
+  const newNode = temp.firstElementChild;
+  newNode.classList.add('step-enter');
+  state.renderedStepMap.set(step.step_index, newNode);
+
+  const isDesc = (state.sessionStepSort || 'step_desc') === 'step_desc';
+  if (isDesc) {
+    el.timelineContainer.prepend(newNode);
+  } else {
+    el.timelineContainer.appendChild(newNode);
+  }
+  attachStepInteractivity(newNode);
+
+  if (state.followStream) {
+    if (isDesc) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      newNode.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+  } else {
+    if (el.newStepsFloatingBtn) {
+      el.newStepsFloatingBtn.innerHTML = isDesc ? '<span>↑</span> New steps arrived' : '<span>↓</span> New steps arrived';
+      el.newStepsFloatingBtn.style.display = 'inline-flex';
+    }
+  }
+}
+
+// Real-Time SSE Log Tailer Management
+function startSessionLiveTail(sessionId) {
+  stopSessionLiveTail(false);
+  state.tailStreaming = true;
+
+  let highestStep = -1;
+  const messages = (state.selectedSessionDetail && state.selectedSessionDetail.messages) || [];
+  messages.forEach(m => {
+    if (m.step_index > highestStep) highestStep = m.step_index;
+  });
+
+  if (el.tailStreamControl) {
+    el.tailStreamControl.classList.remove('paused');
+    el.tailStreamControl.classList.add('streaming');
+  }
+  if (el.tailStatusLabel) el.tailStatusLabel.textContent = 'Live Stream';
+  if (el.detailLiveDot) el.detailLiveDot.classList.add('active', 'pulsing');
+  if (el.toggleStreamBtn) el.toggleStreamBtn.title = 'Click to Pause Live Streaming';
+
+  const sseUrl = `/api/sessions/${encodeURIComponent(sessionId)}/tail?last_step=${highestStep}`;
+  const es = new EventSource(sseUrl);
+  state.tailEventSource = es;
+
+  es.addEventListener('connected', () => {
+    if (el.tailStatusLabel) el.tailStatusLabel.textContent = 'Live Stream ⚡';
+  });
+
+  es.addEventListener('step', (event) => {
+    try {
+      const step = JSON.parse(event.data);
+      appendOrPatchStep(step);
+    } catch (err) {
+      console.warn('Failed to parse SSE step event:', err);
+    }
+  });
+
+  es.onerror = () => {
+    if (state.tailStreaming) {
+      if (el.tailStatusLabel) el.tailStatusLabel.textContent = 'Reconnecting...';
+      if (el.detailLiveDot) el.detailLiveDot.classList.remove('pulsing');
+    }
+  };
+}
+
+function stopSessionLiveTail(userInitiated = false) {
+  if (state.tailEventSource) {
+    state.tailEventSource.close();
+    state.tailEventSource = null;
+  }
+  if (userInitiated) {
+    state.tailStreaming = false;
+    if (el.tailStreamControl) {
+      el.tailStreamControl.classList.remove('streaming');
+      el.tailStreamControl.classList.add('paused');
+    }
+    if (el.tailStatusLabel) el.tailStatusLabel.textContent = 'Stream Paused';
+    if (el.detailLiveDot) el.detailLiveDot.classList.remove('pulsing');
+    if (el.toggleStreamBtn) el.toggleStreamBtn.title = 'Click to Resume Live Streaming';
+  } else {
+    state.tailStreaming = false;
+    if (el.tailStreamControl) el.tailStreamControl.classList.remove('streaming', 'paused');
+    if (el.detailLiveDot) el.detailLiveDot.classList.remove('pulsing');
+  }
+}
+
 
 // Asynchronously render all pending Mermaid diagrams using Mermaid native runner
 async function renderAllMermaidDiagrams(container = document) {

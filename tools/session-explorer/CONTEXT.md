@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `review`
-- **Version**: 0.2.0
+- **Version**: 0.2.1
 - **Language**: Go 1.22+ (backend) + vanilla HTML/CSS/JS (frontend, Bun-bundled)
 - **Category**: GenAI & ML
 
@@ -28,7 +28,7 @@ blockers: []
 | Spec Requirements (R-XXX) | 34 | 34 | 🧪 100% Implemented & Tested |
 | Acceptance Criteria (AC-XXX) | 22 | 22 | 🧪 100% Verified |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 25 unit tests passing + live demo |
+| Test Coverage | 100% | 100% | 🧪 27 unit tests passing + live demo |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -85,6 +85,10 @@ blockers: []
 | 2026-10-14 | Embedded OpenAPI 3.0 & interactive Swagger UI | Single-click accessibility via `/docs` and `/api/openapi.json` with zero external network dependencies |
 | 2026-10-14 | Public documentation hygiene | Strict invariant: Scrub all internal SDLC requirement tickets (`R-XXX`) from public static documentation |
 | 2026-10-14 | Multi-lens Markdown & LaTeX rendering | Embedded KaTeX (fonts + MathML) and Mermaid (client-side dark theme) with clipboard file link handling and responsive tables |
+| 2026-10-14 | Keyed DOM Reconciliation | Map<step_index, HTMLElement> cache eliminates full DOM re-renders; achieves O(Δ) incremental updates without flickering or destroying diagram states |
+| 2026-10-14 | Hash Routing & Route Persistence | Native hash routing (#/session/:id, #/project/:name, #/) guarantees persistent state across Cmd+R reloads and browser Back/Forward |
+| 2026-10-14 | SSE Real-Time Live Tailing | Server-Sent Events at /api/sessions/:id/tail with byte-offset seeking emits newly appended steps with sub-second latency |
+| 2026-10-14 | Dynamic Backend Watch Coordination | POST /api/watch-interval directly controls Go ticker channel, allowing client interval changes (0s-60s) to govern background scans |
 
 ---
 

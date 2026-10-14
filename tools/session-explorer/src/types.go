@@ -236,3 +236,15 @@ type InstallSkillResponse struct {
 	Message       string `json:"message"`
 }
 
+// WatchIntervalRequest is the payload for POST /api/watch-interval.
+type WatchIntervalRequest struct {
+	IntervalSeconds int `json:"interval_seconds"`
+}
+
+// WatchIntervalResponse is the payload returned by GET and POST /api/watch-interval.
+type WatchIntervalResponse struct {
+	IntervalSeconds int    `json:"interval_seconds"`
+	Status          string `json:"status"` // "active" or "paused"
+	Message         string `json:"message"`
+}
+

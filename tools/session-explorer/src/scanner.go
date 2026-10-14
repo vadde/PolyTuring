@@ -19,12 +19,19 @@ import (
 	"time"
 )
 
+type cachedSessionInfo struct {
+	modTime time.Time
+	size    int64
+	session Session
+}
+
 // SessionIndex holds all discovered sessions and provides search capabilities.
 type SessionIndex struct {
 	mu            sync.RWMutex
 	sessions      []Session
 	// entryCache stores parsed transcript entries per session ID for detail views
 	entryCache    map[string][]TranscriptEntry
+	fileCache     map[string]cachedSessionInfo
 	stats         Stats
 	dataDir       string
 	verbose       bool
@@ -36,6 +43,7 @@ func NewSessionIndex(dataDir string, verbose bool) *SessionIndex {
 	idx := &SessionIndex{
 		sessions:      make([]Session, 0),
 		entryCache:    make(map[string][]TranscriptEntry),
+		fileCache:     make(map[string]cachedSessionInfo),
 		dataDir:       dataDir,
 		verbose:       verbose,
 		knownProjects: make(map[string]string),
@@ -171,30 +179,42 @@ func (idx *SessionIndex) ScanAll() error {
 // scanSession parses a single session's transcript file to extract metadata.
 // Implements: R-002, R-003, R-004, R-005
 func (idx *SessionIndex) scanSession(sessionID, transcriptPath string) (Session, error) {
+	// Stat primary transcript
+	info, err := os.Stat(transcriptPath)
+	if err != nil {
+		return Session{}, fmt.Errorf("failed to stat %s: %w", transcriptPath, err)
+	}
+
+	// Check for full transcript
+	fullPath := filepath.Join(filepath.Dir(transcriptPath), "transcript_full.jsonl")
+	hasFull := false
+	checkTime := info.ModTime()
+	checkSize := info.Size()
+	if fullFi, err := os.Stat(fullPath); err == nil {
+		hasFull = true
+		checkTime = fullFi.ModTime()
+		checkSize = fullFi.Size()
+	}
+
+	// Check if already in cache with identical modTime and size
+	idx.mu.RLock()
+	cached, hasCache := idx.fileCache[sessionID]
+	idx.mu.RUnlock()
+
+	if hasCache && cached.size == checkSize && cached.modTime.Equal(checkTime) {
+		return cached.session, nil
+	}
+
 	file, err := os.Open(transcriptPath)
 	if err != nil {
 		return Session{}, fmt.Errorf("failed to open %s: %w", transcriptPath, err)
 	}
 	defer file.Close()
 
-	// Get file size
-	info, err := file.Stat()
-	if err != nil {
-		return Session{}, fmt.Errorf("failed to stat %s: %w", transcriptPath, err)
-	}
-
 	session := Session{
 		ID:                  sessionID,
-		TranscriptSizeBytes: info.Size(),
-	}
-
-	// Check for full transcript
-	fullPath := filepath.Join(filepath.Dir(transcriptPath), "transcript_full.jsonl")
-	if _, err := os.Stat(fullPath); err == nil {
-		session.HasFullTranscript = true
-		if fi, err := os.Stat(fullPath); err == nil {
-			session.TranscriptSizeBytes = fi.Size()
-		}
+		TranscriptSizeBytes: checkSize,
+		HasFullTranscript:   hasFull,
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -408,6 +428,17 @@ func (idx *SessionIndex) scanSession(sessionID, transcriptPath string) (Session,
 		session.ProjectName = "Default"
 	}
 
+	idx.mu.Lock()
+	if idx.fileCache == nil {
+		idx.fileCache = make(map[string]cachedSessionInfo)
+	}
+	idx.fileCache[sessionID] = cachedSessionInfo{
+		modTime: checkTime,
+		size:    checkSize,
+		session: session,
+	}
+	idx.mu.Unlock()
+
 	return session, nil
 }
 
@@ -536,59 +567,64 @@ func (idx *SessionIndex) GetSessionDetail(sessionID string) (*SessionDetailRespo
 			continue
 		}
 
-		// Only include meaningful message types in the UI
-		switch entry.Type {
-		case "USER_INPUT", "PLANNER_RESPONSE", "ERROR_MESSAGE":
-			// Always include these
-		case "VIEW_FILE", "RUN_COMMAND", "GREP_SEARCH", "LIST_DIRECTORY",
-			"CODE_ACTION", "SEARCH_WEB", "READ_URL_CONTENT", "BROWSER_SUBAGENT",
-			"ASK_QUESTION":
-			// Include tool results
-		default:
-			// Skip system messages, checkpoints, ephemeral, etc.
-			continue
+		if isDisplayableType(entry.Type) {
+			messages = append(messages, formatMessageDisplay(entry))
 		}
-
-		msg := MessageDisplay{
-			StepIndex:   entry.StepIndex,
-			Source:      entry.Source,
-			Type:        entry.Type,
-			Status:      entry.Status,
-			CreatedAt:   entry.CreatedAt,
-			HasThinking: entry.Thinking != "",
-			Thinking:    entry.Thinking,
-		}
-
-		// Clean user input content (strip XML tags)
-		if entry.Type == "USER_INPUT" && entry.Source == "USER_EXPLICIT" {
-			msg.Content = extractUserPrompt(entry.Content)
-		} else {
-			msg.Content = entry.Content
-		}
-
-		// Convert tool calls
-		if entry.ToolCalls != nil {
-			for _, tc := range entry.ToolCalls {
-				argsJSON, _ := json.Marshal(tc.Args)
-				preview := string(argsJSON)
-				if len(preview) > 500 {
-					preview = preview[:500] + "..."
-				}
-				msg.ToolCalls = append(msg.ToolCalls, ToolCallDisplay{
-					Name:        tc.Name,
-					ArgsPreview: preview,
-					Args:        tc.Args,
-				})
-			}
-		}
-
-		messages = append(messages, msg)
 	}
 
 	return &SessionDetailResponse{
 		Session:  *session,
 		Messages: messages,
 	}, nil
+}
+
+// isDisplayableType returns true if the message type should be displayed in the UI timeline.
+func isDisplayableType(t string) bool {
+	switch t {
+	case "USER_INPUT", "PLANNER_RESPONSE", "ERROR_MESSAGE":
+		return true
+	case "VIEW_FILE", "RUN_COMMAND", "GREP_SEARCH", "LIST_DIRECTORY",
+		"CODE_ACTION", "SEARCH_WEB", "READ_URL_CONTENT", "BROWSER_SUBAGENT",
+		"ASK_QUESTION":
+		return true
+	default:
+		return false
+	}
+}
+
+// formatMessageDisplay converts a raw TranscriptEntry into a UI-friendly MessageDisplay.
+func formatMessageDisplay(entry TranscriptEntry) MessageDisplay {
+	msg := MessageDisplay{
+		StepIndex:   entry.StepIndex,
+		Source:      entry.Source,
+		Type:        entry.Type,
+		Status:      entry.Status,
+		CreatedAt:   entry.CreatedAt,
+		HasThinking: entry.Thinking != "",
+		Thinking:    entry.Thinking,
+	}
+
+	if entry.Type == "USER_INPUT" && entry.Source == "USER_EXPLICIT" {
+		msg.Content = extractUserPrompt(entry.Content)
+	} else {
+		msg.Content = entry.Content
+	}
+
+	if entry.ToolCalls != nil {
+		for _, tc := range entry.ToolCalls {
+			argsJSON, _ := json.Marshal(tc.Args)
+			preview := string(argsJSON)
+			if len(preview) > 500 {
+				preview = preview[:500] + "..."
+			}
+			msg.ToolCalls = append(msg.ToolCalls, ToolCallDisplay{
+				Name:        tc.Name,
+				ArgsPreview: preview,
+				Args:        tc.Args,
+			})
+		}
+	}
+	return msg
 }
 
 // Search performs full-text search across all sessions.

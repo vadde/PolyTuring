@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -392,4 +393,90 @@ func TestAPI_OpenAPI_And_SwaggerDocs(t *testing.T) {
 		t.Errorf("expected interactive runner in /docs response")
 	}
 }
+
+func TestAPI_WatchInterval(t *testing.T) {
+	idx := setupTestIndex(t)
+	handler := NewAPIHandler(idx, false)
+
+	// 1. GET default interval
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/watch-interval", nil)
+	recGet := httptest.NewRecorder()
+	handler.HandleWatchInterval(recGet, reqGet)
+
+	if recGet.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recGet.Code)
+	}
+
+	var respGet WatchIntervalResponse
+	if err := json.NewDecoder(recGet.Body).Decode(&respGet); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if respGet.IntervalSeconds != 10 {
+		t.Errorf("expected default interval 10s, got %d", respGet.IntervalSeconds)
+	}
+	if respGet.Status != "active" {
+		t.Errorf("expected status 'active', got %s", respGet.Status)
+	}
+
+	// 2. POST update to 60s
+	bodyPost := bytes.NewBufferString(`{"interval_seconds": 60}`)
+	reqPost := httptest.NewRequest(http.MethodPost, "/api/watch-interval", bodyPost)
+	recPost := httptest.NewRecorder()
+	handler.HandleWatchInterval(recPost, reqPost)
+
+	if recPost.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recPost.Code)
+	}
+
+	var respPost WatchIntervalResponse
+	if err := json.NewDecoder(recPost.Body).Decode(&respPost); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if respPost.IntervalSeconds != 60 {
+		t.Errorf("expected updated interval 60s, got %d", respPost.IntervalSeconds)
+	}
+	if handler.GetWatchInterval() != 60 {
+		t.Errorf("expected handler interval to be 60, got %d", handler.GetWatchInterval())
+	}
+
+	// 3. POST update to 0 (paused)
+	bodyPause := bytes.NewBufferString(`{"interval_seconds": 0}`)
+	reqPause := httptest.NewRequest(http.MethodPost, "/api/watch-interval", bodyPause)
+	recPause := httptest.NewRecorder()
+	handler.HandleWatchInterval(recPause, reqPause)
+
+	var respPause WatchIntervalResponse
+	if err := json.NewDecoder(recPause.Body).Decode(&respPause); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if respPause.Status != "paused" {
+		t.Errorf("expected status 'paused', got %s", respPause.Status)
+	}
+}
+
+func TestAPI_SessionTail_InitialReplay(t *testing.T) {
+	idx := setupTestIndex(t)
+	handler := NewAPIHandler(idx, false)
+
+	// Create a context that cancels after 100ms so the SSE loop terminates cleanly
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions/session-api-1/tail?last_step=-1", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.HandleSessionTail(rec, req)
+
+	output := rec.Body.String()
+	if !strings.Contains(output, "event: connected") {
+		t.Errorf("expected 'event: connected' in SSE output, got: %s", output)
+	}
+	if !strings.Contains(output, "event: step") {
+		t.Errorf("expected at least one 'event: step' in SSE output, got: %s", output)
+	}
+	if !strings.Contains(output, "Test prompt for API") {
+		t.Errorf("expected 'Test prompt for API' in SSE output, got: %s", output)
+	}
+}
+
 

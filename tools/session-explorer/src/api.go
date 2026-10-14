@@ -6,8 +6,10 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -15,21 +17,45 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // APIHandler holds the session index and provides HTTP handlers.
 type APIHandler struct {
-	index   *SessionIndex
-	verbose bool
+	index           *SessionIndex
+	verbose         bool
+	watchInterval   int
+	watchIntervalMu sync.RWMutex
+	watchIntervalCh chan int
 }
 
 // NewAPIHandler creates a new API handler.
 func NewAPIHandler(index *SessionIndex, verbose bool) *APIHandler {
 	return &APIHandler{
-		index:   index,
-		verbose: verbose,
+		index:           index,
+		verbose:         verbose,
+		watchInterval:   10,
+		watchIntervalCh: make(chan int, 10),
 	}
+}
+
+// SetWatchInterval safely updates the background watch interval and notifies the watcher loop.
+func (h *APIHandler) SetWatchInterval(sec int) {
+	h.watchIntervalMu.Lock()
+	h.watchInterval = sec
+	h.watchIntervalMu.Unlock()
+	select {
+	case h.watchIntervalCh <- sec:
+	default:
+	}
+}
+
+// GetWatchInterval returns the current background watch interval in seconds.
+func (h *APIHandler) GetWatchInterval() int {
+	h.watchIntervalMu.RLock()
+	defer h.watchIntervalMu.RUnlock()
+	return h.watchInterval
 }
 
 // HandleSessions handles GET /api/sessions
@@ -304,4 +330,180 @@ func (h *APIHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		"stats":   stats,
 	})
 }
+
+// HandleWatchInterval handles GET and POST /api/watch-interval.
+func (h *APIHandler) HandleWatchInterval(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		curr := h.GetWatchInterval()
+		status := "active"
+		if curr <= 0 {
+			status = "paused"
+		}
+		writeJSON(w, WatchIntervalResponse{
+			IntervalSeconds: curr,
+			Status:          status,
+			Message:         fmt.Sprintf("Current background watch interval is %ds (%s)", curr, status),
+		})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req WatchIntervalRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.IntervalSeconds < 0 {
+			req.IntervalSeconds = 0
+		}
+		h.SetWatchInterval(req.IntervalSeconds)
+		status := "active"
+		if req.IntervalSeconds <= 0 {
+			status = "paused"
+		}
+		writeJSON(w, WatchIntervalResponse{
+			IntervalSeconds: req.IntervalSeconds,
+			Status:          status,
+			Message:         fmt.Sprintf("Live watch interval successfully updated to %ds (%s)", req.IntervalSeconds, status),
+		})
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// HandleSessionTail handles GET /api/sessions/{id}/tail for real-time SSE delta streaming.
+func (h *APIHandler) HandleSessionTail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Extract session ID from path: /api/sessions/{id}/tail
+	sub := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
+	parts := strings.Split(sub, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Session ID required", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[0]
+
+	transcriptPath := filepath.Join(h.index.dataDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
+	fullPath := filepath.Join(h.index.dataDir, sessionID, ".system_generated", "logs", "transcript_full.jsonl")
+	if _, err := os.Stat(fullPath); err == nil {
+		transcriptPath = fullPath
+	}
+
+	file, err := os.Open(transcriptPath)
+	if err != nil {
+		http.Error(w, "Session log not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	lastStep := -1
+	if lsStr := r.URL.Query().Get("last_step"); lsStr != "" {
+		if ls, err := strconv.Atoi(lsStr); err == nil {
+			lastStep = ls
+		}
+	}
+
+	fmt.Fprintf(w, "event: connected\ndata: {\"session_id\":\"%s\",\"last_step\":%d}\n\n", sessionID, lastStep)
+	flusher.Flush()
+
+	// Initial replay: send any steps > lastStep
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var entry TranscriptEntry
+		if err := json.Unmarshal(line, &entry); err != nil {
+			continue
+		}
+		if entry.StepIndex > lastStep && isDisplayableType(entry.Type) {
+			msg := formatMessageDisplay(entry)
+			msgBytes, _ := json.Marshal(msg)
+			fmt.Fprintf(w, "event: step\ndata: %s\n\n", msgBytes)
+			flusher.Flush()
+			if entry.StepIndex > lastStep {
+				lastStep = entry.StepIndex
+			}
+		}
+	}
+
+	lastOffset, _ := file.Seek(0, io.SeekEnd)
+
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-heartbeat.C:
+			fmt.Fprintf(w, ": ping\n\n")
+			flusher.Flush()
+		case <-ticker.C:
+			fi, err := os.Stat(transcriptPath)
+			if err != nil {
+				continue
+			}
+			currSize := fi.Size()
+			if currSize < lastOffset {
+				lastOffset = 0
+			}
+			if currSize > lastOffset {
+				file.Seek(lastOffset, io.SeekStart)
+				scan := bufio.NewScanner(file)
+				scanBuf := make([]byte, 0, 1024*1024)
+				scan.Buffer(scanBuf, 10*1024*1024)
+
+				for scan.Scan() {
+					line := scan.Bytes()
+					if len(line) == 0 {
+						continue
+					}
+					var entry TranscriptEntry
+					if err := json.Unmarshal(line, &entry); err != nil {
+						continue
+					}
+					if isDisplayableType(entry.Type) {
+						msg := formatMessageDisplay(entry)
+						msgBytes, _ := json.Marshal(msg)
+						fmt.Fprintf(w, "event: step\ndata: %s\n\n", msgBytes)
+						flusher.Flush()
+						if entry.StepIndex > lastStep {
+							lastStep = entry.StepIndex
+						}
+					}
+				}
+				newOffset, err := file.Seek(0, io.SeekCurrent)
+				if err == nil && newOffset > lastOffset {
+					lastOffset = newOffset
+				}
+			}
+		}
+	}
+}
+
 

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Real-Time Live Tailing via Server-Sent Events (SSE)**: Added `/api/sessions/{id}/tail` endpoint featuring byte-offset delta seeking on JSONL logs, 15s keepalive heartbeats, and sub-second push updates for active IDE coding sessions.
+- **Dynamic Watch Interval Coordination**: Added `GET` and `POST` `/api/watch-interval` to synchronize UI refresh settings with the Go background ticker, supporting active live intervals or full pauses.
+- **Keyed DOM Reconciliation Engine**: Replaced full-DOM redraws with an in-memory `renderedStepMap` cache, enabling fine-grained $O(\Delta)$ appends without tearing down past DOM nodes or resetting interactive Mermaid diagrams and KaTeX formulas.
+- **Client-Side Hash Router & Deep-Link Route Persistence**: Added hash-based routing (`#/session/:id`, `#/project/:name`, `#/`) to guarantee persistent navigation states across browser reloads (`Cmd+R` / `F5`) and native history navigation.
+- **De Facto "Latest First" Sorting Default**: Defaulted in-session step sorting to `step_desc` (Latest First) for both session opening and live tailing, prepending new steps to the top of the viewport.
+- **Interactive Live Stream Play/Pause Toggle**: Converted the session stream pill into an interactive toggle button (`🟢 Live Stream` ⇄ `⏸️ Stream Paused`) with instant connection control.
+- **Smart Auto-Follow Mode**: Preserved pinned scroll during live tailing while automatically unpinning when the user scrolls away to inspect earlier steps, displaying a floating direction-aware indicator (`↑ New steps arrived`).
+- **Scanner Delta Caching**: Implemented `mtime` and file-size delta tracking in `scanner.go`, slashing incremental rescan times from ~950µs to ~50µs (~19x speedup).
 - **Multi-Lens Markdown & LaTeX Math Rendering**: Integrated `katex@0.19.0` with offline embedded fonts and custom Marked tokenizer extensions (`mathBlockExt`, `inlineMathExt`), rendering display math (`$$...$$`, `\[...\]`) and inline math (`$...$`, `\(...\)`) with pre-tokenizer protection against underscore-to-italic corruption.
 - **`isLikelyMath` Heuristic**: Intelligent discrimination between real mathematical expressions and currency or price ranges (`$100`, `$25.50`, `$10 - $20`).
 - **Interactive Client-Side Mermaid Diagrams**: Integrated `mermaid@12.2.0` with dark acrylic glass theme, interactive "Source" toggle, "Copy Code" action, and graceful error recovery.

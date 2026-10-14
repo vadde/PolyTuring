@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,7 @@ var openapiSpec []byte
 // Implements: R-006, NF-008, R-030, R-032, R-033
 func StartServer(cfg Config, index *SessionIndex) error {
 	api := NewAPIHandler(index, cfg.Verbose)
+	api.SetWatchInterval(cfg.WatchInterval)
 
 	mux := http.NewServeMux()
 
@@ -31,15 +33,26 @@ func StartServer(cfg Config, index *SessionIndex) error {
 		// Route to detail if path has an ID segment
 		path := r.URL.Path
 		if path != "/api/sessions" && path != "/api/sessions/" {
+			if strings.HasSuffix(path, "/tail") {
+				api.HandleSessionTail(w, r)
+				return
+			}
 			api.HandleSessionDetail(w, r)
 			return
 		}
 		api.HandleSessions(w, r)
 	})
-	mux.HandleFunc("/api/sessions/", api.HandleSessionDetail)
+	mux.HandleFunc("/api/sessions/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/tail") {
+			api.HandleSessionTail(w, r)
+			return
+		}
+		api.HandleSessionDetail(w, r)
+	})
 	mux.HandleFunc("/api/search", api.HandleSearch)
 	mux.HandleFunc("/api/stats", api.HandleStats)
 	mux.HandleFunc("/api/refresh", api.HandleRefresh)
+	mux.HandleFunc("/api/watch-interval", api.HandleWatchInterval)
 	mux.HandleFunc("/api/wip", api.HandleWIP)
 	mux.HandleFunc("/api/skill/install", api.HandleInstallSkill)
 
@@ -52,18 +65,41 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/docs", handleSwaggerDocs)
 	mux.HandleFunc("/swagger", handleSwaggerDocs)
 
-	// Background Live Watcher (auto-rescan periodically)
-	if cfg.WatchInterval > 0 {
-		go func() {
-			ticker := time.NewTicker(time.Duration(cfg.WatchInterval) * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
+	// Background Live Watcher (dynamically reacts to interval changes)
+	go func() {
+		interval := cfg.WatchInterval
+		var ticker *time.Ticker
+		var tickerC <-chan time.Time
+
+		resetTicker := func(sec int) {
+			if ticker != nil {
+				ticker.Stop()
+				ticker = nil
+				tickerC = nil
+			}
+			if sec > 0 {
+				ticker = time.NewTicker(time.Duration(sec) * time.Second)
+				tickerC = ticker.C
+			}
+		}
+
+		resetTicker(interval)
+
+		for {
+			select {
+			case newSec := <-api.watchIntervalCh:
+				interval = newSec
+				resetTicker(interval)
+				if cfg.Verbose {
+					log.Printf("[watcher] background rescan interval updated to %ds", interval)
+				}
+			case <-tickerC:
 				if err := index.ScanAll(); err != nil && cfg.Verbose {
 					log.Printf("[watcher] background rescan error: %v", err)
 				}
 			}
-		}()
-	}
+		}
+	}()
 
 	// Static files (embedded frontend with no-cache headers to avoid browser caching stale JS)
 	staticFS, err := fs.Sub(staticFiles, "web/dist")
