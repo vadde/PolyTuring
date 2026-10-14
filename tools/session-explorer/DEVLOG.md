@@ -6,6 +6,46 @@
 
 ---
 
+### 2026-10-14 — Feature: Organic Diagram Rendering & Visual Canvas (Signature Detection, Docs Portal Overrides & Interactive Zoom)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (UI/UX Visual Excellence & Diagram Rendering Reinforcement)
+**Duration**: ~15m
+
+#### What Was Done
+- **Root-Cause Analysis of Raw Diagram Rendering**:
+  1. **Strict Language Tag Failure**: Marked only recognized code blocks with strict `lang === 'mermaid'`. However, LLM models frequently output diagrams with missing language fences (```` ``` ```` with no tag) or alternative identifiers (```` ```diagram ````, ```` ```chart ````, ```` ```flowchart ````), as observed in Step 925 of session `9ee8451b-3c5e-46af-8090-f85883a767b3`. These fell through to generic code blocks.
+  2. **Brittle ID & Entity Architecture**: The earlier custom `mermaid.render(id, cleanCode)` pipeline generated random IDs and manually replaced HTML entities, causing silent failures and fallback to raw source code whenever syntax errors or detached DOM timing occurred.
+  3. **Admire & Critique Synthesis (Borrowing from `tool-scripts` Docs Portal)**:
+     - *Admire*: The static docs portal (`docs/site/`) achieved clean, robust rendering with native `<pre class="mermaid">` blocks and high-contrast SVG styling rules. Modern Mermaid v10+ features `mermaid.run({ nodes, suppressErrors: true })` which natively evaluates DOM nodes without manual escaping or temporary iframe acrobatics.
+     - *Critique*: Unlike the static documentation portal which initializes once on page load (`startOnLoad: true`), Session Explorer is a dynamic Single Page Application (SPA). Messages are fetched via REST, searched, filtered, and injected into `innerHTML`. A passive `startOnLoad` leaves dynamic content unrendered. Moreover, complex multi-stage pipelines (like Step 925's 4-stage warehouse strategy) get squashed without interactive zoom controls.
+- **Architectural Solution Implemented**:
+  1. **Diagram Signature Detection (`isMermaidCode`)**:
+     - Inspects code block text for known diagram headers (`graph`, `flowchart`, `sequenceDiagram`, `classDiagram`, `stateDiagram`, `erDiagram`, `journey`, `gantt`, `pie`, `gitGraph`, `mindmap`, `timeline`, `sankey`, `xychart`, `architecture-beta`, etc.) after stripping comments and directives.
+     - Unlabelled code fences containing Mermaid syntax are now seamlessly identified and rendered into visual diagrams.
+  2. **Organic Canvas Architecture**:
+     - Emits `.canvas-container` wrapping `.canvas-viewport`, `.canvas-content-surface`, and `<pre class="mermaid">`.
+     - Integrated toolbar with Zoom In (`+`), Zoom Out (`−`), Zoom Reset (`⟲`), zoom level badge (`100%`), "Source" toggle, and "Copy" button.
+  3. **High-Contrast SVG Readability Overrides (from `docs/site/style.css`)**:
+     - Imported explicit SVG styles for `.mermaid svg text`, `.mermaid .node rect`, `.mermaid .edgePath path`, and `.mermaid .edgeLabel` with cyan borders (`#06b6d4`), violet edge paths (`#a855f7`), and dark acrylic fills (`rgba(15, 23, 42, 0.92)`).
+  4. **Native Batch Rendering (`mermaid.run`)**:
+     - Replaced brittle `mermaid.render()` with native `mermaid.run({ nodes: Array.from(unrendered), suppressErrors: true })`.
+  5. **Interactive Zoom Engine**:
+     - Added `initCanvasZoomInteractions` supporting smooth CSS transform scaling from 40% to 300%.
+- **Verification**:
+  - Rebuilt bundle with Bun (2,128 modules in 119ms) and recompiled Go binary `bin/session-explorer`.
+  - All 25 unit tests pass (`make test`).
+  - Headless Chrome and API tests verify Step 925 and raw diagram fences render into interactive SVG canvas cards.
+
+#### Files Changed
+- `tools/session-explorer/src/web/src/app.js` — Added `isMermaidCode` signature detection, organic canvas container renderer, native `mermaid.run()`, and interactive zoom controls.
+- `tools/session-explorer/src/web/src/styles.css` — Added `.canvas-container`, `.canvas-tool-btn`, `.zoom-level-badge`, and SVG readability overrides from `docs/site/style.css`.
+- `tools/session-explorer/src/web/dist/` — Rebuilt and verified `app.bundle.js` and `styles.css`.
+- `tools/session-explorer/DEVLOG.md` — Appended session log.
+- `tools/session-explorer/CONTEXT.md` — Updated state.
+
+---
+
 ### 2026-10-14 — Feature: Multi-Lens Markdown Rendering Perfection (KaTeX Math, Mermaid Diagrams, Interactive File Links, Callouts)
 
 **Agent/Author**: Antigravity (Google DeepMind)

@@ -78,6 +78,7 @@ blockers: []
 | 2026-09-18 | 100% offline self-contained | Highlight.js, marked, and Swagger UI embedded; no external CDNs required |
 | 2026-09-20 | In-project toolbar & search | Isolated from global search, reactive sort/search/date range within project hub |
 | 2026-09-20 | Dynamic timeline node width | Auto-expanding capsule pill centered on rail for indices in the millions |
+| 2026-10-14 | Organic Diagram Canvas & Signature Detection | Emits .canvas-container with pre.mermaid, runs native mermaid.run(), inspects code headers to catch unlabelled blocks, and provides interactive CSS transform zoom controls |
 | 2026-09-20 | Interrelated in-session sort & search | Unified pipeline for message filtering, searching, and sorting with instant reactivity |
 | 2026-10-14 | Hard-stop halting invariant for multi-session ambiguity | Coding assistants MUST NOT guess or assume when multiple sessions exist; require explicit user selection |
 | 2026-10-14 | Dual-mode agent WIP recovery script (`wip.sh`) | Probes background daemon first; cleanly falls back to headless CLI binary if daemon is offline |

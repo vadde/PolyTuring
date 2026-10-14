@@ -8,21 +8,21 @@ import hljs from 'highlight.js';
 import katex from 'katex';
 import mermaid from 'mermaid';
 
-// Initialize Mermaid with Dark Glass theme
+// Initialize Mermaid with Dark Glass theme matching tool-scripts docs portal
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
   securityLevel: 'loose',
-  fontFamily: 'Inter, system-ui, sans-serif',
+  fontFamily: "'JetBrains Mono', 'Inter', monospace",
   themeVariables: {
     darkMode: true,
-    background: 'transparent',
-    primaryColor: '#38bdf8',
+    background: '#090d16',
+    primaryColor: '#00f2fe',
     primaryTextColor: '#f8fafc',
-    primaryBorderColor: 'rgba(56, 189, 248, 0.4)',
-    lineColor: '#94a3b8',
-    secondaryColor: '#a855f7',
-    tertiaryColor: '#1e293b'
+    primaryBorderColor: '#38bdf8',
+    lineColor: '#a855f7',
+    secondaryColor: '#1e293b',
+    tertiaryColor: '#0f172a'
   }
 });
 
@@ -120,23 +120,37 @@ const calloutIcons = {
   CAUTION: '🛑'
 };
 
+// Detect if a code block is a Mermaid diagram by language tag or code signature
+function isMermaidCode(text, lang) {
+  const cleanLang = (lang || '').trim().toLowerCase();
+  if (['mermaid', 'diagram', 'chart', 'flowchart'].includes(cleanLang)) return true;
+  if (!text) return false;
+  // Strip comments and frontmatter/directives
+  const cleaned = text.replace(/%%\{[\s\S]*?\}%%/g, '').replace(/%%.*$/gm, '').trim();
+  return /^(graph\s+(?:TD|TB|BT|RL|LR)|flowchart\s+(?:TD|TB|BT|RL|LR)|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|C4(?:Context|Container|Component|Dynamic|Deployment)|mindmap|timeline|zenuml|sankey(?:-beta)?|xychart(?:-beta)?|block(?:-beta)?|packet(?:-beta)?|kanban|architecture(?:-beta)?)\b/i.test(cleaned);
+}
+
 // Configure marked with highlight.js, rich code blocks, file links, and Mermaid diagrams
 const renderer = {
   code({ text, lang }) {
-    if (lang === 'mermaid') {
+    if (isMermaidCode(text, lang)) {
       const diagramId = 'mermaid-' + Math.random().toString(36).substring(2, 11);
       return `
-        <div class="mermaid-card" id="${diagramId}-card">
-          <div class="mermaid-card-header">
-            <span class="mermaid-title">📊 Mermaid Diagram</span>
-            <div class="mermaid-actions">
-              <button class="btn-ghost-sm toggle-mermaid-src-btn" data-target="${diagramId}-src" title="View Diagram Source">Source</button>
-              <button class="btn-ghost-sm copy-mermaid-src-btn" data-code="${escapeHtml(text)}" title="Copy Diagram Code">Copy</button>
+        <div class="canvas-container mermaid-card" id="${diagramId}-card">
+          <div class="canvas-header-bar">
+            <span class="canvas-type-tag">📊 Diagram Canvas</span>
+            <div class="canvas-controls-group">
+              <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+              <span class="zoom-level-badge">100%</span>
+              <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+              <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+              <button class="canvas-tool-btn toggle-mermaid-src-btn" data-target="${diagramId}-src" title="View Diagram Source">Source</button>
+              <button class="canvas-tool-btn copy-mermaid-src-btn" data-code="${escapeHtml(text)}" title="Copy Diagram Code">Copy</button>
             </div>
           </div>
-          <div class="mermaid-viewport" id="${diagramId}-viewport">
-            <div class="mermaid-diagram" id="${diagramId}" data-code="${escapeHtml(text)}">
-              <div class="mermaid-loading"><span>⏳</span> Rendering diagram...</div>
+          <div class="canvas-viewport" id="${diagramId}-viewport">
+            <div class="canvas-content-surface">
+              <pre class="mermaid" id="${diagramId}">${escapeHtml(text)}</pre>
             </div>
           </div>
           <pre class="mermaid-source-pre" id="${diagramId}-src" style="display: none;"><code>${escapeHtml(text)}</code></pre>
@@ -1806,41 +1820,63 @@ function renderTimelineMessages() {
   });
 }
 
-// Asynchronously render all pending Mermaid diagrams
+// Asynchronously render all pending Mermaid diagrams using Mermaid native runner
 async function renderAllMermaidDiagrams(container = document) {
-  const diagrams = container.querySelectorAll('.mermaid-diagram[data-code]:not([data-rendered="true"])');
-  if (!diagrams.length) return;
+  const unrendered = container.querySelectorAll('pre.mermaid:not([data-processed="true"])');
+  if (!unrendered.length) return;
 
-  for (const diag of diagrams) {
-    diag.setAttribute('data-rendered', 'true');
-    const rawCode = diag.getAttribute('data-code');
-    const id = diag.id;
-    if (!rawCode || !id) continue;
-
-    try {
-      const cleanCode = rawCode
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#039;/g, "'");
-
-      const { svg, bindFunctions } = await mermaid.render(`${id}-svg`, cleanCode);
-      diag.innerHTML = svg;
-      if (typeof bindFunctions === 'function') {
-        bindFunctions(diag);
-      }
-    } catch (err) {
-      console.warn('Mermaid render error for', id, err);
-      diag.innerHTML = `
-        <div class="mermaid-error-banner">
-          <span>⚠️ Diagram rendering error: ${escapeHtml(err.message || 'Invalid syntax')}</span>
-        </div>
-      `;
-      const srcEl = document.getElementById(`${id}-src`);
-      if (srcEl) srcEl.style.display = 'block';
-    }
+  try {
+    await mermaid.run({
+      nodes: Array.from(unrendered),
+      suppressErrors: true
+    });
+  } catch (err) {
+    console.warn('Mermaid batch render warning:', err);
   }
+
+  // Ensure zoom controls are wired for all canvas containers
+  initCanvasZoomInteractions(container);
+}
+
+// Wire interactive zoom controls for diagram canvases
+function initCanvasZoomInteractions(container = document) {
+  container.querySelectorAll('.canvas-container:not([data-zoom-initialized="true"])').forEach(card => {
+    card.setAttribute('data-zoom-initialized', 'true');
+    const surface = card.querySelector('.canvas-content-surface');
+    const zoomInBtn = card.querySelector('.zoom-in-btn');
+    const zoomOutBtn = card.querySelector('.zoom-out-btn');
+    const zoomResetBtn = card.querySelector('.zoom-reset-btn');
+    const badge = card.querySelector('.zoom-level-badge');
+    if (!surface) return;
+
+    let zoom = 1.0;
+    const update = () => {
+      surface.style.transform = `scale(${zoom})`;
+      if (badge) badge.textContent = `${Math.round(zoom * 100)}%`;
+    };
+
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoom = Math.min(3.0, +(zoom + 0.2).toFixed(2));
+        update();
+      });
+    }
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoom = Math.max(0.4, +(zoom - 0.2).toFixed(2));
+        update();
+      });
+    }
+    if (zoomResetBtn) {
+      zoomResetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoom = 1.0;
+        update();
+      });
+    }
+  });
 }
 
 // Export Session (R-021)
