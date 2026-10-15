@@ -149,68 +149,74 @@
       
       <!-- Sticky Detail Navigation Header -->
       <div class="detail-header">
-        <div class="detail-title-group">
-          <button class="back-btn" id="detailBackBtn">
-            <span>←</span> Back
-          </button>
-          <span class="detail-session-id" id="detailSessionId"></span>
-          <span class="workspace-badge" id="detailWorkspaceBadge">📁 Workspace</span>
-          <span class="session-time" id="detailTime"></span>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-          <!-- In-session Step Search -->
-          <div class="session-step-search-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="sessionStepSearchInput" class="session-step-search-input" placeholder="Search steps in session..." aria-label="Search steps in session">
-            <button class="clear-search-btn" id="clearSessionStepSearchBtn" style="display: none;" title="Clear step search">✕</button>
-          </div>
-
-          <!-- In-session Step Sort -->
-          <div class="filter-group session-sort-group">
-            <span class="filter-label">Sort:</span>
-            <select id="sessionStepSortSelect" class="select-custom select-custom-sm" aria-label="Sort steps in session">
-              <option value="step_desc" selected>Latest Steps First (Latest → 0)</option>
-              <option value="step_asc">Oldest Steps First (0 → Latest)</option>
-              <option value="tools_desc">Most Tool Calls</option>
-              <option value="length_desc">Longest Content</option>
-            </select>
-          </div>
-
-          <!-- Filter Message Types -->
-          <div style="display: flex; gap: 0.35rem;">
-            <button class="chip msg-filter-chip active" data-filter="ALL">All</button>
-            <button class="chip msg-filter-chip" data-filter="USER_INPUT">Prompts</button>
-            <button class="chip msg-filter-chip" data-filter="PLANNER_RESPONSE">Agent</button>
-            <button class="chip msg-filter-chip" data-filter="TOOL_CALLS">Tools</button>
-            <button class="chip msg-filter-chip" data-filter="ERROR">Errors</button>
-          </div>
-
-          <!-- Live Tail Stream Control -->
-          <div class="tail-stream-control" id="tailStreamControl">
-            <button class="stream-toggle-btn" id="toggleStreamBtn" title="Click to Pause or Resume Live Streaming">
-              <span class="live-dot pulsing active" id="detailLiveDot"></span>
-              <span class="tail-status-label" id="tailStatusLabel">Live Stream</span>
+        <div class="detail-header-top">
+          <div class="detail-title-group">
+            <button class="back-btn" id="detailBackBtn">
+              <span>←</span> Back
             </button>
-            <button class="btn-ghost-sm active" id="toggleFollowStreamBtn" title="Auto-scroll to latest step as it arrives">
-              <span>⬇️</span> Follow
-            </button>
+            <span class="detail-session-id" id="detailSessionId"></span>
+            <span class="workspace-badge" id="detailWorkspaceBadge">📁 Workspace</span>
+            <span class="session-time" id="detailTime"></span>
           </div>
 
-          <!-- In-session Step Summary & Reset -->
-          <div class="session-step-summary" style="display: flex; align-items: center; gap: 0.45rem;">
-            <span id="detailStepCountBadge" class="step-count-badge">0 steps</span>
-            <button class="btn-ghost-sm" id="resetSessionStepFiltersBtn" style="display: none;" title="Reset step search, sort, and type filters">Reset</button>
-          </div>
-
-          <!-- Export Actions -->
-          <div style="display: flex; gap: 0.45rem; margin-left: 0.25rem;">
+          <!-- Relocated Export Actions in Top Section for Optimal Real Estate Usage -->
+          <div class="detail-actions-group">
             <button class="btn-pill" id="exportMdBtn" title="Export conversation to Markdown">
               📄 Export MD
             </button>
             <button class="btn-pill" id="exportJsonBtn" title="Export conversation to JSON">
               📦 Export JSON
             </button>
+          </div>
+        </div>
+
+        <div class="detail-controls-bar">
+          <div class="detail-controls-left">
+            <!-- In-session Step Search -->
+            <div class="session-step-search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="sessionStepSearchInput" class="session-step-search-input" placeholder="Search steps in session..." aria-label="Search steps in session">
+              <button class="clear-search-btn" id="clearSessionStepSearchBtn" style="display: none;" title="Clear step search">✕</button>
+            </div>
+
+            <!-- In-session Step Sort -->
+            <div class="filter-group session-sort-group">
+              <span class="filter-label">Sort:</span>
+              <select id="sessionStepSortSelect" class="select-custom select-custom-sm" aria-label="Sort steps in session">
+                <option value="step_desc" selected>Latest Steps First (Latest → 0)</option>
+                <option value="step_asc">Oldest Steps First (0 → Latest)</option>
+                <option value="tools_desc">Most Tool Calls</option>
+                <option value="length_desc">Longest Content</option>
+              </select>
+            </div>
+
+            <!-- Filter Message Types -->
+            <div class="msg-type-chips-group">
+              <button class="chip msg-filter-chip active" data-filter="ALL">All</button>
+              <button class="chip msg-filter-chip" data-filter="USER_INPUT">Prompts</button>
+              <button class="chip msg-filter-chip" data-filter="PLANNER_RESPONSE">Agent</button>
+              <button class="chip msg-filter-chip" data-filter="TOOL_CALLS">Tools</button>
+              <button class="chip msg-filter-chip" data-filter="ERROR">Errors</button>
+            </div>
+          </div>
+
+          <div class="detail-controls-right">
+            <!-- Live Tail Stream Control -->
+            <div class="tail-stream-control" id="tailStreamControl">
+              <button class="stream-toggle-btn" id="toggleStreamBtn" title="Click to Pause or Resume Live Streaming">
+                <span class="live-dot pulsing active" id="detailLiveDot"></span>
+                <span class="tail-status-label" id="tailStatusLabel">Live Stream</span>
+              </button>
+              <button class="btn-ghost-sm active" id="toggleFollowStreamBtn" title="Auto-scroll to latest step as it arrives">
+                <span>⬇️</span> Follow
+              </button>
+            </div>
+
+            <!-- In-session Step Summary & Reset -->
+            <div class="session-step-summary">
+              <span id="detailStepCountBadge" class="step-count-badge">0 steps</span>
+              <button class="btn-ghost-sm" id="resetSessionStepFiltersBtn" style="display: none;" title="Reset step search, sort, and type filters">Reset</button>
+            </div>
           </div>
         </div>
       </div>

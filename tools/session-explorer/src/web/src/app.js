@@ -1717,8 +1717,8 @@ function getFilteredAndSortedMessages() {
   // 3. In-Session Step Sort (Interrelated with search results and type filters)
   const sortMode = state.sessionStepSort || 'step_desc';
   list.sort((a, b) => {
-    const stepA = typeof a.step_index === 'number' ? a.step_index : 0;
-    const stepB = typeof b.step_index === 'number' ? b.step_index : 0;
+    const stepA = typeof a.step_index === 'number' ? a.step_index : (parseInt(a.step_index, 10) || 0);
+    const stepB = typeof b.step_index === 'number' ? b.step_index : (parseInt(b.step_index, 10) || 0);
 
     switch (sortMode) {
       case 'step_asc':
@@ -1736,12 +1736,12 @@ function getFilteredAndSortedMessages() {
       case 'tools_desc': {
         const toolsA = (a.tool_calls || []).length;
         const toolsB = (b.tool_calls || []).length;
-        return (toolsB - toolsA) || (stepA - stepB);
+        return (toolsB - toolsA) || (stepB - stepA);
       }
       case 'length_desc': {
         const lenA = (a.content || '').length + (a.thinking || '').length;
         const lenB = (b.content || '').length + (b.thinking || '').length;
-        return (lenB - lenA) || (stepA - stepB);
+        return (lenB - lenA) || (stepB - stepA);
       }
       case 'step_desc':
       default:
@@ -1805,52 +1805,41 @@ function renderTimelineMessages() {
     return;
   }
 
-  // Keyed DOM Reconciliation:
-  // Full rebuild is only required if active filter/sort is non-default, or if container is empty
-  const isDefaultDesc = sortMode === 'step_desc';
-  const childCount = el.timelineContainer.children.length;
+  // Keyed DOM Mounting:
+  // Mount nodes in the EXACT sequence of filteredAndSorted.
+  // We reuse existing cached DOM elements from state.renderedStepMap to preserve
+  // interactive states and avoid redundant Markdown/KaTeX/Highlight.js parsing.
+  el.timelineContainer.innerHTML = '';
+  state.pendingStepsBuffer = [];
+  if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
 
-  if (hasActiveStepFilters || !isDefaultDesc || childCount === 0 || state.renderedStepMap.size === 0) {
-    el.timelineContainer.innerHTML = '';
-    state.renderedStepMap.clear();
-    state.pendingStepsBuffer = [];
-    if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
-
-    const fragment = document.createDocumentFragment();
-    for (const msg of filteredAndSorted) {
-      const temp = document.createElement('div');
-      temp.innerHTML = buildStepHtml(msg);
-      const node = temp.firstElementChild;
-      state.renderedStepMap.set(msg.step_index, node);
-      fragment.appendChild(node);
-    }
-    el.timelineContainer.appendChild(fragment);
-    attachStepInteractivity(el.timelineContainer);
-  } else {
-    // Fine-grained incremental sync for default step_desc view without tearing down past DOM nodes!
-    for (const msg of filteredAndSorted) {
-      if (state.renderedStepMap.has(msg.step_index)) {
-        const existingNode = state.renderedStepMap.get(msg.step_index);
-        if (existingNode.dataset.status !== msg.status) {
-          existingNode.dataset.status = msg.status;
-          const temp = document.createElement('div');
-          temp.innerHTML = buildStepHtml(msg);
-          const updatedNode = temp.firstElementChild;
-          existingNode.replaceWith(updatedNode);
-          state.renderedStepMap.set(msg.step_index, updatedNode);
-          attachStepInteractivity(updatedNode);
-        }
-      } else {
+  const fragment = document.createDocumentFragment();
+  for (const msg of filteredAndSorted) {
+    let node;
+    if (state.renderedStepMap.has(msg.step_index)) {
+      const existingNode = state.renderedStepMap.get(msg.step_index);
+      if (existingNode.dataset.status !== msg.status) {
+        existingNode.dataset.status = msg.status;
         const temp = document.createElement('div');
         temp.innerHTML = buildStepHtml(msg);
-        const newNode = temp.firstElementChild;
-        newNode.classList.add('step-enter');
-        state.renderedStepMap.set(msg.step_index, newNode);
-        el.timelineContainer.prepend(newNode);
-        attachStepInteractivity(newNode);
+        node = temp.firstElementChild;
+        state.renderedStepMap.set(msg.step_index, node);
+        attachStepInteractivity(node);
+      } else {
+        node = existingNode;
       }
+    } else {
+      const temp = document.createElement('div');
+      temp.innerHTML = buildStepHtml(msg);
+      node = temp.firstElementChild;
+      state.renderedStepMap.set(msg.step_index, node);
+      attachStepInteractivity(node);
     }
+    fragment.appendChild(node);
   }
+
+  el.timelineContainer.appendChild(fragment);
+  renderAllMermaidDiagrams(el.timelineContainer);
 }
 
 // Construct HTML string for a single message step (O(1) Markdown & syntax processing)

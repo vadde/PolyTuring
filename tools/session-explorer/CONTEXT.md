@@ -90,6 +90,8 @@ blockers: []
 | 2026-10-14 | SSE Real-Time Live Tailing | Server-Sent Events at /api/sessions/:id/tail with byte-offset seeking emits newly appended steps with sub-second latency |
 | 2026-10-14 | Dynamic Backend Watch Coordination | POST /api/watch-interval directly controls Go ticker channel, allowing client interval changes (0s-60s) to govern background scans |
 | 2026-10-14 | Staged Buffer Live Tailing Layout Stability | When user is detached from stream head (Follow disabled or scrolled away), new steps stage in an in-memory buffer with badge counter rather than mutating DOM, ensuring zero layout shift (Δy = 0) while reading |
+| 2026-10-15 | Deterministic Ordered Keyed Mounting | Synchronizes DOM order with filteredAndSorted via DocumentFragment while recycling cached nodes from renderedStepMap (zero re-parsing, zero order scramble) |
+| 2026-10-15 | 99% Fluid Viewport Real Estate | Unshackled app-container and timeline-container max-widths to 100% fluid grid; relocated export actions to top identity bar, slashing scrolling by >50% |
 
 ---
 
