@@ -69,6 +69,7 @@ func (h *APIHandler) HandleSessions(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 	workspace := q.Get("workspace")
+	runtimeMode := q.Get("runtime")
 	sortBy := q.Get("sort_by")
 	sortOrder := q.Get("sort_order")
 
@@ -87,6 +88,15 @@ func (h *APIHandler) HandleSessions(w http.ResponseWriter, r *http.Request) {
 	to := parseDate(q.Get("to"), true)
 
 	sessions := h.index.GetSessions(workspace, sortBy, sortOrder, from, to)
+	if runtimeMode != "" {
+		filtered := make([]Session, 0, len(sessions))
+		for _, s := range sessions {
+			if strings.EqualFold(s.RuntimeMode, runtimeMode) || strings.EqualFold(s.Provider, runtimeMode) {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	}
 	stats := h.index.GetStats()
 
 	resp := SessionsResponse{
@@ -394,10 +404,11 @@ func (h *APIHandler) HandleSessionTail(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := parts[0]
 
-	transcriptPath := filepath.Join(h.index.dataDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
-	fullPath := filepath.Join(h.index.dataDir, sessionID, ".system_generated", "logs", "transcript_full.jsonl")
-	if _, err := os.Stat(fullPath); err == nil {
-		transcriptPath = fullPath
+	// Prefer full transcript if available (Implements: R-036)
+	transcriptPath, err := h.index.GetTranscriptPath(sessionID, true)
+	if err != nil {
+		http.Error(w, "Session log not found: "+err.Error(), http.StatusNotFound)
+		return
 	}
 
 	file, err := os.Open(transcriptPath)

@@ -567,3 +567,113 @@ func TestR035_GranularMessageTypeSearch(t *testing.T) {
 	}
 }
 
+// TestR036_MultiRuntimeDiscovery verifies universal discovery across multi-runtime locations (IDE, CLI)
+// Implements: R-036, AC-026, AC-027, AC-028, AC-029
+func TestR036_MultiRuntimeDiscovery(t *testing.T) {
+	mockIdeDir := t.TempDir()
+	mockCliDir := t.TempDir()
+
+	ideJSONL := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-15T10:00:00Z","content":"<USER_REQUEST>IDE prompt</USER_REQUEST>\n<ADDITIONAL_METADATA>\nActive Document: /Users/test/knowledge/my-web/index.html\n</ADDITIONAL_METADATA>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-15T10:01:00Z","content":"IDE response"}`
+
+	cliJSONL := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-15T11:00:00Z","content":"<user_information>\nActive Workspaces:\n- /Users/test/knowledge/my-cli-tool\nCommand Working Directory: /Users/test/knowledge/my-cli-tool\n</user_information>\n<USER_REQUEST>CLI prompt</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-15T11:01:00Z","content":"CLI response"}`
+
+	createMockSession(t, mockIdeDir, "session-ide-01", ideJSONL)
+	createMockSession(t, mockCliDir, "session-cli-01", cliJSONL)
+
+	idx := NewSessionIndex(mockIdeDir, false)
+	// Explicitly configure multi-runtime locations
+	idx.locations = []DiscoveredLocation{
+		{
+			Path:        mockIdeDir,
+			Provider:    "antigravity",
+			RuntimeMode: "ide",
+		},
+		{
+			Path:        mockCliDir,
+			Provider:    "antigravity",
+			RuntimeMode: "cli",
+		},
+	}
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	if len(idx.sessions) != 2 {
+		t.Fatalf("expected 2 sessions discovered across IDE and CLI locations, got %d", len(idx.sessions))
+	}
+
+	sessionMap := make(map[string]Session)
+	for _, s := range idx.sessions {
+		sessionMap[s.ID] = s
+	}
+
+	ideSess, ok := sessionMap["session-ide-01"]
+	if !ok {
+		t.Fatalf("missing session-ide-01 in index")
+	}
+	if ideSess.RuntimeMode != "ide" {
+		t.Errorf("expected runtime_mode 'ide', got %q", ideSess.RuntimeMode)
+	}
+	if ideSess.Provider != "antigravity" {
+		t.Errorf("expected provider 'antigravity', got %q", ideSess.Provider)
+	}
+	if ideSess.StorageDir != mockIdeDir {
+		t.Errorf("expected storage_dir %q, got %q", mockIdeDir, ideSess.StorageDir)
+	}
+
+	cliSess, ok := sessionMap["session-cli-01"]
+	if !ok {
+		t.Fatalf("missing session-cli-01 in index")
+	}
+	if cliSess.RuntimeMode != "cli" {
+		t.Errorf("expected runtime_mode 'cli', got %q", cliSess.RuntimeMode)
+	}
+	if cliSess.Provider != "antigravity" {
+		t.Errorf("expected provider 'antigravity', got %q", cliSess.Provider)
+	}
+	if cliSess.StorageDir != mockCliDir {
+		t.Errorf("expected storage_dir %q, got %q", mockCliDir, cliSess.StorageDir)
+	}
+	if cliSess.ProjectName != "my-cli-tool" {
+		t.Errorf("expected project_name 'my-cli-tool', got %q", cliSess.ProjectName)
+	}
+
+	// Verify GetTranscriptPath correctly routes to respective directory
+	idePath, err := idx.GetTranscriptPath("session-ide-01", false)
+	if err != nil {
+		t.Fatalf("GetTranscriptPath failed for IDE session: %v", err)
+	}
+	if !filepath.HasPrefix(idePath, mockIdeDir) {
+		t.Errorf("expected IDE path inside %s, got %s", mockIdeDir, idePath)
+	}
+
+	cliPath, err := idx.GetTranscriptPath("session-cli-01", false)
+	if err != nil {
+		t.Fatalf("GetTranscriptPath failed for CLI session: %v", err)
+	}
+	if !filepath.HasPrefix(cliPath, mockCliDir) {
+		t.Errorf("expected CLI path inside %s, got %s", mockCliDir, cliPath)
+	}
+
+	// Verify stats runtime breakdown
+	stats := idx.GetStats()
+	if stats.RuntimeBreakdown["ide"] != 1 {
+		t.Errorf("expected 1 IDE session in runtime breakdown, got %d", stats.RuntimeBreakdown["ide"])
+	}
+	if stats.RuntimeBreakdown["cli"] != 1 {
+		t.Errorf("expected 1 CLI session in runtime breakdown, got %d", stats.RuntimeBreakdown["cli"])
+	}
+
+	// Verify GetSessionDetail opens CLI session with zero path errors
+	cliDetail, err := idx.GetSessionDetail("session-cli-01")
+	if err != nil {
+		t.Fatalf("GetSessionDetail failed for CLI session: %v", err)
+	}
+	if len(cliDetail.Messages) != 2 {
+		t.Errorf("expected 2 messages in CLI session detail, got %d", len(cliDetail.Messages))
+	}
+}
+

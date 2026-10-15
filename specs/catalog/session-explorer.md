@@ -88,12 +88,13 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-027 | Lazy loading / virtual scrolling for large conversation timelines | Should | ✅ | 🧪 | src/web/src/app.js DOM rendering |
 | R-028 | Project and repository clustering: dynamically identify repos from tool paths and prompts | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
 | R-029 | Flexible user-driven grouping modes: Project Hub, Date Timeline, or Flat List | Must | ✅ | 🧪 | src/web/src/app.js renderView(), index.html segmented control |
-| R-030 | Agent Work-In-Progress (WIP) Recovery API (`/api/wip`) | Must | 🔨 | ⬜ | scanner.go GetWorkspaceWIP(), api.go HandleWIP |
-| R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | 🔨 | ⬜ | api.go, scripts/wip.sh, session-wip skill |
-| R-032 | Embedded OpenAPI 3.0 Contract & Offline Swagger UI (`/docs`, `/api/openapi.json`) | Must | 🔨 | ⬜ | openapi.json, server.go, api.go |
-| R-033 | One-Click GUI Skill Installer Modal & CLI Command (`make setup-session-wip`) | Should | 🔨 | ⬜ | src/web/src/app.js, setup-skill.sh, api.go HandleInstallSkill |
+| R-030 | Agent Work-In-Progress (WIP) Recovery API (`/api/wip`) | Must | ✅ | 🧪 | scanner.go GetWorkspaceWIP(), api.go HandleWIP |
+| R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | ✅ | 🧪 | api.go, scripts/wip.sh, session-wip skill |
+| R-032 | Embedded OpenAPI 3.0 Contract & Offline Swagger UI (`/docs`, `/api/openapi.json`) | Must | ✅ | 🧪 | openapi.json, server.go, api.go |
+| R-033 | One-Click GUI Skill Installer Modal & CLI Command (`make setup-session-wip`) | Should | ✅ | 🧪 | src/web/src/app.js, setup-skill.sh, api.go HandleInstallSkill |
 | R-034 | Headless CLI Subcommand (`session-explorer wip`) & Fallback Companion Script | Should | ✅ | 🧪 | main.go, scripts/wip.sh |
 | R-035 | Granular Message Type Filtering: Separate Conversational Agent Responses from Tool Execution Steps, with Dialogue Mode | Should | ✅ | 🧪 | src/web/src/app.js, src/web/index.html, src/scanner.go |
+| R-036 | Universal Multi-Runtime Discovery & Provider Architecture (Antigravity IDE + CLI, Claude Code, GitHub Copilot) | Must | ✅ | 🧪 | src/types.go, src/scanner.go, src/main.go, src/api.go, src/web/ |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -420,6 +421,10 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-023 | Given the Responses filter is clicked, only agent turns without tools (conversational prose) are displayed | R-035 |
 | AC-024 | Given the Dialogue mode is clicked, only user prompts and agent responses without tools are shown | R-035 |
 | AC-025 | Given real-time SSE live tailing, incoming steps respect active message filters and stage seamlessly | R-035 |
+| AC-026 | Given multiple Antigravity brain directories (~/.gemini/antigravity-ide/brain, ~/.gemini/antigravity-cli/brain), sessions from all runtimes are auto-discovered concurrently | R-036 |
+| AC-027 | Given discovered sessions, each session is attributed with provider and runtime_mode (ide, cli, desktop, core) and rendered with distinct visual badges | R-036 |
+| AC-028 | Given a session detail request or live SSE stream, engine dynamically resolves transcript path from the session's originating brain path | R-036 |
+| AC-029 | Given extensible SessionProvider interface, architecture supports plugging in Claude Code and GitHub Copilot providers without core scanner rewrites | R-036 |
 
 ---
 

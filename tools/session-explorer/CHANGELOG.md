@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Universal Multi-Runtime Discovery & Provider Architecture (R-036)**:
+  - Decoupled scanner from a single hardcoded IDE data directory; auto-discovers Antigravity IDE (`~/.gemini/antigravity-ide/brain`), Antigravity CLI (`~/.gemini/antigravity-cli/brain`), and Core runtime stores concurrently.
+  - Dynamically routes session detail retrieval, transcript search, and real-time SSE live tailing to each session's originating brain path (`session.TranscriptPath`, `session.StorageDir`).
+  - Added CLI metadata parsing for `Active Workspaces:` and `Command Working Directory:`, instantly extracting proper repository context (`tool-scripts`) for CLI sessions.
+  - Added visual runtime badges (`⚡ CLI`, `💻 IDE`, `⚙️ Core`, `🤖 Claude`, `🐙 Copilot`) on session cards and sticky detail navigation headers.
+  - Added Runtime segmented control filter in the dashboard toolbar (`All`, `💻 IDE`, `⚡ CLI`) with instant backend query parameter support (`/api/sessions?runtime=cli`).
+  - Future-proof provider architecture ready for seamless expansion to Claude Code and GitHub Copilot.
 - **Granular Message Type & Dialogue Filtering (R-035)**: Separated pure conversational agent replies (`AGENT_RESPONSES`) from mechanical tool execution cycles (`TOOL_CALLS`). Introduced a dedicated **`💬 Dialogue`** mode (User Prompts + Agent prose) for a clean, noise-free two-way conversation read, backed by symmetric Go search filtering and real-time SSE live tailing sync.
 - **Real-Time Live Tailing via Server-Sent Events (SSE)**: Added `/api/sessions/{id}/tail` endpoint featuring byte-offset delta seeking on JSONL logs, 15s keepalive heartbeats, and sub-second push updates for active IDE coding sessions.
 - **Dynamic Watch Interval Coordination**: Added `GET` and `POST` `/api/watch-interval` to synchronize UI refresh settings with the Go background ticker, supporting active live intervals or full pauses.

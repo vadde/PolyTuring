@@ -42,8 +42,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 35 | 35 | 100% |
-| Acceptance Criteria (AC-XXX) | 25 | 25 | 100% |
+| Requirements (R-XXX) | 35 | 36 | 97% |
+| Acceptance Criteria (AC-XXX) | 25 | 29 | 86% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -87,6 +87,7 @@ spec: ../../specs/catalog/session-explorer.md
 | R-033 | One-click skill installer | `src/web/src/app.js`, `src/api.go` | `src/api_test.go` | 🧪 |
 | R-034 | Headless CLI & wip script | `src/main.go`, `scripts/wip.sh` | `src/scanner_test.go` | 🧪 |
 | R-035 | Granular response & dialogue filters | `src/web/src/app.js`, `src/scanner.go` | `src/scanner_test.go` | 🧪 |
+| R-036 | Universal multi-runtime discovery (IDE, CLI, Copilot, Claude) | `src/scanner.go`, `src/types.go`, `src/main.go` | `src/scanner_test.go` | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 
@@ -112,7 +113,7 @@ spec: ../../specs/catalog/session-explorer.md
 
 #### Review Phase Requirements
 
-- [x] All 34 spec requirements implemented
+- [x] All 36 spec requirements implemented
 - [x] All acceptance criteria verified
 - [x] Unit test suite passing (`make test-tool T=session-explorer`)
 - [x] Linters passing (`make lint-tool T=session-explorer`)

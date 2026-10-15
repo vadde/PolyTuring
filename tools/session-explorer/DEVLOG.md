@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-10-15 — Feature: Universal Multi-Runtime Discovery & Provider Architecture (R-036)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Multi-Assistant Intelligence & CLI Session Support)
+**Duration**: ~25m
+
+#### What Was Done
+- **Problem Investigated**:
+  - Session Explorer historically targeted only Antigravity IDE (`~/.gemini/antigravity-ide/brain`).
+  - When users interact via Antigravity CLI, conversation sessions are stored in `~/.gemini/antigravity-cli/brain/`, rendering them completely invisible to Session Explorer.
+  - Furthermore, future assistant runtimes (Claude Code Desktop/CLI, GitHub Copilot VSCode Chat/CLI) were unsupported without core refactoring.
+- **Architectural Solution Implemented (R-036)**:
+  1. **DiscoveredLocation & Provider Model (`src/types.go`)**:
+     - Introduced `DiscoveredLocation` struct with `Path`, `Provider`, and `RuntimeMode`.
+     - Added `Provider`, `RuntimeMode`, `StorageDir`, and `TranscriptPath` to `Session` struct.
+     - Added `RuntimeBreakdown map[string]int` to `Stats`.
+  2. **Multi-Location Auto-Discovery & Concurrent Scanning (`src/scanner.go`)**:
+     - Implemented `AutoDiscoverLocations()` which inspects standard assistant directories (`antigravity-ide`, `antigravity-cli`, `antigravity` core, and future Claude Code slots).
+     - Decoupled `NewSessionIndex(dataDir, verbose)` to auto-discover all runtime directories when default dataDir is used, while preserving custom single-directory overrides for CLI flags and unit tests.
+     - Refactored `ScanAll()` to scan across all discovered locations concurrently, safely deduplicating sessions by ID.
+     - Implemented `(idx *SessionIndex) GetTranscriptPath(sessionID string, full bool) (string, error)` to dynamically resolve transcripts across locations.
+     - Updated `GetSessionDetail`, `Search`, and `buildWIPDigest` to resolve paths via each session's originating brain path.
+  3. **CLI Workspace & Metadata Sniffing (`extractWorkspace`)**:
+     - Added regex parsing for CLI user information blocks (`Active Workspaces:\n-\s*(/[^\s\n\r]+)` and `Command Working Directory:\s*(/[^\s\n\r]+)`).
+     - Correctly clusters CLI sessions into their target repositories (`tool-scripts`).
+  4. **API Runtime Parameter & Live Tailing (`src/api.go`)**:
+     - Added `?runtime=` query parameter support to `GET /api/sessions` (`cli`, `ide`, `core`, etc.).
+     - Refactored `HandleSessionTail` to use `GetTranscriptPath`, enabling sub-second SSE live tailing for CLI and IDE sessions alike.
+  5. **Liquid Glass UI Badges & Runtime Filter (`src/web/`)**:
+     - Added visual runtime badges (`⚡ CLI`, `💻 IDE`, `⚙️ Core`, `🤖 Claude`, `🐙 Copilot`) on session cards and sticky detail header.
+     - Added a segmented control runtime switcher (`All`, `💻 IDE`, `⚡ CLI`) in the dashboard toolbar.
+     - Synchronized runtime filter state in `app.js` and `renderView()`.
+  6. **Testing & Verification**:
+     - Added unit test `TestR036_MultiRuntimeDiscovery` in `src/scanner_test.go` verifying multi-location discovery, runtime mode attribution, workspace extraction, path routing, and stats computation.
+     - Verified all 29 Go unit tests pass cleanly (`make test`).
+     - Tested headless `session-explorer wip -workspace tool-scripts -latest` discovering this active CLI session (`df341ce6-1e89-4443-854b-e1e3fed24a2f`).
+     - Launched daemon on test port and verified live API discovery (25 total sessions: 1 CLI, 24 IDE) and real-time SSE live tailing.
+
+#### Files Changed
+- `specs/catalog/session-explorer.md` — R-036 specification, AC-026..AC-029 criteria, marked implemented & verified
+- `tools/session-explorer/STATUS.md` — Updated requirement count to 36, marked R-036 verified
+- `tools/session-explorer/CONTEXT.md` — Updated metrics (36 reqs, 29 ACs, 29 tests), added R-036 key decision and traceability
+- `tools/session-explorer/CHANGELOG.md` — Documented R-036 release notes
+- `tools/session-explorer/src/types.go` — Added DiscoveredLocation struct and multi-runtime fields
+- `tools/session-explorer/src/scanner.go` — Added AutoDiscoverLocations, multi-location ScanAll, GetTranscriptPath, and CLI metadata extraction
+- `tools/session-explorer/src/api.go` — Added runtime query param filter and GetTranscriptPath SSE live tailing
+- `tools/session-explorer/src/main.go` — Updated directory validation and banner for multi-runtime discovery
+- `tools/session-explorer/src/scanner_test.go` — Added TestR036_MultiRuntimeDiscovery unit test
+- `tools/session-explorer/src/web/index.html` — Added runtime segmented control and detailRuntimeBadge
+- `tools/session-explorer/src/web/src/styles.css` — Added runtime badge styling
+- `tools/session-explorer/src/web/src/app.js` — Added runtime filter state, card badge rendering, and detail view badge
+- `tools/session-explorer/src/web/dist/` — Rebuilt Bun web bundle (app.bundle.js, styles.css)
+- `tools/session-explorer/bin/session-explorer` — Recompiled standalone Go binary
+
+---
+
 ### 2026-10-14 — Feature: Organic Diagram Rendering & Visual Canvas (Signature Detection, Docs Portal Overrides & Interactive Zoom)
 
 **Agent/Author**: Antigravity (Google DeepMind)

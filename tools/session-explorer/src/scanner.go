@@ -34,20 +34,92 @@ type SessionIndex struct {
 	fileCache     map[string]cachedSessionInfo
 	stats         Stats
 	dataDir       string
+	locations     []DiscoveredLocation
 	verbose       bool
 	knownProjects map[string]string // project name -> absolute directory path
 }
 
-// NewSessionIndex creates a new session index for the given data directory.
+// AutoDiscoverLocations searches standard locations for AI assistant conversation logs.
+// Implements: R-036
+func AutoDiscoverLocations() []DiscoveredLocation {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+
+	candidates := []DiscoveredLocation{
+		{
+			Path:        filepath.Join(homeDir, ".gemini", "antigravity-ide", "brain"),
+			Provider:    "antigravity",
+			RuntimeMode: "ide",
+		},
+		{
+			Path:        filepath.Join(homeDir, ".gemini", "antigravity-cli", "brain"),
+			Provider:    "antigravity",
+			RuntimeMode: "cli",
+		},
+		{
+			Path:        filepath.Join(homeDir, ".gemini", "antigravity", "brain"),
+			Provider:    "antigravity",
+			RuntimeMode: "core",
+		},
+		// Extensible provider slots for Claude Code and GitHub Copilot (R-036)
+		{
+			Path:        filepath.Join(homeDir, ".claude", "sessions"),
+			Provider:    "claude",
+			RuntimeMode: "cli",
+		},
+	}
+
+	var discovered []DiscoveredLocation
+	seen := make(map[string]bool)
+
+	for _, c := range candidates {
+		if seen[c.Path] {
+			continue
+		}
+		if fi, err := os.Stat(c.Path); err == nil && fi.IsDir() {
+			seen[c.Path] = true
+			discovered = append(discovered, c)
+		}
+	}
+
+	return discovered
+}
+
+// NewSessionIndex creates a new session index for the given data directory or auto-discovers all runtimes.
+// Implements: R-001, R-036
 func NewSessionIndex(dataDir string, verbose bool) *SessionIndex {
 	idx := &SessionIndex{
 		sessions:      make([]Session, 0),
 		entryCache:    make(map[string][]TranscriptEntry),
 		fileCache:     make(map[string]cachedSessionInfo),
 		dataDir:       dataDir,
+		locations:     make([]DiscoveredLocation, 0),
 		verbose:       verbose,
 		knownProjects: make(map[string]string),
 	}
+
+	homeDir, _ := os.UserHomeDir()
+	defaultIdeDir := filepath.Join(homeDir, ".gemini", "antigravity-ide", "brain")
+
+	// If dataDir is empty or default, auto-discover all runtime brain locations
+	if dataDir == "" || dataDir == defaultIdeDir {
+		discovered := AutoDiscoverLocations()
+		if len(discovered) > 0 {
+			idx.locations = discovered
+		} else if dataDir != "" {
+			idx.locations = []DiscoveredLocation{
+				{Path: dataDir, Provider: "antigravity", RuntimeMode: "ide"},
+			}
+		}
+	} else {
+		// Custom directory passed (e.g. from CLI flag or unit test)
+		idx.locations = []DiscoveredLocation{
+			{Path: dataDir, Provider: "antigravity", RuntimeMode: "custom"},
+		}
+	}
+
 	idx.discoverKnownProjects()
 	return idx
 }
@@ -95,46 +167,136 @@ func (idx *SessionIndex) discoverKnownProjects() {
 	}
 }
 
-// ScanAll discovers and indexes all sessions concurrently.
-// Implements: R-001
+// GetTranscriptPath resolves the transcript filepath for a given session ID.
+// Implements: R-036
+func (idx *SessionIndex) GetTranscriptPath(sessionID string, full bool) (string, error) {
+	idx.mu.RLock()
+	var targetSession *Session
+	for i := range idx.sessions {
+		if idx.sessions[i].ID == sessionID {
+			s := idx.sessions[i]
+			targetSession = &s
+			break
+		}
+	}
+	idx.mu.RUnlock()
+
+	var transcriptPath string
+	hasFull := false
+
+	if targetSession != nil {
+		transcriptPath = targetSession.TranscriptPath
+		hasFull = targetSession.HasFullTranscript
+		if transcriptPath == "" && targetSession.StorageDir != "" {
+			transcriptPath = filepath.Join(targetSession.StorageDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
+		}
+	}
+
+	if transcriptPath == "" {
+		// Fallback check across all locations and primary dataDir
+		locs := idx.locations
+		if len(locs) == 0 && idx.dataDir != "" {
+			locs = []DiscoveredLocation{{Path: idx.dataDir, Provider: "antigravity", RuntimeMode: "ide"}}
+		}
+		for _, loc := range locs {
+			candidate := filepath.Join(loc.Path, sessionID, ".system_generated", "logs", "transcript.jsonl")
+			if _, err := os.Stat(candidate); err == nil {
+				transcriptPath = candidate
+				break
+			}
+		}
+		if transcriptPath == "" && idx.dataDir != "" {
+			candidate := filepath.Join(idx.dataDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
+			if _, err := os.Stat(candidate); err == nil {
+				transcriptPath = candidate
+			}
+		}
+	}
+
+	if transcriptPath == "" {
+		return "", fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	if full {
+		fullPath := filepath.Join(filepath.Dir(transcriptPath), "transcript_full.jsonl")
+		if hasFull {
+			return fullPath, nil
+		}
+		if _, err := os.Stat(fullPath); err == nil {
+			return fullPath, nil
+		}
+	}
+
+	return transcriptPath, nil
+}
+
+// ScanAll discovers and indexes all sessions concurrently across all discovered locations.
+// Implements: R-001, R-036
 func (idx *SessionIndex) ScanAll() error {
 	start := time.Now()
 
-	entries, err := os.ReadDir(idx.dataDir)
-	if err != nil {
-		return fmt.Errorf("failed to read data directory %s: %w", idx.dataDir, err)
+	locs := idx.locations
+	if len(locs) == 0 && idx.dataDir != "" {
+		locs = []DiscoveredLocation{
+			{Path: idx.dataDir, Provider: "antigravity", RuntimeMode: "ide"},
+		}
+	}
+
+	type scanTarget struct {
+		loc       DiscoveredLocation
+		sessionID string
+		path      string
+	}
+
+	var targets []scanTarget
+	for _, loc := range locs {
+		entries, err := os.ReadDir(loc.Path)
+		if err != nil {
+			if idx.verbose {
+				log.Printf("[scanner] could not read location %s: %v", loc.Path, err)
+			}
+			continue
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			sessionID := entry.Name()
+			transcriptPath := filepath.Join(loc.Path, sessionID, ".system_generated", "logs", "transcript.jsonl")
+
+			// Check if transcript file exists
+			if _, err := os.Stat(transcriptPath); os.IsNotExist(err) {
+				if idx.verbose {
+					log.Printf("[scanner] skipping %s in %s: no transcript.jsonl", sessionID, loc.Path)
+				}
+				continue
+			}
+
+			targets = append(targets, scanTarget{
+				loc:       loc,
+				sessionID: sessionID,
+				path:      transcriptPath,
+			})
+		}
 	}
 
 	var wg sync.WaitGroup
-	sessionChan := make(chan Session, len(entries))
-	errChan := make(chan error, len(entries))
+	sessionChan := make(chan Session, len(targets))
+	errChan := make(chan error, len(targets))
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		sessionID := entry.Name()
-		transcriptPath := filepath.Join(idx.dataDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
-
-		// Check if transcript file exists
-		if _, err := os.Stat(transcriptPath); os.IsNotExist(err) {
-			if idx.verbose {
-				log.Printf("[scanner] skipping %s: no transcript.jsonl", sessionID)
-			}
-			continue
-		}
-
+	for _, tgt := range targets {
 		wg.Add(1)
-		go func(id, path string) {
+		go func(target scanTarget) {
 			defer wg.Done()
-			session, err := idx.scanSession(id, path)
+			session, err := idx.scanSession(target.loc, target.sessionID, target.path)
 			if err != nil {
-				errChan <- fmt.Errorf("session %s: %w", id, err)
+				errChan <- fmt.Errorf("session %s: %w", target.sessionID, err)
 				return
 			}
 			sessionChan <- session
-		}(sessionID, transcriptPath)
+		}(tgt)
 	}
 
 	// Wait for all goroutines, then close channels
@@ -145,9 +307,13 @@ func (idx *SessionIndex) ScanAll() error {
 	}()
 
 	// Collect results into fresh slice for atomic swap
-	newSessions := make([]Session, 0, len(sessionChan))
+	newSessions := make([]Session, 0, len(targets))
+	seenIDs := make(map[string]bool)
 	for session := range sessionChan {
-		newSessions = append(newSessions, session)
+		if !seenIDs[session.ID] {
+			seenIDs[session.ID] = true
+			newSessions = append(newSessions, session)
+		}
 	}
 
 	// Log errors but don't fail
@@ -171,14 +337,14 @@ func (idx *SessionIndex) ScanAll() error {
 	idx.mu.Unlock()
 
 	elapsed := time.Since(start)
-	log.Printf("[scanner] indexed %d sessions in %v", len(newSessions), elapsed)
+	log.Printf("[scanner] indexed %d sessions across %d locations in %v", len(newSessions), len(locs), elapsed)
 
 	return nil
 }
 
 // scanSession parses a single session's transcript file to extract metadata.
-// Implements: R-002, R-003, R-004, R-005
-func (idx *SessionIndex) scanSession(sessionID, transcriptPath string) (Session, error) {
+// Implements: R-002, R-003, R-004, R-005, R-036
+func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcriptPath string) (Session, error) {
 	// Stat primary transcript
 	info, err := os.Stat(transcriptPath)
 	if err != nil {
@@ -211,8 +377,21 @@ func (idx *SessionIndex) scanSession(sessionID, transcriptPath string) (Session,
 	}
 	defer file.Close()
 
+	provider := loc.Provider
+	if provider == "" {
+		provider = "antigravity"
+	}
+	runtimeMode := loc.RuntimeMode
+	if runtimeMode == "" {
+		runtimeMode = "ide"
+	}
+
 	session := Session{
 		ID:                  sessionID,
+		Provider:            provider,
+		RuntimeMode:         runtimeMode,
+		StorageDir:          loc.Path,
+		TranscriptPath:      transcriptPath,
 		TranscriptSizeBytes: checkSize,
 		HasFullTranscript:   hasFull,
 	}
@@ -535,13 +714,10 @@ func (idx *SessionIndex) GetSessionDetail(sessionID string) (*SessionDetailRespo
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	// Prefer full transcript if available
-	transcriptPath := filepath.Join(idx.dataDir, sessionID, ".system_generated", "logs", "transcript.jsonl")
-	if session.HasFullTranscript {
-		fullPath := filepath.Join(idx.dataDir, sessionID, ".system_generated", "logs", "transcript_full.jsonl")
-		if _, err := os.Stat(fullPath); err == nil {
-			transcriptPath = fullPath
-		}
+	// Prefer full transcript if available (Implements: R-036)
+	transcriptPath, err := idx.GetTranscriptPath(sessionID, true)
+	if err != nil {
+		return nil, err
 	}
 
 	file, err := os.Open(transcriptPath)
@@ -671,8 +847,15 @@ func (idx *SessionIndex) Search(query, workspace, msgType string, from, to time.
 			continue
 		}
 
-		// Scan transcript for matches
-		transcriptPath := filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript.jsonl")
+		// Scan transcript for matches (Implements: R-036)
+		transcriptPath := session.TranscriptPath
+		if transcriptPath == "" {
+			if session.StorageDir != "" {
+				transcriptPath = filepath.Join(session.StorageDir, session.ID, ".system_generated", "logs", "transcript.jsonl")
+			} else {
+				transcriptPath = filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript.jsonl")
+			}
+		}
 		file, err := os.Open(transcriptPath)
 		if err != nil {
 			continue
@@ -779,8 +962,9 @@ func (idx *SessionIndex) computeStats() {
 		Workspaces:     make([]string, 0),
 		Projects:       make([]ProjectSummary, 0),
 		TopToolCalls:   make([]ToolFreq, 0),
-		TopPrompts:     make([]PromptFreq, 0),
-		MessagesByType: make(map[string]int),
+		TopPrompts:        make([]PromptFreq, 0),
+		MessagesByType:    make(map[string]int),
+		RuntimeBreakdown:  make(map[string]int),
 	}
 
 	workspaceSet := make(map[string]bool)
@@ -796,6 +980,12 @@ func (idx *SessionIndex) computeStats() {
 		idx.stats.TotalAgentResponses += s.AgentResponseCount
 		idx.stats.TotalToolCalls += s.ToolCallCount
 		idx.stats.TotalErrors += s.ErrorCount
+
+		rm := s.RuntimeMode
+		if rm == "" {
+			rm = "ide"
+		}
+		idx.stats.RuntimeBreakdown[rm]++
 
 		proj := s.ProjectName
 		if isValidWorkspaceName(proj) {
@@ -959,19 +1149,33 @@ func extractUserPrompt(content string) string {
 	return content
 }
 
-// extractWorkspace extracts the workspace/project path from ADDITIONAL_METADATA.
-// Implements: R-005
+// extractWorkspace extracts the workspace/project path from ADDITIONAL_METADATA or CLI user_information.
+// Implements: R-005, R-036
 var activeDocRegex = regexp.MustCompile(`Active Document:\s*(/[^\s\n\r]+)`)
 var workspaceMappingRegex = regexp.MustCompile(`(?m)(/[^\s\n\r]+)\s*->\s*([^\s\n\r]+)`)
+var activeWorkspacesRegex = regexp.MustCompile(`(?m)Active Workspaces:\s*\n-\s*(/[^\s\n\r]+)`)
+var commandWorkingDirRegex = regexp.MustCompile(`(?m)Command Working Directory:\s*(/[^\s\n\r]+)`)
 
 func extractWorkspace(content string) string {
-	// 1. Check workspace mapping: /path/to/project -> corpus
-	matches := workspaceMappingRegex.FindStringSubmatch(content)
-	if len(matches) > 1 && !strings.Contains(matches[1], ".gemini/antigravity-ide/brain") {
+	// 1. Check CLI active workspaces: Active Workspaces:\n- /path/to/...
+	matches := activeWorkspacesRegex.FindStringSubmatch(content)
+	if len(matches) > 1 && !strings.Contains(matches[1], ".gemini/antigravity") {
 		return matches[1]
 	}
 
-	// 2. Check active document
+	// 2. Check CLI command working directory: Command Working Directory: /path/to/...
+	matches = commandWorkingDirRegex.FindStringSubmatch(content)
+	if len(matches) > 1 && !strings.Contains(matches[1], ".gemini/antigravity") {
+		return matches[1]
+	}
+
+	// 3. Check workspace mapping: /path/to/project -> corpus
+	matches = workspaceMappingRegex.FindStringSubmatch(content)
+	if len(matches) > 1 && !strings.Contains(matches[1], ".gemini/antigravity") {
+		return matches[1]
+	}
+
+	// 4. Check active document
 	matches = activeDocRegex.FindStringSubmatch(content)
 	if len(matches) > 1 {
 		doc := matches[1]
@@ -1305,14 +1509,12 @@ func (idx *SessionIndex) GetWorkspaceWIP(workspace, sessionID string, forceLates
 }
 
 // buildWIPDigest constructs the detailed work-in-progress summary for a single session.
+// Implements: R-034, R-036
 func (idx *SessionIndex) buildWIPDigest(session *Session) (*WIPDigest, error) {
 	// Prefer full transcript if available
-	transcriptPath := filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript.jsonl")
-	if session.HasFullTranscript {
-		fullPath := filepath.Join(idx.dataDir, session.ID, ".system_generated", "logs", "transcript_full.jsonl")
-		if _, err := os.Stat(fullPath); err == nil {
-			transcriptPath = fullPath
-		}
+	transcriptPath, err := idx.GetTranscriptPath(session.ID, true)
+	if err != nil {
+		return nil, err
 	}
 
 	file, err := os.Open(transcriptPath)

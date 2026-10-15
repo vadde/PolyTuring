@@ -28,13 +28,25 @@ type ToolCall struct {
 	Args map[string]interface{} `json:"args,omitempty"`
 }
 
+// DiscoveredLocation represents an assistant session store path and its runtime identity.
+// Implements: R-036
+type DiscoveredLocation struct {
+	Path        string `json:"path"`
+	Provider    string `json:"provider"`     // "antigravity", "claude", "copilot"
+	RuntimeMode string `json:"runtime_mode"` // "ide", "cli", "desktop", "core", "custom"
+}
+
 // Session represents a discovered conversation session with computed metadata.
-// Implements: R-001, R-008
+// Implements: R-001, R-008, R-036
 type Session struct {
-	ID                     string    `json:"id"`
-	CreatedAt              time.Time `json:"created_at"`
-	LastMessageAt          time.Time `json:"last_message_at"`
-	Workspace              string    `json:"workspace"`
+	ID                     string         `json:"id"`
+	Provider               string         `json:"provider"`                 // e.g. "antigravity", "claude", "copilot"
+	RuntimeMode            string         `json:"runtime_mode"`             // e.g. "ide", "cli", "desktop", "core"
+	StorageDir             string         `json:"storage_dir,omitempty"`    // parent brain directory
+	TranscriptPath         string         `json:"transcript_path,omitempty"`// absolute path to transcript.jsonl
+	CreatedAt              time.Time      `json:"created_at"`
+	LastMessageAt          time.Time      `json:"last_message_at"`
+	Workspace              string         `json:"workspace"`
 	ProjectName            string         `json:"project_name"`
 	ProjectsTouched        []string       `json:"projects_touched,omitempty"`
 	StepCount              int            `json:"step_count"`
@@ -117,6 +129,7 @@ type Stats struct {
 	TopToolCalls        []ToolFreq       `json:"top_tool_calls"`
 	TopPrompts          []PromptFreq     `json:"top_prompts"`
 	MessagesByType      map[string]int   `json:"messages_by_type"`
+	RuntimeBreakdown    map[string]int   `json:"runtime_breakdown,omitempty"`
 	LastScannedAt       time.Time        `json:"last_scanned_at"`
 }
 

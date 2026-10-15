@@ -57,15 +57,22 @@ func main() {
 	}
 
 	// Validate data directory
-	if _, err := os.Stat(cfg.DataDir); os.IsNotExist(err) {
-		log.Fatalf("❌ Data directory not found: %s\n\nUse --data-dir to specify the path to your Antigravity IDE brain directory.", cfg.DataDir)
+	if cfg.DataDir == defaultDataDir {
+		discovered := AutoDiscoverLocations()
+		if len(discovered) == 0 {
+			log.Fatalf("❌ No AI session directories found.\n\nChecked:\n- %s\n- %s\n\nUse --data-dir to specify a custom brain directory.",
+				filepath.Join(homeDir, ".gemini", "antigravity-ide", "brain"),
+				filepath.Join(homeDir, ".gemini", "antigravity-cli", "brain"))
+		}
+	} else if _, err := os.Stat(cfg.DataDir); os.IsNotExist(err) {
+		log.Fatalf("❌ Data directory not found: %s\n\nUse --data-dir to specify the path to your brain directory.", cfg.DataDir)
 	}
 
 	// Banner
 	fmt.Printf(`
   ╔══════════════════════════════════════════╗
   ║     🔍 Session Explorer v%s          ║
-  ║     Antigravity IDE Session Library      ║
+  ║  Universal Multi-Assistant Library (R-036)║
   ╚══════════════════════════════════════════╝
 `, appVersion)
 

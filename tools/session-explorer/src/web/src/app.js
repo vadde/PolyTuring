@@ -214,6 +214,7 @@ const state = {
   currentView: 'dashboard', // 'dashboard' | 'detail'
   groupBy: localStorage.getItem('se_group_by') || 'project', // 'project' | 'date' | 'flat'
   filterWorkspace: '',
+  filterRuntime: '', // '' | 'ide' | 'cli' | 'core'
   dateFrom: '',
   dateTo: '',
   sortBy: 'date',
@@ -262,12 +263,15 @@ const el = {
   viewContainer: document.getElementById('viewContainer'),
   groupByControl: document.getElementById('groupByControl'),
   groupByBtns: document.querySelectorAll('#groupByControl .segment-btn'),
+  runtimeControl: document.getElementById('runtimeControl'),
+  runtimeBtns: document.querySelectorAll('#runtimeControl .segment-btn'),
   projectHeroBanner: document.getElementById('projectHeroBanner'),
   dashboardView: document.getElementById('dashboardView'),
   detailView: document.getElementById('detailView'),
   detailBackBtn: document.getElementById('detailBackBtn'),
   detailSessionId: document.getElementById('detailSessionId'),
   detailWorkspaceBadge: document.getElementById('detailWorkspaceBadge'),
+  detailRuntimeBadge: document.getElementById('detailRuntimeBadge'),
   detailTime: document.getElementById('detailTime'),
   exportMdBtn: document.getElementById('exportMdBtn'),
   exportJsonBtn: document.getElementById('exportJsonBtn'),
@@ -638,6 +642,18 @@ function initEventListeners() {
     });
   }
 
+  // Runtime Mode Segmented Switcher (R-036)
+  if (el.runtimeBtns) {
+    el.runtimeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.runtimeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.filterRuntime = btn.dataset.runtime || '';
+        loadSessions();
+      });
+    });
+  }
+
   // Live Stream Play/Pause Toggle
   if (el.toggleStreamBtn) {
     el.toggleStreamBtn.addEventListener('click', (e) => {
@@ -762,6 +778,7 @@ async function loadSessions() {
     const params = new URLSearchParams();
     const effectiveWorkspace = state.filterWorkspace || (state.groupBy === 'project' && state.drilledProject ? state.drilledProject : '');
     if (effectiveWorkspace) params.append('workspace', effectiveWorkspace);
+    if (state.filterRuntime) params.append('runtime', state.filterRuntime);
     if (state.sortBy) params.append('sort_by', state.sortBy);
     if (state.sortOrder) params.append('sort_order', state.sortOrder);
     if (state.dateFrom) params.append('from', state.dateFrom);
@@ -936,6 +953,13 @@ function renderView() {
   if (el.groupByBtns) {
     el.groupByBtns.forEach(b => {
       b.classList.toggle('active', b.dataset.group === state.groupBy);
+    });
+  }
+
+  // Sync Runtime control button state (R-036)
+  if (el.runtimeBtns) {
+    el.runtimeBtns.forEach(b => {
+      b.classList.toggle('active', (b.dataset.runtime || '') === state.filterRuntime);
     });
   }
 
@@ -1504,6 +1528,25 @@ function renderFlatGridView() {
   attachSessionCardClicks(container);
 }
 
+// Helper: Get runtime badge HTML for a session (R-036)
+function getRuntimeBadgeHtml(s) {
+  const rm = (s.runtime_mode || 'ide').toLowerCase();
+  const prov = (s.provider || 'antigravity').toLowerCase();
+  if (rm === 'cli') {
+    return `<span class="runtime-badge runtime-cli" title="Antigravity CLI">⚡ CLI</span>`;
+  }
+  if (rm === 'core') {
+    return `<span class="runtime-badge runtime-core" title="Antigravity Core">⚙️ Core</span>`;
+  }
+  if (prov === 'claude') {
+    return `<span class="runtime-badge runtime-claude" title="Claude Code">🤖 Claude</span>`;
+  }
+  if (prov === 'copilot') {
+    return `<span class="runtime-badge runtime-copilot" title="GitHub Copilot">🐙 Copilot</span>`;
+  }
+  return `<span class="runtime-badge runtime-ide" title="Antigravity IDE">💻 IDE</span>`;
+}
+
 // Helper: Render session cards HTML
 function renderSessionCardsHtml(sessions) {
   return sessions.map(s => {
@@ -1516,9 +1559,12 @@ function renderSessionCardsHtml(sessions) {
       <div class="session-card" data-id="${s.id}">
         <div>
           <div class="card-top">
-            <span class="workspace-badge" title="${escapeHtml(s.workspace || s.project_name)}">
-              📁 ${escapeHtml(s.project_name || 'Default')}
-            </span>
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+              <span class="workspace-badge" title="${escapeHtml(s.workspace || s.project_name)}">
+                📁 ${escapeHtml(s.project_name || 'Default')}
+              </span>
+              ${getRuntimeBadgeHtml(s)}
+            </div>
             <span class="session-time" title="${timeStr}">${relTime}</span>
           </div>
           <div class="prompt-snippet" title="${escapeHtml(preview)}">
@@ -1575,6 +1621,33 @@ function showDetailView(detail) {
 
   if (el.detailSessionId) el.detailSessionId.textContent = s.id;
   if (el.detailWorkspaceBadge) el.detailWorkspaceBadge.textContent = `📁 ${s.project_name || 'Default'}`;
+  if (el.detailRuntimeBadge) {
+    const rm = (s.runtime_mode || 'ide').toLowerCase();
+    const prov = (s.provider || 'antigravity').toLowerCase();
+    el.detailRuntimeBadge.style.display = 'inline-flex';
+    el.detailRuntimeBadge.className = 'runtime-badge';
+    if (rm === 'cli') {
+      el.detailRuntimeBadge.classList.add('runtime-cli');
+      el.detailRuntimeBadge.textContent = '⚡ CLI';
+      el.detailRuntimeBadge.title = `Antigravity CLI (${s.storage_dir || ''})`;
+    } else if (rm === 'core') {
+      el.detailRuntimeBadge.classList.add('runtime-core');
+      el.detailRuntimeBadge.textContent = '⚙️ Core';
+      el.detailRuntimeBadge.title = `Antigravity Core (${s.storage_dir || ''})`;
+    } else if (prov === 'claude') {
+      el.detailRuntimeBadge.classList.add('runtime-claude');
+      el.detailRuntimeBadge.textContent = '🤖 Claude';
+      el.detailRuntimeBadge.title = 'Claude Code';
+    } else if (prov === 'copilot') {
+      el.detailRuntimeBadge.classList.add('runtime-copilot');
+      el.detailRuntimeBadge.textContent = '🐙 Copilot';
+      el.detailRuntimeBadge.title = 'GitHub Copilot';
+    } else {
+      el.detailRuntimeBadge.classList.add('runtime-ide');
+      el.detailRuntimeBadge.textContent = '💻 IDE';
+      el.detailRuntimeBadge.title = `Antigravity IDE (${s.storage_dir || ''})`;
+    }
+  }
   if (el.detailTime) el.detailTime.textContent = formatDateTime(s.created_at, true);
 
   if (!window.location.hash.includes(s.id)) {

@@ -118,6 +118,15 @@
         </div>
 
         <div class="filter-group group-by-control">
+          <span class="filter-label">Runtime:</span>
+          <div class="segmented-control" id="runtimeControl" role="group" aria-label="Filter by assistant runtime">
+            <button class="segment-btn active" data-runtime="" title="Show all runtimes">All</button>
+            <button class="segment-btn" data-runtime="ide" title="Antigravity IDE sessions">💻 IDE</button>
+            <button class="segment-btn" data-runtime="cli" title="Antigravity CLI sessions">⚡ CLI</button>
+          </div>
+        </div>
+
+        <div class="filter-group group-by-control">
           <span class="filter-label">Group By:</span>
           <div class="segmented-control" id="groupByControl" role="group" aria-label="Group sessions by">
             <button class="segment-btn active" data-group="project" title="Group sessions by Repository/Project Hub">📁 Project Hub</button>
@@ -156,6 +165,7 @@
             </button>
             <span class="detail-session-id" id="detailSessionId"></span>
             <span class="workspace-badge" id="detailWorkspaceBadge">📁 Workspace</span>
+            <span class="runtime-badge" id="detailRuntimeBadge" style="display: none;">💻 IDE</span>
             <span class="session-time" id="detailTime"></span>
           </div>
 

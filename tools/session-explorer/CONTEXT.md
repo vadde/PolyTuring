@@ -25,10 +25,10 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 35 | 35 | 🧪 100% Implemented & Tested |
-| Acceptance Criteria (AC-XXX) | 25 | 25 | 🧪 100% Verified |
+| Spec Requirements (R-XXX) | 36 | 36 | ✅ 100% Implemented (R-036 completed) |
+| Acceptance Criteria (AC-XXX) | 29 | 29 | 🧪 100% Verified |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 28 unit tests passing + live demo |
+| Test Coverage | 100% | 100% | 🧪 29 unit tests passing + live demo |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -93,13 +93,14 @@ blockers: []
 | 2026-10-15 | Deterministic Ordered Keyed Mounting | Synchronizes DOM order with filteredAndSorted via DocumentFragment while recycling cached nodes from renderedStepMap (zero re-parsing, zero order scramble) |
 | 2026-10-15 | 99% Fluid Viewport Real Estate | Unshackled app-container and timeline-container max-widths to 100% fluid grid; relocated export actions to top identity bar, slashing scrolling by >50% |
 | 2026-10-15 | Granular Message Filtering & Clean Dialogue Mode | Separated pure agent conversational responses from tool execution turns; added 1-click Dialogue mode (User + Agent prose) and symmetric backend Search filters (R-035) |
+| 2026-10-15 | Universal Multi-Runtime Discovery & Provider Architecture | Decoupled scanner from hardcoded single IDE data dir; auto-discovers Antigravity IDE, CLI, and Core brain stores concurrently with runtime badges, runtime filters, and future-proof provider slots (R-036) |
 
 ---
 
 ## Traceability Summary
 
-> _35 functional requirements, 9 non-functional, 25 acceptance criteria._
-> _All 35 requirements implemented and verified._
+> _36 functional requirements, 9 non-functional, 29 acceptance criteria._
+> _All 36 requirements implemented and verified._
 
 | Req ID | Description | Impl | Tested |
 |--------|-------------|------|--------|
@@ -138,6 +139,7 @@ blockers: []
 | R-033 | One-click skill installer | ✅ | 🧪 |
 | R-034 | Headless CLI & wip script | ✅ | 🧪 |
 | R-035 | Granular response & dialogue filters | ✅ | 🧪 |
+| R-036 | Universal multi-runtime discovery (IDE, CLI, Copilot, Claude) | ✅ | 🧪 |
 
 ---
 
