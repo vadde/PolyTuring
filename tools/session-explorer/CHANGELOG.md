@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Granular Message Type & Dialogue Filtering (R-035)**: Separated pure conversational agent replies (`AGENT_RESPONSES`) from mechanical tool execution cycles (`TOOL_CALLS`). Introduced a dedicated **`💬 Dialogue`** mode (User Prompts + Agent prose) for a clean, noise-free two-way conversation read, backed by symmetric Go search filtering and real-time SSE live tailing sync.
 - **Real-Time Live Tailing via Server-Sent Events (SSE)**: Added `/api/sessions/{id}/tail` endpoint featuring byte-offset delta seeking on JSONL logs, 15s keepalive heartbeats, and sub-second push updates for active IDE coding sessions.
 - **Dynamic Watch Interval Coordination**: Added `GET` and `POST` `/api/watch-interval` to synchronize UI refresh settings with the Go background ticker, supporting active live intervals or full pauses.
 - **Keyed DOM Reconciliation Engine**: Replaced full-DOM redraws with an in-memory `renderedStepMap` cache, enabling fine-grained $O(\Delta)$ appends without tearing down past DOM nodes or resetting interactive Mermaid diagrams and KaTeX formulas.

@@ -190,13 +190,15 @@
               </select>
             </div>
 
-            <!-- Filter Message Types -->
+            <!-- Filter Message Types (R-013, R-035) -->
             <div class="msg-type-chips-group">
-              <button class="chip msg-filter-chip active" data-filter="ALL">All</button>
-              <button class="chip msg-filter-chip" data-filter="USER_INPUT">Prompts</button>
-              <button class="chip msg-filter-chip" data-filter="PLANNER_RESPONSE">Agent</button>
-              <button class="chip msg-filter-chip" data-filter="TOOL_CALLS">Tools</button>
-              <button class="chip msg-filter-chip" data-filter="ERROR">Errors</button>
+              <button class="chip msg-filter-chip active" data-filter="ALL" title="Show all conversation turns and events">All</button>
+              <button class="chip msg-filter-chip" data-filter="DIALOGUE" title="Show clean two-way conversation (prompts and direct agent replies, hiding tool executions)">💬 Dialogue</button>
+              <button class="chip msg-filter-chip" data-filter="USER_INPUT" title="Show user prompts only">Prompts</button>
+              <button class="chip msg-filter-chip" data-filter="AGENT_RESPONSES" title="Show agent conversational responses only (without tool calls)">Responses</button>
+              <button class="chip msg-filter-chip" data-filter="TOOL_CALLS" title="Show steps that invoked tools">Tools</button>
+              <button class="chip msg-filter-chip" data-filter="PLANNER_RESPONSE" title="Show all agent turns (both responses and tool executions)">All Agent</button>
+              <button class="chip msg-filter-chip" data-filter="ERROR" title="Show steps with errors or failures">Errors</button>
             </div>
           </div>
 

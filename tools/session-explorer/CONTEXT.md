@@ -25,10 +25,10 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 34 | 34 | 🧪 100% Implemented & Tested |
-| Acceptance Criteria (AC-XXX) | 22 | 22 | 🧪 100% Verified |
+| Spec Requirements (R-XXX) | 35 | 35 | 🧪 100% Implemented & Tested |
+| Acceptance Criteria (AC-XXX) | 25 | 25 | 🧪 100% Verified |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 27 unit tests passing + live demo |
+| Test Coverage | 100% | 100% | 🧪 28 unit tests passing + live demo |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -92,13 +92,14 @@ blockers: []
 | 2026-10-14 | Staged Buffer Live Tailing Layout Stability | When user is detached from stream head (Follow disabled or scrolled away), new steps stage in an in-memory buffer with badge counter rather than mutating DOM, ensuring zero layout shift (Δy = 0) while reading |
 | 2026-10-15 | Deterministic Ordered Keyed Mounting | Synchronizes DOM order with filteredAndSorted via DocumentFragment while recycling cached nodes from renderedStepMap (zero re-parsing, zero order scramble) |
 | 2026-10-15 | 99% Fluid Viewport Real Estate | Unshackled app-container and timeline-container max-widths to 100% fluid grid; relocated export actions to top identity bar, slashing scrolling by >50% |
+| 2026-10-15 | Granular Message Filtering & Clean Dialogue Mode | Separated pure agent conversational responses from tool execution turns; added 1-click Dialogue mode (User + Agent prose) and symmetric backend Search filters (R-035) |
 
 ---
 
 ## Traceability Summary
 
-> _34 functional requirements, 9 non-functional, 22 acceptance criteria._
-> _All 34 requirements implemented and verified._
+> _35 functional requirements, 9 non-functional, 25 acceptance criteria._
+> _All 35 requirements implemented and verified._
 
 | Req ID | Description | Impl | Tested |
 |--------|-------------|------|--------|
@@ -136,7 +137,8 @@ blockers: []
 | R-032 | OpenAPI 3.0 & Swagger UI | ✅ | 🧪 |
 | R-033 | One-click skill installer | ✅ | 🧪 |
 | R-034 | Headless CLI & wip script | ✅ | 🧪 |
+| R-035 | Granular response & dialogue filters | ✅ | 🧪 |
 
 ---
 
-_Last updated: 2026-09-18_
+_Last updated: 2026-10-15_

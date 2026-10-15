@@ -42,8 +42,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 29 | 34 | 85% |
-| Acceptance Criteria (AC-XXX) | 15 | 17 | 88% |
+| Requirements (R-XXX) | 35 | 35 | 100% |
+| Acceptance Criteria (AC-XXX) | 25 | 25 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -86,6 +86,7 @@ spec: ../../specs/catalog/session-explorer.md
 | R-032 | OpenAPI 3.0 & Swagger UI | `src/server.go`, `src/api.go` | `src/api_test.go` | 🧪 |
 | R-033 | One-click skill installer | `src/web/src/app.js`, `src/api.go` | `src/api_test.go` | 🧪 |
 | R-034 | Headless CLI & wip script | `src/main.go`, `scripts/wip.sh` | `src/scanner_test.go` | 🧪 |
+| R-035 | Granular response & dialogue filters | `src/web/src/app.js`, `src/scanner.go` | `src/scanner_test.go` | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

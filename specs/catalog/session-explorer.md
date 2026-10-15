@@ -92,7 +92,8 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | 🔨 | ⬜ | api.go, scripts/wip.sh, session-wip skill |
 | R-032 | Embedded OpenAPI 3.0 Contract & Offline Swagger UI (`/docs`, `/api/openapi.json`) | Must | 🔨 | ⬜ | openapi.json, server.go, api.go |
 | R-033 | One-Click GUI Skill Installer Modal & CLI Command (`make setup-session-wip`) | Should | 🔨 | ⬜ | src/web/src/app.js, setup-skill.sh, api.go HandleInstallSkill |
-| R-034 | Headless CLI Subcommand (`session-explorer wip`) & Fallback Companion Script | Should | 🔨 | ⬜ | main.go, scripts/wip.sh |
+| R-034 | Headless CLI Subcommand (`session-explorer wip`) & Fallback Companion Script | Should | ✅ | 🧪 | main.go, scripts/wip.sh |
+| R-035 | Granular Message Type Filtering: Separate Conversational Agent Responses from Tool Execution Steps, with Dialogue Mode | Should | ✅ | 🧪 | src/web/src/app.js, src/web/index.html, src/scanner.go |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -409,6 +410,16 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-013 | Given malformed JSONL lines, when parsing, then they are skipped gracefully without crashing | NF-007 |
 | AC-014 | Given the server starts, then the default browser opens automatically (unless `--no-open`) | R-007 |
 | AC-015 | Given the UI renders on mobile viewport, then layout adapts responsively | R-019 |
+| AC-016 | Given user triggers export, conversation can be saved as Markdown or JSON | R-021 |
+| AC-017 | Given user groups sessions by project, sessions are clustered by repository/working directory | R-028, R-029 |
+| AC-018 | Given a workspace with a single recent session, WIP digest returns active document and recent context | R-030 |
+| AC-019 | Given a workspace with multiple recent sessions, WIP endpoint halts with candidate list (Invariant R-031) | R-031 |
+| AC-020 | Given OpenAPI endpoint /api/openapi.json and /docs, Swagger UI renders completely offline | R-032 |
+| AC-021 | Given install skill modal or make setup-session-wip, session-wip skill is installed to target | R-033 |
+| AC-022 | Given headless CLI session-explorer wip, JSON or human summary is emitted | R-034 |
+| AC-023 | Given the Responses filter is clicked, only agent turns without tools (conversational prose) are displayed | R-035 |
+| AC-024 | Given the Dialogue mode is clicked, only user prompts and agent responses without tools are shown | R-035 |
+| AC-025 | Given real-time SSE live tailing, incoming steps respect active message filters and stage seamlessly | R-035 |
 
 ---
 

@@ -693,9 +693,28 @@ func (idx *SessionIndex) Search(query, workspace, msgType string, from, to time.
 				continue
 			}
 
-			// Apply type filter
-			if msgType != "" && entry.Type != msgType {
-				continue
+			// Apply type filter (Implements: R-013, R-035)
+			if msgType != "" {
+				switch msgType {
+				case "AGENT_RESPONSES", "RESPONSES":
+					if entry.Type != "PLANNER_RESPONSE" || len(entry.ToolCalls) > 0 {
+						continue
+					}
+				case "TOOL_CALLS", "TOOLS":
+					if len(entry.ToolCalls) == 0 {
+						continue
+					}
+				case "DIALOGUE", "CHAT":
+					isUser := entry.Type == "USER_INPUT"
+					isCleanAgent := entry.Type == "PLANNER_RESPONSE" && len(entry.ToolCalls) == 0
+					if !isUser && !isCleanAgent {
+						continue
+					}
+				default:
+					if entry.Type != msgType {
+						continue
+					}
+				}
 			}
 
 			// Search in content

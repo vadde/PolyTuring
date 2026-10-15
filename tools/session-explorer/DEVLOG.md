@@ -695,3 +695,36 @@
 
 ---
 
+### 2026-10-15 — Granular Message Filtering: Conversational Responses vs. Tool Calls & Dialogue Mode (R-035)
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Feature Specification, Verification & UI/UX Enhancement)  
+**Duration**: ~15m
+
+#### Multi-Lens UI/UX Research & Systems Design
+1. **Principal UX Architect Lens (Signal-to-Noise Ratio & Conversational Core)**:
+   - *Problem*: In agentic coding workflows, 80–90% of transcript steps are autonomous tool executions (`view_file`, `replace_file_content`, `run_command`). The previous `PLANNER_RESPONSE` filter ("Agent") matched all agent turns indiscriminately, leaving users forced to scroll past dozens of mechanical tool cards to read what the agent actually communicated.
+   - *Solution*: Separated pure conversational agent replies (`AGENT_RESPONSES` — prose answers, summaries, plans without tools) from tool executions (`TOOL_CALLS`). Introduced a dedicated **`💬 Dialogue`** mode displaying `USER_INPUT` + `AGENT_RESPONSES`, rendering a clean, noise-free human-to-AI dialogue transcript.
+2. **Staff Interaction Designer Lens (1-Click Affordance & Descriptive Tooltips)**:
+   - Replaced ambiguous monolithic filters with a streamlined 1-click filter matrix:
+     `[ All ] [ 💬 Dialogue ] [ Prompts ] [ Responses ] [ Tools ] [ All Agent ] [ Errors ]`
+   - Added descriptive `title` tooltips explaining each filter's exact scope.
+   - Preserved `All Agent` for developers auditing the full agent pipeline.
+3. **Systems & Performance Lens (Keyed DOM & Live Stream Real-Time Sync)**:
+   - Mirrored filtering predicates across both `getFilteredAndSortedMessages()` and `stepMatchesActiveFilters(step)`.
+   - Guaranteed that incoming Server-Sent Events (SSE) in real-time live tailing adhere strictly to the active filter state, staging into `pendingStepsBuffer` with badge counter if detached, preserving zero layout shift ($\Delta y = 0$).
+   - Enhanced Go backend search in `scanner.go` with full support for `type=AGENT_RESPONSES`, `type=TOOL_CALLS`, and `type=DIALOGUE`.
+
+#### Files Changed
+- `specs/catalog/session-explorer.md` — Added requirement `R-035` and acceptance criteria `AC-023`, `AC-024`, `AC-025`.
+- `tools/session-explorer/STATUS.md` — Updated requirements count to 35, ACs to 25, added R-035 to traceability matrix.
+- `tools/session-explorer/CONTEXT.md` — Updated metrics, key decisions, and traceability summary.
+- `tools/session-explorer/src/scanner.go` — Added granular message type filtering in `Search()`.
+- `tools/session-explorer/src/openapi.json` — Documented granular message type query parameters.
+- `tools/session-explorer/src/web/index.html` — Added `💬 Dialogue`, `Responses`, `Tools`, `All Agent` chips with tooltips.
+- `tools/session-explorer/src/web/src/app.js` — Implemented granular filtering in `getFilteredAndSortedMessages()` and `stepMatchesActiveFilters()`.
+- `tools/session-explorer/src/web/dist/` — Rebuilt Bun web bundle (2,128 modules in 112ms).
+- `tools/session-explorer/src/scanner_test.go` — Added `TestR035_GranularMessageTypeSearch` unit test.
+- `bin/session-explorer` — Recompiled standalone Go binary.
+- `DEVLOG.md` — Documented session design, implementation, and test verification.
+

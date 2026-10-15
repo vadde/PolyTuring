@@ -1686,12 +1686,26 @@ function getFilteredAndSortedMessages() {
   if (!state.selectedSessionDetail) return [];
   const messages = state.selectedSessionDetail.messages || [];
 
-  // 1. Filter by Message Type (R-013)
+  // 1. Filter by Message Type (R-013, R-035)
   let list = messages.filter(m => {
-    if (state.messageFilter === 'USER_INPUT' && m.type !== 'USER_INPUT') return false;
-    if (state.messageFilter === 'PLANNER_RESPONSE' && m.type !== 'PLANNER_RESPONSE') return false;
-    if (state.messageFilter === 'TOOL_CALLS' && (!m.tool_calls || m.tool_calls.length === 0)) return false;
-    if (state.messageFilter === 'ERROR' && (m.status !== 'ERROR' && m.type !== 'ERROR_MESSAGE')) return false;
+    const isUser = m.type === 'USER_INPUT';
+    const isAgent = m.type === 'PLANNER_RESPONSE';
+    const hasTools = Boolean(m.tool_calls && m.tool_calls.length > 0);
+    const isError = m.status === 'ERROR' || m.type === 'ERROR_MESSAGE';
+    const hasContent = Boolean(m.content && m.content.trim());
+
+    if (state.messageFilter === 'USER_INPUT') return isUser;
+    if (state.messageFilter === 'AGENT_RESPONSES') {
+      return isAgent && !hasTools && hasContent;
+    }
+    if (state.messageFilter === 'DIALOGUE') {
+      if (isUser) return true;
+      if (isAgent && !hasTools && hasContent) return true;
+      return false;
+    }
+    if (state.messageFilter === 'PLANNER_RESPONSE') return isAgent;
+    if (state.messageFilter === 'TOOL_CALLS') return hasTools;
+    if (state.messageFilter === 'ERROR') return isError;
     return true;
   });
 
@@ -2005,12 +2019,25 @@ function attachStepInteractivity(container) {
   renderAllMermaidDiagrams(container);
 }
 
-// Test if an incoming step matches currently selected filters
+// Test if an incoming step matches currently selected filters (Implements: R-013, R-035)
 function stepMatchesActiveFilters(step) {
-  if (state.messageFilter === 'USER_INPUT' && step.type !== 'USER_INPUT') return false;
-  if (state.messageFilter === 'PLANNER_RESPONSE' && step.type !== 'PLANNER_RESPONSE') return false;
-  if (state.messageFilter === 'TOOL_CALLS' && (!step.tool_calls || step.tool_calls.length === 0)) return false;
-  if (state.messageFilter === 'ERROR' && step.type !== 'ERROR_MESSAGE' && step.status !== 'ERROR') return false;
+  const isUser = step.type === 'USER_INPUT';
+  const isAgent = step.type === 'PLANNER_RESPONSE';
+  const hasTools = Boolean(step.tool_calls && step.tool_calls.length > 0);
+  const isError = step.type === 'ERROR_MESSAGE' || step.status === 'ERROR';
+  const hasContent = Boolean(step.content && step.content.trim());
+
+  if (state.messageFilter === 'USER_INPUT' && !isUser) return false;
+  if (state.messageFilter === 'AGENT_RESPONSES') {
+    if (!isAgent || hasTools || !hasContent) return false;
+  }
+  if (state.messageFilter === 'DIALOGUE') {
+    const isCleanAgent = isAgent && !hasTools && hasContent;
+    if (!isUser && !isCleanAgent) return false;
+  }
+  if (state.messageFilter === 'PLANNER_RESPONSE' && !isAgent) return false;
+  if (state.messageFilter === 'TOOL_CALLS' && !hasTools) return false;
+  if (state.messageFilter === 'ERROR' && !isError) return false;
 
   const q = (state.sessionStepSearch || '').trim().toLowerCase();
   if (!q) return true;

@@ -236,7 +236,7 @@
             "name": "type",
             "in": "query",
             "required": false,
-            "description": "Filter by message type",
+            "description": "Filter by message type (USER_INPUT, PLANNER_RESPONSE, AGENT_RESPONSES, TOOL_CALLS, DIALOGUE, ERROR)",
             "schema": { "type": "string" }
           }
         ],

@@ -516,3 +516,54 @@ func TestR030_GetWorkspaceWIP_NotFound(t *testing.T) {
 	}
 }
 
+// TestR035_GranularMessageTypeSearch tests searching with granular message filters (Implements: R-035, AC-023, AC-024)
+func TestR035_GranularMessageTypeSearch(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	s1 := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-15T10:00:00Z","content":"<USER_REQUEST>How do I fix this database connection bug?</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-15T10:01:00Z","content":"Let me inspect the connection pool config to fix it.","tool_calls":[{"name":"view_file","args":{"path":"db.go"}}]}
+{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-15T10:02:00Z","content":"Here is the verified fix: increase the max open connections in database pool."}`
+
+	createMockSession(t, tmpDir, "sess-filter", s1)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	// 1. Search with no type filter -> Should find all 3 steps matching "fix"
+	resAll := idx.Search("fix", "", "", time.Time{}, time.Time{})
+	if resAll.TotalCount != 3 {
+		t.Fatalf("expected 3 results for all types, got %d", resAll.TotalCount)
+	}
+
+	// 2. Search with AGENT_RESPONSES -> Should only match Step 2 (prose response without tools)
+	resResponses := idx.Search("fix", "", "AGENT_RESPONSES", time.Time{}, time.Time{})
+	if resResponses.TotalCount != 1 {
+		t.Fatalf("expected 1 result for AGENT_RESPONSES, got %d", resResponses.TotalCount)
+	}
+	if resResponses.Results[0].StepIndex != 2 {
+		t.Errorf("expected step_index 2 for AGENT_RESPONSES, got %d", resResponses.Results[0].StepIndex)
+	}
+
+	// 3. Search with TOOL_CALLS -> Should only match Step 1 (has tool_calls)
+	resTools := idx.Search("fix", "", "TOOL_CALLS", time.Time{}, time.Time{})
+	if resTools.TotalCount != 1 {
+		t.Fatalf("expected 1 result for TOOL_CALLS, got %d", resTools.TotalCount)
+	}
+	if resTools.Results[0].StepIndex != 1 {
+		t.Errorf("expected step_index 1 for TOOL_CALLS, got %d", resTools.Results[0].StepIndex)
+	}
+
+	// 4. Search with DIALOGUE -> Should match Step 0 (USER_INPUT) and Step 2 (pure response), excluding Step 1
+	resDialogue := idx.Search("fix", "", "DIALOGUE", time.Time{}, time.Time{})
+	if resDialogue.TotalCount != 2 {
+		t.Fatalf("expected 2 results for DIALOGUE, got %d", resDialogue.TotalCount)
+	}
+	for _, r := range resDialogue.Results {
+		if r.StepIndex == 1 {
+			t.Errorf("DIALOGUE filter must exclude tool call Step 1, but it was returned")
+		}
+	}
+}
+
