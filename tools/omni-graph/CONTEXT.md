@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
 status: in-progress
-last_session: 2026-10-13
+last_session: 2026-10-16
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `in-progress`
-- **Version**: 0.2.2
+- **Version**: 0.2.3
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
@@ -30,6 +30,9 @@ blockers: []
 | Acceptance Criteria (AC-XXX) | 25 | 25 | 🟢 100% Complete |
 | Non-Functional (NF-XXX) | 11 | 11 | 🟢 100% Complete |
 | Test Coverage | 72/72 Unit & Integration Tests | 72 | 🟢 100% Verified in Docker |
+| Negative Ingestion Guardrail & Zero Redundant Ingest | Complete | — | 🟢 Suppressed /api/ingest in banners for indexed repos |
+| Accurate Stdin Workspace Resolution in Lifecycle Hooks | Complete | — | 🟢 CLI payload workspacePaths prioritization |
+| Hook Invocation Idempotency (Zero Duplicate Banners) | Complete | — | 🟢 Token marker eliminating dual local/global banner injection |
 | Top-Down Worktree Auto-Cascade & Dynamic Sync (R-059) | Complete | — | 🟢 Discover .git/worktrees/*, auto-cascade ingest & watchers |
 | Safe SurrealDB Volume Reset & Automation | Complete | — | 🟢 make reset-graph-db / reset-db preserving TEI cache |
 | Git Worktree Fleet Switcher & Lineage HUD | Complete | — | 🟢 Interactive Strategy Modal, Branch HUD & Top-Bar Breadcrumbs |

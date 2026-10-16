@@ -1,22 +1,34 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Omni-Graph PreToolUse Guardrail Hook
-# Intercepts brute-force grep, broad search, un-reconnoitered source access,
-# and unbounded source file reads (>150 lines) that exhaust LLM context windows.
-# Enforces the Session-Scoped Recon Gate and high-density AST retrieval.
+# Omni-Graph PreToolUse Guardrail Hook (Zero-Fluff / High-Density)
+# Intercepts brute-force grep, un-reconnoitered source access, and unbounded
+# source file reads (>150 lines). Enforces Session-Scoped Recon Gate.
 # ==============================================================================
 
 set -e
 
-# Read hook payload from stdin
 PAYLOAD=$(cat)
 
 python3 - "$PAYLOAD" << 'EOF'
 import sys, json, os, urllib.request, time, subprocess, re
 
 try:
+    # 0. Parse Tool Call Payload
+    raw_input = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
+    data = json.loads(raw_input) if raw_input.strip() else {}
+    tool_call = data.get("toolCall", {})
+    tool_name = tool_call.get("name", "")
+    args = tool_call.get("args", {})
+
+    # Hard Block: browser_subagent causes language server IPC deadlocks/crashes
+    if tool_name == "browser_subagent":
+        print(json.dumps({
+            "decision": "deny",
+            "reason": "BLOCKED: browser_subagent is disabled (causes LS crashes). Use Playwright MCP or run_command."
+        }))
+        sys.exit(0)
+
     # 1. Daemon Liveness Check (Fail-Open Safeguard)
-    # If Omni-Graph daemon is offline, allow all tools immediately so agents are never blocked
     try:
         req = urllib.request.Request("http://localhost:8080/api/health", headers={"User-Agent": "OmniHook/1.0"})
         with urllib.request.urlopen(req, timeout=0.5) as resp:
@@ -24,16 +36,8 @@ try:
                 print(json.dumps({"decision": "allow"}))
                 sys.exit(0)
     except Exception:
-        # Daemon is offline or unreachable -> Fail-Open
         print(json.dumps({"decision": "allow"}))
         sys.exit(0)
-
-    # 2. Parse Tool Call Payload
-    raw_input = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
-    data = json.loads(raw_input) if raw_input.strip() else {}
-    tool_call = data.get("toolCall", {})
-    tool_name = tool_call.get("name", "")
-    args = tool_call.get("args", {})
 
     RECON_TTL = 7200  # 2 hours
 
@@ -53,19 +57,44 @@ try:
         ws = os.environ.get("WORKSPACE")
         if ws:
             return ws
+
         if target_path:
             norm = target_path.replace("\\", "/")
             for part in reversed(norm.split("/")):
                 if part and is_workspace_indexed(part):
                     return part
+
+        for k in ("Cwd", "SearchPath", "TargetFile", "AbsolutePath"):
+            val = args.get(k, "")
+            if val:
+                norm = val.replace("\\", "/")
+                for part in reversed(norm.split("/")):
+                    if part and is_workspace_indexed(part):
+                        return part
+
+        ws_paths = data.get("workspacePaths", [])
+        if ws_paths:
+            for wp in ws_paths:
+                norm = wp.replace("\\", "/")
+                for part in reversed(norm.split("/")):
+                    if part and is_workspace_indexed(part):
+                        return part
+                base = os.path.basename(wp)
+                if base:
+                    return base
+
+        base_dir = ws_paths[0] if ws_paths else (args.get("Cwd") or "")
         try:
+            git_cmd = ["git", "-C", base_dir, "rev-parse", "--show-toplevel"] if base_dir else ["git", "rev-parse", "--show-toplevel"]
             git_root = subprocess.check_output(
-                ["git", "rev-parse", "--show-toplevel"],
+                git_cmd,
                 stderr=subprocess.DEVNULL,
                 encoding="utf-8"
             ).strip()
             return os.path.basename(git_root)
         except Exception:
+            if base_dir:
+                return os.path.basename(base_dir)
             return os.path.basename(os.getcwd()) or "default"
 
     def is_recon_done(workspace):
@@ -120,11 +149,10 @@ try:
             return False
         return True
 
-    # 3. Intercept run_command (detect recon API queries & block blind recursive search)
+    # 3. Intercept run_command
     if tool_name == "run_command":
         cmd = args.get("CommandLine", "")
 
-        # Detect Omni-Graph API / CLI usage -> record recon
         omni_patterns = [
             "localhost:8080/api/symbol", "127.0.0.1:8080/api/symbol",
             "localhost:8080/api/condense", "127.0.0.1:8080/api/condense",
@@ -151,11 +179,11 @@ try:
         if any(p in cmd for p in blocked_patterns):
             print(json.dumps({
                 "decision": "deny",
-                "reason": "Blind recursive search blocked. Query Omni-Graph semantic vector search: GET http://localhost:8080/api/search?q=<query> or AST symbol lookups."
+                "reason": "BLOCKED: Blind recursive search. Query Omni-Graph: :8080/api/search?q=X or :8080/api/symbol?name=X."
             }))
             sys.exit(0)
 
-    # 4. Intercept view_file (Recon Gate + 150-line gate on source code, 450-line gate on markdown)
+    # 4. Intercept view_file
     elif tool_name == "view_file":
         target_path = args.get("AbsolutePath", "")
         ws = get_workspace(target_path)
@@ -163,23 +191,17 @@ try:
             if is_workspace_indexed(ws) and not is_recon_done(ws):
                 print(json.dumps({
                     "decision": "deny",
-                    "reason": f"🧭 Omni-Graph reconnaissance required before touching source code ({os.path.basename(target_path)}).\n"
-                              f"Run one of:\n"
-                              f"  curl -s \"http://localhost:8080/api/condense?symbol=<sym>&workspace={ws}&hops=2\"\n"
-                              f"  curl -s \"http://localhost:8080/api/symbol?name=<sym>&workspace={ws}\"\n"
-                              f"  curl -s \"http://localhost:8080/api/search?q=<query>&workspace={ws}&k=5\"\n"
-                              f"This ensures you start from the AST graph, not blind file reading."
+                    "reason": f"🧭 Omni-Graph recon required for {os.path.basename(target_path)} (ws: {ws}). Query :8080/api/symbol?name=X, /condense?symbol=X, or /search?q=X first."
                 }))
                 sys.exit(0)
 
             start_line = args.get("StartLine")
             end_line = args.get("EndLine")
 
-            # Missing EndLine means reading up to full file limit (800 lines)
             if end_line is None:
                 print(json.dumps({
                     "decision": "deny",
-                    "reason": "BLOCKED: Reading >150 lines of source code directly exhausts agent context. Omni-Graph is active. Query the AST subgraph instead: GET http://localhost:8080/api/condense?symbol=<target_symbol>&hops=2 or query symbol definitions via GET http://localhost:8080/api/symbol?name=<target_symbol>. If you must view raw lines, narrow your slice to <= 150 lines."
+                    "reason": "BLOCKED: Direct reading >150 lines of source code exhausts context. Query :8080/api/symbol?name=X or /condense?symbol=X, or specify EndLine <= 150."
                 }))
                 sys.exit(0)
 
@@ -190,14 +212,13 @@ try:
                 if span > 150:
                     print(json.dumps({
                         "decision": "deny",
-                        "reason": f"BLOCKED: Requested line slice of {span} lines exceeds the 150-line gate. Omni-Graph is active. Query AST symbol definition (GET http://localhost:8080/api/symbol?name=<symbol>) or narrow your view slice to <= 150 lines."
+                        "reason": f"BLOCKED: Slice of {span} lines exceeds the 150-line gate. Query :8080/api/symbol?name=X or narrow slice to <= 150 lines."
                     }))
                     sys.exit(0)
             except (ValueError, TypeError):
                 pass
 
         elif target_path and any(target_path.lower().endswith(ext) for ext in [".md", ".markdown", ".mdown", ".mkd"]):
-            # Markdown file: calibrate threshold to 450 lines
             start_line = args.get("StartLine")
             end_line = args.get("EndLine")
 
@@ -208,7 +229,7 @@ try:
                     if line_count > 450:
                         print(json.dumps({
                             "decision": "deny",
-                            "reason": f"BLOCKED: Markdown file '{os.path.basename(target_path)}' has {line_count} lines. Reading >450 lines directly exhausts agent context.\nOmni-Graph indexes all sections via semantic search:\n  curl -s \"http://localhost:8080/api/search?q=<topic>&workspace={ws}&k=5\"\nOr narrow your slice to <= 450 lines (StartLine/EndLine)."
+                            "reason": f"BLOCKED: Markdown '{os.path.basename(target_path)}' has {line_count} lines (>450 ceiling). Query :8080/api/search?q=X&workspace={ws} or narrow slice to <= 450 lines."
                         }))
                         sys.exit(0)
                 except Exception:
@@ -221,32 +242,27 @@ try:
                     if span > 450:
                         print(json.dumps({
                             "decision": "deny",
-                            "reason": f"BLOCKED: Requested line slice of {span} lines exceeds the 450-line documentation threshold.\nOmni-Graph indexes all sections via semantic search:\n  curl -s \"http://localhost:8080/api/search?q=<topic>&workspace={ws}&k=5\"\nOr narrow your slice to <= 450 lines."
+                            "reason": f"BLOCKED: Slice of {span} lines exceeds 450-line documentation limit. Narrow slice to <= 450 lines or query :8080/api/search."
                         }))
                         sys.exit(0)
                 except (ValueError, TypeError):
                     pass
 
-    # 5. Intercept grep_search (Recon Gate + empty query check)
+    # 5. Intercept grep_search
     elif tool_name == "grep_search":
         search_path = args.get("SearchPath", "")
         ws = get_workspace(search_path)
         query = args.get("Query", "").strip()
         includes = args.get("Includes", [])
 
-        # Intercept broad recursive grep on markdown if recon not done
         is_markdown_grep = any(inc.lower().endswith(ext) for inc in includes for ext in [".md", ".markdown"]) if includes else False
         if is_markdown_grep and is_workspace_indexed(ws) and not is_recon_done(ws):
             print(json.dumps({
                 "decision": "deny",
-                "reason": f"🧭 Omni-Graph reconnaissance recommended before recursive markdown search in workspace \"{ws}\".\n"
-                          f"Omni-Graph indexes all sections and headings via vector search:\n"
-                          f"  curl -s \"http://localhost:8080/api/search?q={query}&workspace={ws}&k=5\"\n"
-                          f"This returns exact section boundaries, file paths, and line spans without context exhaustion."
+                "reason": f"🧭 Omni-Graph recon recommended before searching docs in ws: {ws}. Query :8080/api/search?q={query}&workspace={ws}."
             }))
             sys.exit(0)
 
-        # Check if search is strictly targeting non-code files or agent meta
         is_non_code_search = False
         normalized_path = search_path.replace("\\", "/")
         if "/.agents" in normalized_path or "/.gemini" in normalized_path or "/.git" in normalized_path:
@@ -259,26 +275,19 @@ try:
         if not is_non_code_search and is_workspace_indexed(ws) and not is_recon_done(ws):
             print(json.dumps({
                 "decision": "deny",
-                "reason": f"🧭 Omni-Graph reconnaissance required before text searching source code in workspace \"{ws}\".\n"
-                          f"Run one of:\n"
-                          f"  curl -s \"http://localhost:8080/api/symbol?name=<sym>&workspace={ws}\"\n"
-                          f"  curl -s \"http://localhost:8080/api/search?q=<query>&workspace={ws}&k=5\"\n"
-                          f"  curl -s \"http://localhost:8080/api/references?symbol=<sym>&workspace={ws}\"\n"
-                          f"This ensures you start from the AST graph, not brute-force grep."
+                "reason": f"🧭 Omni-Graph recon required for ws: {ws}. Query :8080/api/symbol?name=X, /condense?symbol=X, or /search?q={query}&workspace={ws}."
             }))
             sys.exit(0)
 
         if len(query) < 2:
             print(json.dumps({
                 "decision": "deny",
-                "reason": "Broad blanket grep search without target query detected. Use Omni-Graph AST symbol & reference endpoints (GET http://localhost:8080/api/symbol?name=...)."
+                "reason": "BLOCKED: Empty/broad grep query. Query :8080/api/symbol?name=X or :8080/api/search?q=X."
             }))
             sys.exit(0)
 
-    # Default Allow
     print(json.dumps({"decision": "allow"}))
 
-except Exception as e:
-    # Fail-safe allow so agents are never hard-crashed on script error
+except Exception:
     print(json.dumps({"decision": "allow"}))
 EOF

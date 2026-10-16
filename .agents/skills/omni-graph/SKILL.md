@@ -22,6 +22,27 @@ Always use this skill instead of running blind recursive `grep -rn` or reading w
 
 ---
 
+## 🛑 Ingestion Invariant & Live Watch Guardrail
+
+Omni-Graph operates as a **persistent background daemon with real-time filesystem watchers**:
+- **NEVER re-ingest an already indexed workspace**: Once a repository is indexed into SurrealDB, live file watch automatically re-indexes file modifications, additions, and deletions in under 500ms.
+- **Mandatory Pre-Ingestion Check**: Before EVER calling `POST /api/ingest`, query:
+  ```bash
+  curl -s http://localhost:8080/api/workspaces
+  ```
+- If your current project is already listed with `total_nodes > 0` or `"is_watching": true`, **DO NOT CALL `/api/ingest`**.
+- Proceed immediately to scoped retrieval:
+  - Definition: `curl -s "http://localhost:8080/api/symbol?name=<sym>&workspace=<ws>"`
+  - Blast Radius: `curl -s "http://localhost:8080/api/references?symbol=<sym>&workspace=<ws>"`
+  - AST Subgraph: `curl -s "http://localhost:8080/api/condense?symbol=<sym>&workspace=<ws>&hops=2"`
+  - Vector Search: `curl -s "http://localhost:8080/api/search?q=<query>&workspace=<ws>&k=5"`
+  - Graph-RAG: `curl -s -X POST http://localhost:8080/api/query -H "Content-Type: application/json" -d '{"prompt": "<question>", "workspace": "<ws>"}'`
+- **When `/api/ingest` IS appropriate**:
+  1. Setting up a brand-new untracked repository that is not present in `GET /api/workspaces`.
+  2. Forcing a hard database reset and clean re-index via `{"path": "...", "refresh": true}` after a major upstream merge or schema wipe.
+
+---
+
 ## ⚡ Quick Make Commands (From Repository Root)
 
 The easiest way to interact with Omni-Graph is via the root `Makefile`:

@@ -2011,3 +2011,49 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
   - Added **Recipe D: Working Across Parallel Git Worktrees** detailing the exact sequence for parallel branch exploration and blast radius isolation.
 - **Documentation Anonymization & Governance**:
   - Ensured all examples in public-facing and agent docs use standard metasyntactic names (`ecommerce-core`, `wt-stripe-v3`, `wt-crypto-pay`, `wt-perf-cache`) avoiding internal repository paths or personal identifiers.
+
+---
+
+### Session Log: 2026-10-16 — Hardening Ingestion Guardrail, Workspace Resolution & Hook Idempotency
+
+**Agent/Author**: Antigravity
+**SDLC Phase**: `in-progress`
+**Duration**: ~25m
+
+#### Objectives
+1. Root-cause and resolve feedback from `tutor-intelligence` where the coding assistant was lured into executing redundant `POST /api/ingest` calls despite the codebase already being indexed and under live watch.
+2. Fix working directory resolution in global lifecycle hooks (`~/.gemini/config/scripts/hook_pre_invocation.sh` and `hook_pre_tool.sh`) when executed by Antigravity CLI from the hooks configuration root.
+3. Prevent duplicate banner injections when both workspace-local (`.agents/hooks.json`) and machine-wide (`~/.gemini/config/hooks.json`) hooks trigger on the same turn.
+4. Establish an explicit Negative Ingestion Guardrail and Live Watch invariant across `SKILL.md` and `Rule 00`.
+5. Deploy synchronized updates across the repository and execute global setup to the local machine (`~/.gemini/config`).
+
+#### What Was Done
+- **Root Cause Analysis & Fix: Workspace Resolution from CLI Payload (`hook_pre_invocation.sh` & `hook_pre_tool.sh`)**:
+  - Identified that Antigravity CLI executes hook scripts with working directory set to the directory containing `hooks.json` (per spec in `docs/hooks.md`). For global hooks, this is `~/.gemini/config`.
+  - Calling `os.getcwd()` inside the hook evaluated to `~/.gemini/config`, which caused the hook to misidentify every external repository as unindexed `Workspace: config`.
+  - Updated both hooks to read stdin payload and resolve active workspace path hierarchically:
+    1. `data.get("workspacePaths", [])[0]` (accurate across IDE and CLI sessions)
+    2. Tool arguments (`args.get("Cwd")`, `args.get("SearchPath")`, `args.get("TargetFile")`, `args.get("AbsolutePath")`)
+    3. `os.environ.get("WORKSPACE_CWD")` / `os.environ.get("WORKSPACE")`
+    4. Subprocess git resolution using `git -C <target_dir> rev-parse --show-toplevel`
+    5. `os.getcwd()` as ultimate fallback.
+  - Aligned against `GET /api/workspaces` canonical `root_path` prefixes and candidate names.
+- **Hook Idempotency Guard (Eliminated Duplicate Prompt Banners)**:
+  - Added an invocation marker check (`/tmp/omni_pre_inv_{conversationId}_{invocationNum}.done`).
+  - When both repository `.agents/hooks.json` and global `~/.gemini/config/hooks.json` fire on the same turn, the second execution recognizes the active marker and cleanly yields `{"injectSteps": []}`, guaranteeing exactly one crisp banner in context.
+- **Suppressed Misleading Ingest Directives in Prompt Banners**:
+  - Removed `• Index Codebase: curl -s -X POST http://localhost:8080/api/ingest...` when a workspace is already indexed in Omni-Graph (`total_nodes > 0`).
+  - Banners for indexed workspaces now strictly render the 3-Tier Reconnaissance Ladder (`/api/query`, `/api/galaxies`, `/api/condense`, `/api/references`, `/api/symbol`, `/api/search`) with `Live-Watch: ON`.
+  - For unindexed codebases, the banner explicitly notes: `First Ingestion: ... Once ingested, background live-watch maintains AST sync in real time without manual re-ingestion.`
+- **Enforced Negative Ingestion Guardrail in `SKILL.md` & `Rule 00`**:
+  - Updated `tools/omni-graph/skills/omni-graph/SKILL.md` and `.agents/skills/omni-graph/SKILL.md` with Section: `🛑 Ingestion Invariant & Live Watch Guardrail` mandating `GET /api/workspaces` prior to any ingestion call.
+  - Updated `tools/omni-graph/rules/00-omni-graph-mandatory-retrieval.md` and `.agents/rules/00-omni-graph-mandatory-retrieval.md` with Section 2.D prohibiting redundant ingestion calls.
+- **Machine-Wide Synchronization**:
+  - Updated `tools/omni-graph/scripts/setup-agent.sh`.
+  - Deployed repository shield via `setup-agent.sh workspace` and global machine configuration via `setup-agent.sh global`.
+  - Verified with simulated payloads for `tutor-intelligence` (3,614 AST nodes resolved instantly with Live-Watch ON and zero re-ingestion prompts).
+
+- **Forensic Token Audit & Compression (78% Token Reduction)**:
+  - Replaced verbose 8-line curl template banner (~220 tokens) with a 3-line high-density cheat-sheet (~46 tokens).
+  - Upgraded debounce mechanism from invocation index to millisecond timestamp threshold (`<1.5s`), completely eliminating dual-hook execution races on user prompts and tool steps.
+  - Compressed PreToolUse deny notices to direct, actionable 1-2 line messages.

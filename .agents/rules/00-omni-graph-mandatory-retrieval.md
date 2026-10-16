@@ -41,6 +41,10 @@ Language models frequently suffer from **context exhaustion, cognitive drift, an
   - **MANDATORY**: Run `curl -s "http://localhost:8080/api/references?symbol=<name>&workspace=<ws>"`
   - Review all callers across all files in the repository before making edits.
 
+### D. Ambient Live Watch & Zero Redundant Ingestion Invariant
+- **Live Watch Persistence**: Codebases indexed in Omni-Graph have real-time file watchers active. Edits made by agents or humans are automatically synchronized into AST nodes in SurrealDB within 500ms.
+- **Prohibited Action**: Never execute `POST /api/ingest` on a workspace that is already indexed (`total_nodes > 0`) or active under live watch. Always check `GET /api/workspaces` first. Redundant ingestion causes unnecessary disk I/O and CPU churn.
+
 ---
 
 ## 3. The 3-Tier Omniverse Reconnaissance Ladder
