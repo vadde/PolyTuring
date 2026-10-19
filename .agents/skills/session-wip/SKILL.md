@@ -41,10 +41,10 @@ Run the companion script for your active workspace:
 ./tools/session-explorer/scripts/wip.sh
 
 # Or target a specific workspace
-./tools/session-explorer/scripts/wip.sh -w tool-scripts
+./tools/session-explorer/scripts/wip.sh -w PolyTuring
 
 # Or query via the local REST API if daemon is running
-curl -s "http://127.0.0.1:9876/api/wip?workspace=tool-scripts"
+curl -s "http://127.0.0.1:9876/api/wip?workspace=PolyTuring"
 ```
 
 ### Step 2: Handle the Response
@@ -53,7 +53,7 @@ curl -s "http://127.0.0.1:9876/api/wip?workspace=tool-scripts"
 Stop immediately and present the formatted candidate table:
 
 ```markdown
-🛑 Multiple sessions found for workspace "tool-scripts":
+🛑 Multiple sessions found for workspace "PolyTuring":
 
 | # | Session ID | Last Active | Steps | Prompts | Last Prompt Preview |
 |---|---|---|---|---|---|
@@ -78,11 +78,11 @@ The tool outputs the deep WIP snapshot:
 
 | Flag | Description | Example |
 |---|---|---|
-| `-w, --workspace <NAME>` | Filter by workspace or repo name | `./scripts/wip.sh -w tool-scripts` |
+| `-w, --workspace <NAME>` | Filter by workspace or repo name | `./scripts/wip.sh -w PolyTuring` |
 | `-s, --session <UUID>` | Force inspection of an exact session ID | `./scripts/wip.sh -s 70af9b9e-...` |
-| `-l, --latest` | Override disambiguation and force latest | `./scripts/wip.sh -w tool-scripts -l` |
+| `-l, --latest` | Override disambiguation and force latest | `./scripts/wip.sh -w PolyTuring -l` |
 | `--limit <N>` | Maximum candidate sessions to display | `./scripts/wip.sh --limit 10` |
-| `--json` | Return structured JSON output | `./scripts/wip.sh -w tool-scripts --json` |
+| `--json` | Return structured JSON output | `./scripts/wip.sh -w PolyTuring --json` |
 
 ---
 

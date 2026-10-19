@@ -68,7 +68,7 @@ main() {
 
   echo ""
   echo "╔══════════════════════════════════════════════════╗"
-  echo "║  🧪 Tool-Scripts — Test Runner                  ║"
+  echo "║  🧪 PolyTuring — Test Runner                     ║"
   echo "╚══════════════════════════════════════════════════╝"
   echo ""
 

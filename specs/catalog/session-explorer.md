@@ -151,7 +151,7 @@ Returns list of all sessions with metadata.
       "created_at": "2026-09-18T15:47:39Z",
       "last_message_at": "2026-09-18T16:31:30Z",
       "workspace": "/path/to/workspace",
-      "project_name": "tool-scripts",
+      "project_name": "PolyTuring",
       "step_count": 169,
       "user_message_count": 6,
       "agent_response_count": 50,
@@ -165,7 +165,7 @@ Returns list of all sessions with metadata.
     "total_user_messages": 150,
     "total_agent_responses": 400,
     "date_range": { "from": "2026-06-17", "to": "2026-09-18" },
-    "workspaces": ["tool-scripts", "vadde.github.io", "DSA"]
+    "workspaces": ["PolyTuring", "vadde.github.io", "DSA"]
   }
 }
 ```
@@ -219,7 +219,7 @@ Full-text search across all sessions.
       "type": "USER_INPUT",
       "content_preview": "...matching text...",
       "created_at": "2026-09-18T15:47:39Z",
-      "workspace": "tool-scripts",
+      "workspace": "PolyTuring",
       "highlight_ranges": [[10, 25]]
     }
   ],
@@ -243,11 +243,11 @@ Extracts recent work-in-progress (WIP) session status for a workspace or exact s
 {
   "status": "resolved",
   "multiple": false,
-  "workspace": "tool-scripts",
+  "workspace": "PolyTuring",
   "active_session": {
     "session_id": "952f3203-4fe9-4e6c-9edb-a93984b1f3f0",
-    "workspace": "tool-scripts",
-    "project_name": "tool-scripts",
+    "workspace": "PolyTuring",
+    "project_name": "PolyTuring",
     "created_at": "2026-09-18T15:47:39Z",
     "last_message_at": "2026-09-18T16:31:30Z",
     "relative_time": "12 minutes ago",
@@ -269,7 +269,7 @@ Extracts recent work-in-progress (WIP) session status for a workspace or exact s
 {
   "status": "ambiguous_multi_session",
   "multiple": true,
-  "workspace": "tool-scripts",
+  "workspace": "PolyTuring",
   "candidate_count": 3,
   "candidates": [
     {
@@ -304,7 +304,7 @@ Installs the `session-wip` recovery skill and lifecycle hooks to the workspace o
 {
   "success": true,
   "target": "workspace",
-  "installed_path": "/Users/aparv/Library/.../tool-scripts/.agents/skills/session-wip",
+  "installed_path": "/Users/aparv/Library/.../PolyTuring/.agents/skills/session-wip",
   "message": "Skill installed successfully."
 }
 ```

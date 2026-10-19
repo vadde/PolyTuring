@@ -144,7 +144,7 @@ func (idx *SessionIndex) discoverKnownProjects() {
 	}
 
 	for _, dir := range searchDirs {
-		if strings.Contains(dir, "/tool-scripts/") || strings.HasSuffix(dir, "/tool-scripts") {
+		if strings.Contains(dir, "/PolyTuring/") || strings.HasSuffix(dir, "/PolyTuring") || strings.Contains(dir, "/tool-scripts/") || strings.HasSuffix(dir, "/tool-scripts") {
 			continue
 		}
 		entries, err := os.ReadDir(dir)
@@ -1230,7 +1230,13 @@ func extractProjectName(workspace string) string {
 
 	cleaned := filepath.Clean(strings.Trim(workspace, `"'`))
 
-	// 1. Direct match for knowledge or Interviews parent paths: /knowledge/<repo> or /Interviews/<repo>
+	// 1. If it contains PolyTuring or tool-scripts or starts with /workspace, normalize to PolyTuring
+	lowerCleaned := strings.ToLower(cleaned)
+	if strings.Contains(lowerCleaned, "polyturing") || strings.Contains(lowerCleaned, "tool-scripts") || strings.HasPrefix(cleaned, "/workspace") {
+		return "PolyTuring"
+	}
+
+	// 2. Direct match for knowledge or Interviews parent paths: /knowledge/<repo> or /Interviews/<repo>
 	if kIdx := strings.Index(cleaned, "/knowledge/"); kIdx != -1 {
 		sub := cleaned[kIdx+len("/knowledge/"):]
 		parts := strings.Split(sub, "/")
@@ -1244,11 +1250,6 @@ func extractProjectName(workspace string) string {
 		if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
 			return parts[0]
 		}
-	}
-
-	// 2. If it contains tool-scripts or starts with /workspace, return tool-scripts
-	if strings.Contains(cleaned, "tool-scripts") || strings.HasPrefix(cleaned, "/workspace") {
-		return "tool-scripts"
 	}
 
 	// 3. Scan path components from right to left, skipping files and blocked directories

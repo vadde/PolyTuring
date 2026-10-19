@@ -288,7 +288,7 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
         <div class="ep-desc">Retrieve indexed conversation sessions, sorted and filtered by workspace, date range, and sort order.</div>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
-          <tr><td>workspace</td><td>query (string)</td><td><input type="text" id="p_sessions_workspace" class="input-field" placeholder="e.g. tool-scripts"></td></tr>
+          <tr><td>workspace</td><td>query (string)</td><td><input type="text" id="p_sessions_workspace" class="input-field" placeholder="e.g. PolyTuring"></td></tr>
           <tr><td>sort_by</td><td>query (string)</td><td><input type="text" id="p_sessions_sort_by" class="input-field" placeholder="date, steps, messages, size"></td></tr>
           <tr><td>from</td><td>query (string)</td><td><input type="text" id="p_sessions_from" class="input-field" placeholder="YYYY-MM-DD"></td></tr>
           <tr><td>to</td><td>query (string)</td><td><input type="text" id="p_sessions_to" class="input-field" placeholder="YYYY-MM-DD"></td></tr>
@@ -309,7 +309,7 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
         <div class="ep-desc">Inspect recent session state. If multiple sessions match, returns candidates and halts according to the Multi-Session Disambiguation Invariant.</div>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
-          <tr><td>workspace</td><td>query (string)</td><td><input type="text" id="p_wip_workspace" class="input-field" placeholder="e.g. tool-scripts" value="tool-scripts"></td></tr>
+          <tr><td>workspace</td><td>query (string)</td><td><input type="text" id="p_wip_workspace" class="input-field" placeholder="e.g. PolyTuring" value="PolyTuring"></td></tr>
           <tr><td>session_id</td><td>query (string)</td><td><input type="text" id="p_wip_session_id" class="input-field" placeholder="Optional exact session UUID"></td></tr>
           <tr><td>limit</td><td>query (integer)</td><td><input type="text" id="p_wip_limit" class="input-field" placeholder="5" value="5"></td></tr>
           <tr><td>force_latest</td><td>query (boolean)</td><td><input type="text" id="p_wip_force" class="input-field" placeholder="true or false" value="false"></td></tr>

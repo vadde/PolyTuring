@@ -9,7 +9,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Name** | `vadde/tool-scripts` |
+| **Name** | `vadde/PolyTuring` |
 | **Purpose** | Enterprise monorepo for engineering tools, scripts, plugins, and workflows |
 | **Architecture** | Polyglot monorepo with self-contained tool folders |
 | **Governance** | Spec-Driven Development (SDD) with SDLC status tracking |
@@ -19,7 +19,7 @@
 ## Repository Map
 
 ```
-tool-scripts/
+PolyTuring/
 ├── .agents/          → YOU ARE HERE — Agent rules, skills, plugins
 ├── specs/            → Specifications (read BEFORE writing code)
 ├── tools/            → Self-contained tools (each is independent)

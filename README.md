@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🔧 tool-scripts
+# 🧠 PolyTuring
 
-### Enterprise Engineering Tools, Scripts, Plugins & Workflows
+### Universal Agentic Intelligence Platform, AST Knowledge Graphs & Polyglot Engineering
 
-[![CI](https://github.com/vadde/tool-scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/vadde/tool-scripts/actions/workflows/ci.yml)
-[![Security](https://github.com/vadde/tool-scripts/actions/workflows/security-audit.yml/badge.svg)](https://github.com/vadde/tool-scripts/actions/workflows/security-audit.yml)
+[![CI](https://github.com/vadde/PolyTuring/actions/workflows/ci.yml/badge.svg)](https://github.com/vadde/PolyTuring/actions/workflows/ci.yml)
+[![Security](https://github.com/vadde/PolyTuring/actions/workflows/security-audit.yml/badge.svg)](https://github.com/vadde/PolyTuring/actions/workflows/security-audit.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![SDD](https://img.shields.io/badge/methodology-Spec%20Driven-purple)](specs/README.md)
 
-*A polyglot monorepo housing self-contained engineering tools — from simple
-math scripts to complex GenAI-powered workflows — governed by spec-driven
-development and navigable by both humans and AI agents.*
+*An enterprise polyglot monorepo housing autonomous AI agent systems, AST knowledge graphs,
+real-time conversation observability, and engineering tools — governed by spec-driven
+development and navigable by both humans and AI companions.*
 
 [**Getting Started**](docs/book/01-getting-started.md) · [**Tool Catalog**](tools/README.md) · [**Documentation**](docs/README.md) · [**Roadmap**](sdlc/ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
 
@@ -22,7 +22,7 @@ development and navigable by both humans and AI agents.*
 
 ## ✨ What Is This?
 
-**tool-scripts** is a monorepo for engineering tools built with a first-principles
+**PolyTuring** is an enterprise monorepo for agentic engineering tools built with a first-principles
 approach to code quality, documentation, and lifecycle management:
 
 - 🔧 **Self-contained tools** — Each tool lives in its own folder with everything
@@ -31,7 +31,7 @@ approach to code quality, documentation, and lifecycle management:
   requirement is numbered, traced, and tested
 - 🤖 **Agent-native** — Built for AI agents to autonomously navigate, build,
   test, and maintain tools using ReAct and Reflexion patterns
-- 🌍 **Polyglot** — Python, Go, Rust, Node.js, Shell — whatever fits the problem
+- 🌍 **Polyglot** — Rust, Go, Python, TypeScript, Node.js, Shell — whatever fits the problem
 - 🔄 **Full lifecycle** — Every tool has an SDLC status: draft → spec-review →
   in-progress → testing → review → released
 
@@ -40,7 +40,7 @@ approach to code quality, documentation, and lifecycle management:
 ## 🗺️ Repository Map
 
 ```
-tool-scripts/
+PolyTuring/
 ├── .agents/          🧠 Agent rules, skills, and behavioral guidelines
 ├── .github/          ⚙️ CI/CD workflows, issue templates, CODEOWNERS
 ├── specs/            📋 Specifications (SDD templates and active specs)
@@ -59,8 +59,8 @@ tool-scripts/
 
 ```bash
 # Clone
-git clone https://github.com/vadde/tool-scripts.git
-cd tool-scripts
+git clone https://github.com/vadde/PolyTuring.git
+cd PolyTuring
 
 # See what's available
 make help
@@ -86,13 +86,13 @@ make status
 | [omni-graph](tools/omni-graph/) | GenAI & ML | Rust / React | `in-progress` v0.2.2 | 100% local semantic knowledge hub modeling codebases as AST graphs + vector embeddings with Ephemeral Branch Fabric and strict &lt;1500 token Graph-RAG SLA. |
 | [session-explorer](tools/session-explorer/) | GenAI & ML | Go / Bun | `review` v0.3.0 | High-performance, single-binary conversation intelligence browser and real-time observability cockpit for agent coding transcripts. |
 
-📖 **Living Documentation Portal**: [https://vadde.github.io/tool-scripts/](https://vadde.github.io/tool-scripts/) · Or run `make docs-serve` locally.
+📖 **Living Documentation Portal**: [https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/) · Or run `make docs-serve` locally.
 
 ---
 
 ## 📚 Documentation
 
-The **[Tool-Scripts Book](docs/README.md)** is a 9-chapter guide covering
+The **[PolyTuring Book](docs/README.md)** is a 9-chapter guide covering
 everything from getting started to advanced patterns:
 
 | Chapter | Topic |

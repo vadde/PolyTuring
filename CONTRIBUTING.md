@@ -1,6 +1,6 @@
-# Contributing to tool-scripts
+# Contributing to PolyTuring
 
-Thank you for contributing to **tool-scripts**! This guide will help you get
+Thank you for contributing to **PolyTuring**! This guide will help you get
 started quickly and ensure your contributions meet our standards.
 
 ---
@@ -34,8 +34,8 @@ By participating in this project, you agree to abide by our
 ### Setup
 
 ```bash
-git clone https://github.com/vadde/tool-scripts.git
-cd tool-scripts
+git clone https://github.com/vadde/PolyTuring.git
+cd PolyTuring
 make setup  # Installs pre-commit hooks
 ```
 
@@ -204,4 +204,4 @@ We support multiple languages. See the full
 
 ---
 
-Thank you for helping make **tool-scripts** better! 🚀
+Thank you for helping make **PolyTuring** better! 🚀

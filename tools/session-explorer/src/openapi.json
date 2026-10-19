@@ -5,8 +5,8 @@
     "description": "High-performance REST API for Antigravity IDE conversation telemetry, agent work-in-progress (WIP) recovery, and trajectory analysis.",
     "version": "0.1.0",
     "contact": {
-      "name": "vadde/tool-scripts",
-      "url": "https://vadde.github.io/tool-scripts/"
+      "name": "vadde/PolyTuring",
+      "url": "https://vadde.github.io/PolyTuring/"
     }
   },
   "servers": [

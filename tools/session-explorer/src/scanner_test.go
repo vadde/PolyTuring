@@ -360,8 +360,10 @@ func TestExtractProjectName_Sanitization(t *testing.T) {
 	}{
 		{"/tmp/all_mermaids.txt", "Default"},
 		{"/Users/aparv/something.py", "Default"},
-		{"/workspace/specs/_templates/tool-spec.md", "tool-scripts"},
-		{"/workspace/tools/session-explorer/src/scanner.go", "tool-scripts"},
+		{"/workspace/specs/_templates/tool-spec.md", "PolyTuring"},
+		{"/workspace/tools/session-explorer/src/scanner.go", "PolyTuring"},
+		{"/Users/aparv/knowledge/tool-scripts/tools/session-explorer/src/scanner.go", "PolyTuring"},
+		{"/Users/aparv/knowledge/PolyTuring/tools/session-explorer/src/scanner.go", "PolyTuring"},
 		{"/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/QuarkDock/docs/sizing.md", "QuarkDock"},
 		{"/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/DSA/binary_search.py", "DSA"},
 		{"", "Default"},
@@ -382,7 +384,7 @@ func TestExtractProjectName_Sanitization(t *testing.T) {
 		}
 	}
 
-	validNames := []string{"QuarkDock", "tool-scripts", "tutor-intelligence", "DSA", "GoLang", "GenAI"}
+	validNames := []string{"QuarkDock", "PolyTuring", "tool-scripts", "tutor-intelligence", "DSA", "GoLang", "GenAI"}
 	for _, name := range validNames {
 		if !isValidWorkspaceName(name) {
 			t.Errorf("expected isValidWorkspaceName(%q) to be true, got false", name)

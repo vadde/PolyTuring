@@ -24,8 +24,8 @@ _2-3 sentence description of the problem this tool solves and how it solves it._
 
 ```bash
 # Clone the repository (if not already done)
-git clone https://github.com/vadde/tool-scripts.git
-cd tool-scripts/tools/<tool-name>
+git clone https://github.com/vadde/PolyTuring.git
+cd PolyTuring/tools/<tool-name>
 
 # Install dependencies
 make setup

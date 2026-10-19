@@ -161,8 +161,8 @@ impl AnalyticsEngine {
         if lower == "quarkdock" || lower.contains("quarkdock") {
             return Some("QuarkDock".to_string());
         }
-        if lower == "tool-scripts" || lower.contains("tool-scripts") {
-            return Some("tool-scripts".to_string());
+        if lower == "polyturing" || lower.contains("polyturing") || lower == "tool-scripts" || lower.contains("tool-scripts") {
+            return Some("PolyTuring".to_string());
         }
         if lower == "tutor-intelligence" || lower.contains("tutor-intelligence") {
             return Some("tutor-intelligence".to_string());
@@ -264,6 +264,7 @@ impl AnalyticsEngine {
         let prompt_lower = prompt.to_lowercase();
         let candidates = [
             "quarkdock",
+            "polyturing",
             "tool-scripts",
             "tutor-intelligence",
             "dsa",
@@ -289,7 +290,7 @@ impl AnalyticsEngine {
             return keys.remove(0);
         }
 
-        "tool-scripts".to_string()
+        "PolyTuring".to_string()
     }
 
     /// Parse any command line invocation to detect Omni-Graph capabilities and workspace target
@@ -430,7 +431,7 @@ impl AnalyticsEngine {
                 let lower_tok = clean_token.to_lowercase();
                 if matches!(
                     lower_tok.as_str(),
-                    "tool-scripts" | "tutor-intelligence" | "dsa" | "designpatterns" | "genai" | "golang" | "k8s-eks" | "session-explorer"
+                    "polyturing" | "tool-scripts" | "tutor-intelligence" | "dsa" | "designpatterns" | "genai" | "golang" | "k8s-eks" | "session-explorer"
                 ) {
                     if let Some(canonical) = Self::resolve_canonical_workspace(clean_token) {
                         detected_ws = Some(canonical);

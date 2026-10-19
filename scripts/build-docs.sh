@@ -11,7 +11,7 @@ SITE_DIR="${ROOT_DIR}/_site"
 DOCS_SITE_DIR="${ROOT_DIR}/docs/site"
 
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║  📚 Building tool-scripts Living Documentation Portal            ║"
+echo "║  📚 Building PolyTuring Living Documentation Portal              ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 
 # 1. Clean and prepare output directory

@@ -1297,9 +1297,10 @@ async fn watch_start_handler(
 
     // Auto-resolve path if it doesn't exist on disk
     let mut target_path = payload.path;
-    let trimmed = target_path.trim_end_matches('/');
-    if trimmed.ends_with("/tools/tool-scripts") || trimmed.ends_with("/tools/workspace") {
-        if let Some(prefix) = trimmed.strip_suffix("/tools/tool-scripts").or_else(|| trimmed.strip_suffix("/tools/workspace")) {
+    if trimmed.ends_with("/tools/PolyTuring") || trimmed.ends_with("/tools/tool-scripts") || trimmed.ends_with("/tools/workspace") {
+        if let Some(prefix) = trimmed.strip_suffix("/tools/PolyTuring")
+            .or_else(|| trimmed.strip_suffix("/tools/tool-scripts"))
+            .or_else(|| trimmed.strip_suffix("/tools/workspace")) {
             let candidate = if prefix.is_empty() { "/workspace".to_string() } else { prefix.to_string() };
             if std::path::Path::new(&candidate).exists() {
                 target_path = candidate;

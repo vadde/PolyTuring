@@ -942,4 +942,32 @@
 - Automated docs verification suite passed 100% via Headless Chrome (`bash .agents/skills/docs-portal/scripts/test-docs.sh`).
 - Playwright in-browser verification confirmed: full scrollability to line 549, 1:1 gutter alignment, 22px mark delta, 0px drift.
 
+---
+
+### 2026-10-19 — Repository Renamed to PolyTuring & Dual-Compatibility Hardening
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Global Identity & Spec Alignment)  
+**Duration**: ~30m
+
+#### Forensic Renaming & Infrastructure Updates
+1. **GitHub Remote & Config**:
+   - Renamed GitHub repository to `PolyTuring` using GitHub CLI (`gh repo rename PolyTuring --yes`).
+   - Updated `.git/config` remote fetch/push URLs to `https://github.com/vadde/PolyTuring.git`.
+2. **Backwards Compatibility**:
+   - `session-explorer/src/scanner.go`: Updated `extractProjectName()` and `discoverProjects()` to prioritize and normalize `PolyTuring`, `tool-scripts`, and `/workspace` to `PolyTuring`.
+   - `session-explorer/src/go.mod`: Updated module path to `github.com/vadde/PolyTuring/tools/session-explorer`.
+   - `session-explorer/src/openapi.json`: Updated contact, title, and external documentation URLs.
+   - `session-explorer/src/scanner_test.go`: Added test cases for `PolyTuring` project normalization.
+   - `omni-graph`: Updated `db/mod.rs`, `analytics/mod.rs`, `api/mod.rs`, and `ui/src/App.tsx` with dual-support for both `PolyTuring` and `tool-scripts`.
+3. **Public Living Docs & Core Assets**:
+   - Updated Living Docs portal branding, navbar badges, documentation links, and book chapters.
+   - Audited all root and documentation files (`README.md`, `CONTRIBUTING.md`, `Makefile`, `.gitignore`, `.agents/AGENTS.md`, `.agents/skills/docs-portal/SKILL.md`, `.agents/skills/session-wip/SKILL.md`).
+4. **Verification**:
+   - All 30 unit tests pass in `tools/session-explorer/src/`.
+   - Standalone Go binary recompiled successfully (`bin/session-explorer`).
+   - Living Docs Portal test suite passed 100% via headless Chrome.
+   - All SDD specifications validated (`make validate-specs` — 0 errors, 0 warnings).
+
+
 

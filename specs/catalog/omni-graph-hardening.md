@@ -69,7 +69,7 @@ A forensic audit of Omni-Graph revealed nine architectural vulnerabilities and f
    - Record ID cleaner unit tests.
    - Git worktree detection (`detect_git_worktree`) across regular repos, worktree files, and detached states.
    - Seed-preserving worktree LPA clustering stability.
-2. End-to-end container verification on `tool-scripts`, `ecommerce-platform`, and `feat-stripe-v2`:
+2. End-to-end container verification on `PolyTuring`, `ecommerce-platform`, and `feat-stripe-v2`:
    - Re-index and confirm 0 orphaned edges (`SELECT count() FROM linked_to WHERE in.id IS NONE OR out.id IS NONE`).
    - Confirm automatic watch daemon enrollment on worktree ingest.
    - Test live file modification in `feat-stripe-v2` and verify single-file incremental update in <100ms.

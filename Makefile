@@ -1,6 +1,6 @@
 # ============================================================================
 #  ╔══════════════════════════════════════════════════════════════════════╗
-#  ║                     tool-scripts — Root Command Center               ║
+#  ║                     PolyTuring — Root Command Center                 ║
 #  ║                                                                      ║
 #  ║  The unified command interface for all tools, scripts, and plugins.  ║
 #  ║  Run `make help` to see all available targets.                       ║
@@ -62,7 +62,7 @@ NC     := \033[0m
 help: ## Show this interactive command directory
 	@printf "\n"
 	@printf "$(BOLD)╔══════════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BOLD)║               🔧 tool-scripts — Command Center                   ║$(NC)\n"
+	@printf "$(BOLD)║               🧠 PolyTuring — Command Center                     ║$(NC)\n"
 	@printf "$(BOLD)╚══════════════════════════════════════════════════════════════════╝$(NC)\n\n"
 	@printf "$(BOLD)🚀 Tool Execution:$(NC)\n"
 	@printf "  $(CYAN)%-24s$(NC) %s\n" "run-tool T=<name>"         "Launch a tool (e.g. make run-tool T=session-explorer)"
@@ -337,7 +337,7 @@ new-tool: ## Scaffold a new tool (NAME=tool-name)
 	@$(SCRIPTS_DIR)/scaffold-tool.sh "$(NAME)"
 
 setup: ## Install pre-commit hooks and repo dependencies
-	@printf "$(BLUE)⚙️  Setting up tool-scripts...$(NC)\n"
+	@printf "$(BLUE)⚙️  Setting up PolyTuring...$(NC)\n"
 	@if command -v pre-commit &>/dev/null; then \
 		pre-commit install && \
 		pre-commit install --hook-type commit-msg && \
@@ -366,7 +366,7 @@ docs: ## Build static living documentation portal (_site)
 	@bash $(SCRIPTS_DIR)/build-docs.sh
 
 docs-serve: docs ## Build and serve living documentation portal on http://localhost:4000
-	@printf "$(CYAN)📚 Serving tool-scripts Living Documentation on http://localhost:4000...$(NC)\n"
+	@printf "$(CYAN)📚 Serving PolyTuring Living Documentation on http://localhost:4000...$(NC)\n"
 	@if command -v python3 >/dev/null; then \
 		python3 -m http.server 4000 --directory _site; \
 	elif command -v npx >/dev/null; then \

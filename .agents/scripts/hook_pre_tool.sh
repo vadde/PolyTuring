@@ -51,7 +51,7 @@ try:
                 indexed = json.load(f)
                 return workspace in indexed
         except Exception:
-            return workspace in {"tool-scripts", "session-explorer", "k8s-eks", "python", "tutor-intelligence", "DSA"}
+            return workspace in {"PolyTuring", "tool-scripts", "session-explorer", "k8s-eks", "python", "tutor-intelligence", "DSA"}
 
     def get_workspace(target_path=""):
         ws = os.environ.get("WORKSPACE")

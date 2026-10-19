@@ -39,8 +39,8 @@ Before you begin, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/vadde/tool-scripts.git
-cd tool-scripts
+git clone https://github.com/vadde/PolyTuring.git
+cd PolyTuring
 ```
 
 ### 2. Explore the Structure
@@ -85,7 +85,7 @@ Edit `specs/catalog/hello-world.md`:
 ## 1. Overview
 
 ### 1.1 Problem Statement
-Engineers need a quick way to verify their tool-scripts setup is working.
+Engineers need a quick way to verify their PolyTuring setup is working.
 
 ### 1.2 Proposed Solution
 A simple "hello world" tool that prints a greeting.
@@ -124,7 +124,7 @@ def greet(name: str = "World") -> str:
     Returns:
         The greeting string.
     """
-    return f"Hello, {name}! 👋 Welcome to tool-scripts."
+    return f"Hello, {name}! 👋 Welcome to PolyTuring."
 
 
 def main() -> int:

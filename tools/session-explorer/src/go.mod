@@ -1,3 +1,3 @@
-module github.com/vadde/tool-scripts/tools/session-explorer
+module github.com/vadde/PolyTuring/tools/session-explorer
 
 go 1.26.5

@@ -1536,9 +1536,13 @@ impl DbClient {
 
 /// Smart heuristic to find where a workspace root directory lives on disk
 pub fn resolve_disk_path(workspace: &str, sample_files: &[String]) -> Option<String> {
-    if workspace == "tool-scripts" || workspace == "workspace" || workspace == "default" {
+    if workspace == "PolyTuring" || workspace == "tool-scripts" || workspace == "workspace" || workspace == "default" {
         if std::path::Path::new("/workspace").exists() {
             return Some("/workspace".to_string());
+        }
+        let pt_p = "/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring";
+        if std::path::Path::new(pt_p).exists() {
+            return Some(pt_p.to_string());
         }
         let host_p = "/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/tool-scripts";
         if std::path::Path::new(host_p).exists() {
@@ -1551,6 +1555,7 @@ pub fn resolve_disk_path(workspace: &str, sample_files: &[String]) -> Option<Str
         format!("/workspace/{}", workspace),
         format!("/workspace/../{}", workspace),
         format!("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/{}", workspace),
+        format!("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/tools/{}", workspace),
         format!("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/tool-scripts/tools/{}", workspace),
     ];
 

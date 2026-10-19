@@ -2740,7 +2740,7 @@ export default function App() {
           {/* Architectural Boundary & Blast Radius Contract (R-030) */}
           <BoundaryContractCard
             symbol={selectedNode.label}
-            workspace={selectedNode.workspace || selectedWorkspace || 'tool-scripts'}
+            workspace={selectedNode.workspace || selectedWorkspace || 'PolyTuring'}
             previousSymbol={nodeHistory.length > 0 ? nodeHistory[nodeHistory.length - 1].label : null}
             onNavigateBack={() => {
               if (nodeHistory.length > 0) {
@@ -2774,7 +2774,7 @@ export default function App() {
           {/* Symbol Provenance & Lineage Inspector */}
           <SymbolProvenanceInspector
             symbol={selectedNode.label}
-            workspace={selectedNode.workspace || selectedWorkspace || 'tool-scripts'}
+            workspace={selectedNode.workspace || selectedWorkspace || 'PolyTuring'}
             parentWorkspace={workspaces.find((w) => w.workspace === (selectedNode.workspace || selectedWorkspace))?.parent_workspace}
             filePath={selectedNode.file_path}
             lineStart={selectedNode.line_start}
@@ -4198,7 +4198,7 @@ export default function App() {
                             onClick={() => {
                               const targetP =
                                 ws.root_path ||
-                                (ws.workspace === 'tool-scripts' || ws.workspace === 'workspace'
+                                (ws.workspace === 'PolyTuring' || ws.workspace === 'tool-scripts' || ws.workspace === 'workspace'
                                   ? '/workspace'
                                   : ws.workspace === 'session-explorer' || ws.workspace === 'omni-graph'
                                   ? `/workspace/tools/${ws.workspace}`
@@ -4227,7 +4227,7 @@ export default function App() {
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                               <span style={{ fontWeight: 600 }}>📁 {ws.workspace}</span>
                               <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                                {ws.root_path || (ws.workspace === 'tool-scripts' ? '/workspace' : `.../${ws.workspace}`)}
+                                {ws.root_path || (ws.workspace === 'PolyTuring' || ws.workspace === 'tool-scripts' ? '/workspace' : `.../${ws.workspace}`)}
                               </span>
                             </div>
                             {isAlreadyWatched ? (

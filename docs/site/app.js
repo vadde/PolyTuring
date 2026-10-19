@@ -1,5 +1,5 @@
 // ==============================================================================
-// tool-scripts Master Documentation Portal — Client Logic & Interactive Engines
+// PolyTuring Master Documentation Portal — Client Logic & Interactive Engines
 // ==============================================================================
 
 let isFocusModeActive = false; // When true, expanding one chapter auto-collapses others
@@ -774,7 +774,7 @@ function initApiPlayground() {
 
   function updateCurl() {
     const ep = endpointSelect.value;
-    const ws = wsInput.value.trim() || 'tool-scripts';
+    const ws = wsInput.value.trim() || 'PolyTuring';
     const sym = symInput.value.trim() || 'ContextCondenser';
     const q = qInput.value.trim() || 'How does token budgeting work?';
 

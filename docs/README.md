@@ -1,10 +1,10 @@
 # 📚 Documentation Home
 
-> **The living knowledge base for `vadde/tool-scripts`.**
+> **The living knowledge base for `vadde/PolyTuring`.**
 
 ---
 
-## 📖 The Tool-Scripts Book
+## 📖 The PolyTuring Book
 
 A comprehensive, notebook-style guide to everything in this repository.
 Read it cover-to-cover or jump to the chapter you need.

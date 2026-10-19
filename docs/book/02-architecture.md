@@ -7,7 +7,7 @@
 ## Repository Architecture
 
 ```
-tool-scripts/
+PolyTuring/
 │
 ├── .agents/               🧠 Agent Intelligence Layer
 │   ├── AGENTS.md          Master instructions for AI agents

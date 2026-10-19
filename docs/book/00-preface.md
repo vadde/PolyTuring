@@ -6,8 +6,8 @@
 
 ## Welcome
 
-Welcome to the **Tool-Scripts Book** — the definitive guide to building,
-managing, and evolving engineering tools in the `vadde/tool-scripts` repository.
+Welcome to the **PolyTuring Book** — the definitive guide to building,
+managing, and evolving engineering tools in the `vadde/PolyTuring` repository.
 
 This book is designed for:
 

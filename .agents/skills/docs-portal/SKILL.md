@@ -1,12 +1,12 @@
 ---
 name: docs-portal
 description: >-
-  Authoritative engineering guide and automated testing protocol for the tool-scripts Living Documentation Portal. Covers liquid-glass design system, 1:1 bi-directional navigation sync, Mermaid diagram canvas invariants, KaTeX mathematical typesetting, interactive simulators, and headless Chrome verification.
+  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers liquid-glass design system, 1:1 bi-directional navigation sync, Mermaid diagram canvas invariants, KaTeX mathematical typesetting, interactive simulators, and headless Chrome verification.
 ---
 
 # 📚 Living Documentation Portal Engineering Skill
 
-This skill is the **single source of truth** for maintaining, styling, extending, and testing the `vadde/tool-scripts` Living Documentation Portal ([https://vadde.github.io/tool-scripts/](https://vadde.github.io/tool-scripts/)).
+This skill is the **single source of truth** for maintaining, styling, extending, and testing the `vadde/PolyTuring` Living Documentation Portal ([https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/)).
 
 Follow this guide whenever adding chapters, modifying CSS styles, rendering architecture diagrams, typesetting mathematical equations, or building interactive simulator widgets.
 
@@ -17,7 +17,7 @@ Follow this guide whenever adding chapters, modifying CSS styles, rendering arch
 The documentation portal is built with **zero build toolchain dependencies** (pure vanilla HTML5, CSS3, ES2022 JavaScript, and CDN-loaded libraries):
 
 ```
-tool-scripts/
+PolyTuring/
 ├── docs/site/
 │   ├── index.html        → Semantic HTML5 layout, chapter disclosure trees, widgets
 │   ├── style.css         → Liquid-glass design tokens, animations, canvas layout
@@ -348,7 +348,7 @@ After pushing to `main`:
 gh run list --workflow="docs-publish.yml" --limit 1
 
 # 2. Verify HTTP 200 on live GitHub Pages:
-curl -sI https://vadde.github.io/tool-scripts/
+curl -sI https://vadde.github.io/PolyTuring/
 ```
 
 ---
