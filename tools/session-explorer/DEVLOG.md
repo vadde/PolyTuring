@@ -905,4 +905,41 @@
 - `deltaTop`: exactly `0px`.
 - Search query and navigation while scrolled at 3000px: matched `1 of 44`, clicked next to `2 of 44`, widget remained 100% visible and interactive.
 
+---
+
+### 2026-10-19 — Resolution: Code Viewer Flex Clipping & Line Gutter Height Drift
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Viewport Stability & Gutter Invariants)  
+**Duration**: ~15m
+
+#### Forensic Root Cause Analysis
+1. **The Issue**: In session `822a4bd0-d8ff-4438-82cf-818b7c423baf` on file `/Users/aparv/.../exact_gtsp.go` (549 lines), scrolling down caused the code pane to appear completely blank/empty below ~line 42, while the line numbers gutter on the left continued down to lines 50–75 highlighted in cyan.
+2. **Backend & Agent Verification**:
+   - Audited Go endpoint `GET /api/file?path=.../exact_gtsp.go`. Verified the backend reads and returns all 549 lines (14,351 bytes) in under 1ms. The coding assistant agent transcript and backend were 100% complete and healthy.
+3. **Frontend Root Cause A (Blank Void on Scroll)**:
+   - `.file-viewer-body` was configured as `display: flex; flex-direction: column; height: 100%;`.
+   - Its child `.code-content-pre` had `overflow-y: hidden; flex: 1;`.
+   - In CSS flexbox, this locked the `<pre>` element to the viewport height (771px), clipping lines 43–549 completely. When `.file-viewer-body` scrolled down, the 771px code box scrolled off the top, leaving empty black background void below line 42.
+4. **Frontend Root Cause B (Line Height Drift & Phantom Blank Lines)**:
+   - `.code-line-numbers` had `font-size: 0.82rem` (`line-height: 20.992px`), whereas `code` had `font-size: 0.88rem` (`line-height: 22.528px`). By line 50, the gutter and code drifted by 76px (~3.5 lines).
+   - `.code-content-pre mark.line-highlight` had `display: block;`. Inside `<pre>` tags, combining `display: block` with a literal trailing newline (`\n`) created a second line break. Every highlighted line doubled in rendered height (22px &rarr; 44px), pushing line 56 in code down to line 34 in the gutter.
+
+#### Surgical Resolution
+1. **Natural Container Sizing**: Changed `.file-viewer-body` to `display: block; overflow: auto;` and `.code-content-pre` to `overflow: visible;`, allowing code containers to expand naturally to full content height (`12,123px` for 549 lines).
+2. **Gutter Synchronization**: Standardized `.file-viewer-code-container`, `.code-line-numbers`, and `.code-content-pre code` to identical metrics: `font-size: 0.84rem; line-height: 22px;`.
+3. **Inline Highlight Marks**: Converted `mark.line-highlight` to `display: inline; padding: 1px 4px; border-radius: 3px; box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);`, completely eliminating duplicate newline breaks.
+4. **Living Docs Portal Enhancement**:
+   - Integrated 5 high-resolution user screenshots into `docs/site/assets/`: `omni-graph-3d-galaxies.png`, `omni-db-agent-analytics.png`, `session-explorer-cockpit.png`, `session-explorer-trail-dialogue.png`, and `session-explorer-file-viewer.png`.
+   - Updated Figure numbering across Chapter 01 and Chapter 02.
+   - Refined Chapter 02 text to be crisp, minimalistic, and high-impact.
+   - Codified Code Viewer & Preformatted Gutter Invariants in `.agents/skills/docs-portal/SKILL.md`.
+
+#### Verification
+- Rebuilt web assets with Bun (`src/web/dist/app.bundle.js`).
+- Recompiled Go binary (`bin/session-explorer`).
+- All 30 unit tests pass (`make test-tool T=session-explorer`).
+- Automated docs verification suite passed 100% via Headless Chrome (`bash .agents/skills/docs-portal/scripts/test-docs.sh`).
+- Playwright in-browser verification confirmed: full scrollability to line 549, 1:1 gutter alignment, 22px mark delta, 0px drift.
+
 

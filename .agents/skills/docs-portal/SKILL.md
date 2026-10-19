@@ -353,6 +353,28 @@ curl -sI https://vadde.github.io/tool-scripts/
 
 ---
 
+## 🖥️ Code Viewer & Preformatted Gutter Invariants
+
+When implementing or styling code viewers with line numbers gutters and inline highlights:
+
+### 1. The Preformatted Block Highlight Invariant
+Inside preformatted code tags (`<pre><code>...</code></pre>`), NEVER apply `display: block` to line highlight marks (`<mark>` or `<span>`).
+* **Root Cause**: In `<pre>` tags, combining `display: block` with a literal trailing newline (`\n`) forces modern browser layout engines to create a second line break, doubling the rendered height (e.g. 22px &rarr; 44px) and progressively shifting highlighted code downward out of sync with the gutter.
+* **Invariant**: Always style `<mark class="line-highlight">` as `display: inline` (e.g., `padding: 1px 4px; border-radius: 3px;`).
+
+### 2. Gutter & Code Metric Synchronization Invariant
+The line numbers gutter (`.code-line-numbers`) and code text (`.code-content-pre code`) must share **IDENTICAL** font metrics:
+* Same `font-family` (e.g. `'JetBrains Mono', monospace`).
+* Same `font-size` (e.g. `0.84rem`).
+* Same fixed pixel `line-height` (e.g. `22px`).
+* Any fractional `rem` line-height variation accumulates vertical drift across large files (by line 100, a 1px delta causes a 100px / ~4.5 line offset).
+
+### 3. Flex Column Scroll Containment
+When an `overflow: auto` scroll container uses `display: flex; flex-direction: column`, nested child code blocks (`<pre>`) with `overflow-y: hidden; flex: 1;` will get clamped to the viewport height (e.g. 770px). When scrolled down, the code box scrolls out of view, revealing an empty background void.
+* **Invariant**: Use `display: block; overflow: auto;` on the scroll parent, and allow the child `<pre>` to expand to its full content height (`overflow: visible`), ensuring all lines (1 to N) remain fully visible during multi-page scroll.
+
+---
+
 ## 🚀 Playbook: Adding a New Chapter or Tool
 
 When documenting a new tool (e.g. `Chapter 04 · New Tool`):

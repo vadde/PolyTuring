@@ -2404,8 +2404,7 @@ body {
   overflow: auto;
   position: relative;
   background: rgba(7, 10, 19, 0.88);
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 
 .file-viewer-loading {
@@ -2414,7 +2413,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  height: 100%;
+  min-height: 320px;
   color: var(--text-muted);
   font-size: 0.95rem;
 }
@@ -2442,11 +2441,12 @@ body {
 /* Code Viewer with Line Gutter */
 .file-viewer-code-container {
   display: flex;
-  flex: 1;
   min-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 22px;
 }
 
 .code-line-numbers {
@@ -2457,28 +2457,31 @@ body {
   text-align: right;
   user-select: none;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.82rem;
-  line-height: 1.6;
-  min-width: 52px;
+  font-size: 0.84rem;
+  line-height: 22px;
+  min-width: 54px;
+  box-sizing: border-box;
 }
 
 .code-line-numbers span {
   display: block;
+  height: 22px;
+  line-height: 22px;
 }
 
 .code-content-pre {
   margin: 0;
   padding: 1.25rem 1.5rem;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   flex: 1;
   background: transparent;
+  box-sizing: border-box;
 }
 
 .code-content-pre code {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 22px;
   background: transparent;
   padding: 0;
   display: block;
@@ -2495,14 +2498,16 @@ body {
   color: var(--accent-cyan);
   font-weight: 700;
   background: rgba(6, 182, 212, 0.25);
+  border-radius: 2px;
 }
 
 .code-content-pre mark.line-highlight {
-  background: rgba(6, 182, 212, 0.18);
-  border-left: 3px solid var(--accent-cyan);
-  display: block;
-  margin: 0 -1.5rem;
-  padding: 0 1.5rem;
+  background: rgba(6, 182, 212, 0.22);
+  color: inherit;
+  display: inline;
+  padding: 1px 4px;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
 }
 
 /* In-File Find Widget (R-038) */

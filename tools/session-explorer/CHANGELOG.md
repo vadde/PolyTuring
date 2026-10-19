@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Code Viewer Flex Layout Clipping & Line Gutter Height Drift**:
+  - Replaced constrained flex layout on `.file-viewer-body` with natural block container layout (`display: block; overflow: auto;`) and `.code-content-pre { overflow: visible; }`, resolving empty blank rendering below viewport height on long code files.
+  - Standardized `.code-line-numbers` and `code` font metrics (`font-size: 0.84rem; line-height: 22px;`) to eliminate vertical alignment drift over multi-hundred-line files.
+  - Converted preformatted line highlight marks (`mark.line-highlight`) from `display: block` to `display: inline` with styled background and shadow, eliminating duplicate phantom line-breaks caused by block elements before trailing `\n` characters in `<pre>` tags.
+  - Fixed floating Find bar to stay anchored at `position: fixed` within viewer viewport during deep multi-page scrolling.
+
 ### Added
 - **Bounded Diagram Viewports & Fullscreen Theater Mode (R-037)**:
   - Constrained inline `.canvas-viewport` containers to `max-height: 440px` with slim internal scrollbars, eliminating vertical scroll trapping in long conversational timelines.

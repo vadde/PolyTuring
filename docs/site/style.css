@@ -1171,6 +1171,19 @@ tr:hover td {
   max-width: 100%;
 }
 
+.canvas-viewport img,
+.theater-surface img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--bg-card-border);
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
 .canvas-caption {
   font-size: 0.8rem;
   color: var(--text-dim);
