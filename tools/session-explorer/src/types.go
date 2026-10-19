@@ -261,3 +261,17 @@ type WatchIntervalResponse struct {
 	Message         string `json:"message"`
 }
 
+// FileContentResponse is the payload returned by GET /api/file.
+// Implements: R-038 (Native In-Browser File & Artifact Viewer)
+type FileContentResponse struct {
+	Path      string `json:"path"`
+	Name      string `json:"name"`
+	Extension string `json:"extension"`
+	Size      int64  `json:"size"`
+	ModTime   string `json:"mod_time"`
+	Content   string `json:"content"`
+	IsBinary  bool   `json:"is_binary"`
+	MimeType  string `json:"mime_type"`
+	LineCount int    `json:"line_count"`
+}
+

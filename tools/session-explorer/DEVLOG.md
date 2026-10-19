@@ -784,3 +784,125 @@
 - `bin/session-explorer` — Recompiled standalone Go binary.
 - `DEVLOG.md` — Documented session design, implementation, and test verification.
 
+---
+
+### 2026-10-19 — Bounded Diagram Viewports, Fullscreen Theater Mode & Native In-Browser File & Artifact Viewer (R-037, R-038)
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (UI/UX Engineering, Cognitive Flow Optimization & In-Browser File Viewer)  
+**Duration**: ~35m
+
+#### Multi-Lens UI/UX Research & Systems Design
+1. **Principal UX Architect Lens (Vertical Rhythm & Scroll Trap Elimination — R-037)**:
+   - *Problem*: In complex technical sessions (e.g. `08c850ee-51fd-4291-9924-8b2c75090a80`), generated Mermaid diagrams and architecture blueprints spanned thousands of vertical pixels inline. Users reading conversational monologues were forced to scroll endlessly through massive diagrams just to reach the following text or turn, completely disrupting reading velocity.
+   - *Solution*: Inline `.canvas-viewport` containers are now strictly bounded to `max-height: 440px` with internal scrolling (`overflow: auto`, custom slim scrollbars) and `cursor: grab`.
+   - *Fullscreen Theater Mode*: Replicated and enhanced the living documentation portal pattern. Every diagram card features a dedicated `.theater-btn` ("Theater"), and double-clicking the canvas immediately launches the full-screen `#diagramTheaterModal`. Features 20% to 500% zoom controls, click-and-drag 2D panning, Fit to View, Copy SVG, Copy Diagram Source, and `Esc` key dismiss.
+2. **Staff Systems Engineer & Security Lens (Native In-Browser File & Artifact Viewer — R-038)**:
+   - *Problem*: Previously, files and artifacts generated or touched during agent sessions only provided a "Copy Path" button. Users had to leave the browser, switch to a terminal or external editor, and manually view the file. For users of CLI agents, this was a high-friction context switch.
+   - *Solution*: Built a secure local file retrieval endpoint `GET /api/file?path=<path>`:
+     - Strict path validation and credential blocking (`.ssh`, `.gnupg`, `.aws`, `/etc/shadow`) returning HTTP 403.
+     - 10MB file ceiling with HTTP 413 Payload Too Large.
+     - Content-aware metadata (language detection, total line counts, human-readable size, image detection).
+     - Intelligent workspace root fallback: relative tool paths resolve automatically against discovered project repositories.
+3. **Product Designer Lens (Native In-Browser Code & Document Reading Experience)**:
+   - Built the `#fileViewerModal` with frosted cosmic glass styling:
+     - Header bar with file extension icons (🐹 Go, 🐍 Python, 🦀 Rust, ⚡ JS/TS, 📝 Markdown, ⚙️ Config, 🖼️ Image), breadcrumb path, line counts, and file size.
+     - **Rich Markdown Preview vs. Raw Mode**: Segmented toggle allows toggling between rich rendered Markdown (complete with KaTeX LaTeX math and client-side Mermaid diagrams) and syntax-highlighted code.
+     - **Anchor Line Highlighting**: Automatically parses line anchors (e.g. `#L10-L20` or `:10`). Highlights the target lines in the `.code-line-numbers` gutter and code view and auto-scrolls into view.
+     - **Unified Clickable Chips**: All tool file arguments (`AbsolutePath`, `TargetFile`, `path`) and markdown file links (`[text](file://...)`) are rendered as clickable chips (`.tool-file-pill`, `.file-path-link`) that open the file natively.
+     - **Session Files & Artifacts Drawer**: Added a dedicated top action button `📁 Files & Artifacts (count)` that displays a categorized list of all files in the session (`✨ Artifact`, `✏️ Modified`, `👁️ Read`), enabling one-click opening.
+
+#### Automated Test & Browser Verification
+- **Go Unit Tests**: Added `TestAPI_HandleFile` covering markdown read, line anchors (`#L3-L5`, `:3`), missing path (400), 404, directory (400), and restricted `.ssh` path (403). All 30 unit tests pass.
+- **Headless Playwright Verification**:
+  - Live session `08c850ee-51fd-4291-9924-8b2c75090a80`:
+    - 199 files/artifacts aggregated in `detailFilesBtn`.
+    - Double-click and Theater button successfully opened `#diagramTheaterModal` with SVG rendered, zoom in to 140%, zoom out to 115%, reset, and fit to view.
+    - `openFileViewer` rendered `README.md` in rich preview mode with 5 headings and KaTeX math.
+    - Switched to Raw mode: verified code container displayed with 86 numbered lines and lines 10 to 20 highlighted (`.line-highlight`).
+    - Opened `sessionFilesModal` drawer: verified 199 items categorized with icons and badges, and clicking an item loaded `task-225.log` into the viewer.
+- **Spec & Documentation Standards**:
+  - Updated `specs/catalog/session-explorer.md` (R-037, R-038, AC-030..AC-035).
+  - Updated `.agents/skills/docs-portal/SKILL.md` (Diagram Viewport Bounding, Theater Mode Invariants, Native File Viewer Design Standards).
+  - Updated `STATUS.md`, `CONTEXT.md`, and `DEVLOG.md`.
+
+#### Files Changed
+- `tools/session-explorer/src/types.go` — Added `FileContentResponse` struct.
+- `tools/session-explorer/src/api.go` — Implemented `HandleFile` with security checks, line counting, language detection, and workspace resolution.
+- `tools/session-explorer/src/server.go` — Registered `GET /api/file` endpoint.
+- `tools/session-explorer/src/openapi.json` — Documented `/api/file` and `FileContentResponse`.
+- `tools/session-explorer/src/api_test.go` — Added `TestAPI_HandleFile`.
+- `tools/session-explorer/src/web/index.html` — Added `#diagramTheaterModal`, `#fileViewerModal`, `#sessionFilesModal`, and `#detailFilesBtn`.
+- `tools/session-explorer/src/web/src/styles.css` — Added bounded canvas `max-height: 440px`, `.theater-modal`, `.file-viewer-modal`, `.code-line-numbers`, `.line-highlight`, and `.tool-file-pill`.
+- `tools/session-explorer/src/web/src/app.js` — Implemented diagram theater engine, file viewer engine with preview/raw toggle, line anchor scrolling/highlighting, and session files aggregator.
+- `tools/session-explorer/src/web/dist/` — Rebuilt bundle via Bun (`bun run build`).
+- `tools/session-explorer/bin/session-explorer` — Recompiled standalone Go binary.
+- `specs/catalog/session-explorer.md` — Documented R-037, R-038, AC-030..AC-035.
+- `.agents/skills/docs-portal/SKILL.md` — Added theater and native file viewer engineering standards.
+- `STATUS.md`, `CONTEXT.md`, `DEVLOG.md` — Updated SDLC tracking, metrics, and session journal.
+
+---
+
+### 2026-10-19 — Refinement: Unified Single Scrollbar, IDE-Grade In-File Find, Dual-Action File Chips & Action Micro-Feedback
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (UI/UX Micro-Interactions & Usability Refinement)  
+**Duration**: ~20m
+
+#### Multi-Lens Analysis & Problem Resolution
+1. **Principal Interaction Designer Lens (Scrollbar Invariant & Dual-Scroll Elimination)**:
+   - *Problem*: The file viewer previously rendered two nested vertical scrollbars: one on the parent `.file-viewer-body` and another on the nested `.code-content-pre`. This created confusion, scroll fighting, and visual jitter.
+   - *Resolution*: Enforced the single unified scrollbar architecture. `.code-content-pre` is configured with `overflow-x: auto; overflow-y: hidden;` while `.file-viewer-body` manages `overflow: auto;`. Vertical scrolling now flows smoothly with a single custom scrollbar, perfectly keeping code and line numbers gutter in lockstep.
+2. **Staff Systems Engineer Lens (IDE-Grade In-File Search Engine)**:
+   - *Problem*: Long files and technical transcripts require rapid in-document search.
+   - *Resolution*: Built the In-File Find widget (`#fileViewerFindWidget`):
+     - Triggerable via `Cmd+F` / `Ctrl+F` or the Find button (`🔍 Find`) in the viewer header.
+     - Case sensitivity toggle (`Aa`).
+     - Match counter showing exact match positions (`X of Y`).
+     - Next / Previous match navigation via `Enter` / `Shift+Enter` and `▲` / `▼` buttons.
+     - Non-destructive DOM search using `document.createTreeWalker(root, NodeFilter.SHOW_TEXT, ...)`. Safely splits text nodes and wraps occurrences in `<mark class="find-match">`, completely preserving syntax-highlighted code spans, KaTeX equations, and Markdown formatting.
+     - Smooth scrolling to active matches (`find-match-current`) and clean unwrap restoration upon close or modal dismissal.
+     - Priority `Escape` handling: dismisses the Find widget before closing the parent modal.
+3. **UX / Cognitive Flow Lens (Dual-Affordance File Reference & Micro-Feedback)**:
+   - *Problem*: Previously, the copy icon on the session trail was merged into the file view pill, forcing users through a 2-step modal flow just to copy a path. In addition, action buttons in the viewer gave no visual feedback when clicked.
+   - *Resolution*:
+     - **Dual-Affordance File Chip**: Separated file pills into a primary view pill (`📄 file ↗`) and a secondary 1-click quick-copy button (`📋`). Clicking the copy icon copies the absolute path directly to the clipboard with zero modal popups and instantly toggles to a green checkmark (`✓`) with toast feedback.
+     - **Micro-Feedback**: All file viewer action buttons (`📋 Copy Content`, `🔗 Copy Path`, `↩ Wrap`) now trigger instant visual feedback: icon switches to `✓`, label updates (e.g. `✓ Copied!`, `✓ Path Copied!`, `✓ Wrapped`), button flashes an emerald/cyan glow, and smoothly reverts after 1.5s.
+4. **Visual Real Estate Lens (Full-Width Markdown & View Leak Prevention)**:
+   - Expanded `.file-viewer-markdown` to `max-width: 100%; width: 100%`, fully utilizing the pane real estate matching the Raw code view.
+   - Fixed pane mode switching bug in `renderFileViewerContent()` by ensuring all other mode containers are explicitly set to `display = 'none'` before activating the selected mode, preventing Raw content from leaking below the Preview pane.
+
+#### Automated Browser Verification
+- Verified with headless Playwright:
+  - Single scrollbar verified (`code-content-pre` `overflow-y` is `hidden`, body is `auto`).
+  - Markdown preview width verified at 100%.
+  - Mode toggle verified clean: Preview mode hides code pre (`none`), Raw mode hides preview (`none`).
+  - Find widget tested: found 16 matches in preview mode, navigated next/prev with counter updating (`2 of 16`, `1 of 16`), highlighted without corrupting DOM, and unwrapped cleanly on dismiss.
+  - 1-click copy path verified on session trail: copied path without opening modal and flipped to `✓`.
+
+---
+
+### 2026-10-19 — Pinned Floating Find Widget Invariant & Multi-Page Viewport Anchoring
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Viewport Stability & Search Ergonomics)  
+**Duration**: ~10m
+
+#### Forensic Investigation & Root Cause
+- **The Issue**: When viewing multi-page files (hundreds or thousands of lines) and scrolling down, the In-File Find bar disappeared off the top of the screen. Users had to scroll all the way back to the top of the file to see the match counter, click navigation buttons, or close the search.
+- **Root Cause**: `#fileViewerFindWidget` was nested inside `#fileViewerBody` which is the scroll container (`overflow: auto`). In CSS, an absolutely positioned element whose containing block is an `overflow: auto` container scrolls along with that container's inner content.
+- **The Architecture Fix**:
+  1. Relocated `#fileViewerFindWidget` in `index.html` to be a direct sibling of `#fileViewerBody` inside `.file-viewer-shell`.
+  2. Set `position: relative` on `.file-viewer-shell` (which has `overflow: hidden` and never scrolls).
+  3. Styled `.file-viewer-find-widget` with `position: absolute; top: 66px; right: 24px; z-index: 100;`.
+  4. Result: `#fileViewerFindWidget` is firmly anchored to the unscrollable outer modal shell, floating right beneath the topbar. No matter how much the user scrolls (tested up to 3,000px down), its position delta is exactly 0px (`deltaTop: 0`).
+  5. Updated `.agents/skills/docs-portal/SKILL.md` to permanently codify the **Pinned Floating Find Widget Invariant** across all future tools and living documentation components.
+
+#### Automated Browser Verification (Playwright MCP)
+- Initial Rect at `scrollTop = 0`: `top: 107.09px`, `right: 1139px`.
+- Scrolled down to `scrollTop = 1200px`: `top: 107.09px`, `right: 1139px`.
+- Scrolled down to `scrollTop = 3000px`: `top: 107.09px`, `right: 1139px`.
+- `deltaTop`: exactly `0px`.
+- Search query and navigation while scrolled at 3000px: matched `1 of 44`, clicked next to `2 of 44`, widget remained 100% visible and interactive.
+
+

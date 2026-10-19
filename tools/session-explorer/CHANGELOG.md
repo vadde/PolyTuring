@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Bounded Diagram Viewports & Fullscreen Theater Mode (R-037)**:
+  - Constrained inline `.canvas-viewport` containers to `max-height: 440px` with slim internal scrollbars, eliminating vertical scroll trapping in long conversational timelines.
+  - Added Fullscreen Theater mode modal (`#diagramTheaterModal`) with 20% to 500% zoom controls, click-and-drag 2D panning, Fit to View, Copy SVG, and Copy Diagram Source.
+  - Implemented double-click to expand on diagram canvas viewports, seamlessly launching Theater mode.
+- **Native In-Browser File & Artifact Viewer (R-038)**:
+  - Added secure Go endpoint `GET /api/file?path=<path>` supporting absolute and relative paths with workspace auto-resolution, credential path protection (`.ssh`, `.gnupg`, `.aws`, `/etc/shadow`), 10MB file ceiling, and content-aware metadata detection.
+  - Built frosted glass `#fileViewerModal` featuring detected language badge, line count, human-readable size, and breadcrumb path copy.
+  - Added segmented toggle for Markdown files switching between rich HTML Preview (with KaTeX LaTeX math and client-side Mermaid rendering) and syntax-highlighted Raw mode, with 100% full-width real estate utilization and strict view separation.
+  - Added `.code-line-numbers` gutter and automatic line anchor scrolling and highlighting for paths specifying line ranges (`#L10-L20` or `:10`).
+  - Added embedded preview for image files (`.png`, `.jpg`, `.svg`, `.webp`).
+  - Unified all tool call file parameters (`AbsolutePath`, `TargetFile`, `path`) and markdown file links (`[text](file://...)`) into interactive clickable `.tool-file-pill` chips with dedicated 1-click copy path buttons (`📋` → `✓`).
+  - Added IDE-grade In-File Find widget (`#fileViewerFindWidget`) with `Cmd+F` / `Ctrl+F` shortcut, match counter (`X of Y`), case-sensitivity toggle (`Aa`), next/previous navigation (`Enter`/`Shift+Enter`, `▲`/`▼`), smooth scrolling to matches, and non-destructive syntax-preserving tree highlights.
+  - Enforced single unified scrollbar architecture on File Viewer, eliminating nested dual vertical scrollbars.
+  - Added instant micro-feedback with color glow transitions to all viewer actions (`📋 Copy Content`, `🔗 Copy Path`, `↩ Wrap`).
+  - Added top action button `📁 Files & Artifacts (count)` and comprehensive session files aggregator drawer (`#sessionFilesModal`) categorizing all session files into `✨ Artifact`, `✏️ Modified`, and `👁️ Read`.
 - **Universal Multi-Runtime Discovery & Provider Architecture (R-036)**:
   - Decoupled scanner from a single hardcoded IDE data directory; auto-discovers Antigravity IDE (`~/.gemini/antigravity-ide/brain`), Antigravity CLI (`~/.gemini/antigravity-cli/brain`), and Core runtime stores concurrently.
   - Dynamically routes session detail retrieval, transcript search, and real-time SSE live tailing to each session's originating brain path (`session.TranscriptPath`, `session.StorageDir`).

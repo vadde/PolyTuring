@@ -176,9 +176,58 @@ flowchart TB
 > **Always write:** `≤ 1,500 Tokens` or `&lt;1500 Tokens`.
 
 ### 4. Theater Button Layout Rule
-The theater button contains an SVG icon and text ("Theater"). Its CSS class `.canvas-tool-btn.fullscreen-btn` must specify:
+The theater button contains an SVG icon and text ("Theater"). Its CSS class `.canvas-tool-btn.fullscreen-btn` (or `.theater-btn`) must specify:
 `min-width: 32px; padding: 0 14px; gap: 8px; font-weight: 600;`
 Never constrain it to `width: 28px` (which is reserved for single-character zoom buttons like `+` and `−`).
+
+### 5. Diagram Viewport Bounding & Theater Mode Invariants
+> [!IMPORTANT]
+> **The Vertical Rhythm Invariant**: Diagrams in vertical conversational monologue feeds or long-form documentation must **NEVER** expand with unbounded vertical height that traps user scrolling.
+> 1. Constrain inline `.canvas-viewport` to `max-height: 440px` (or `600px` for static docs) with internal scroll (`overflow: auto`) and custom scrollbars.
+> 2. Double-clicking any `.canvas-viewport` MUST immediately launch the Fullscreen Theater modal.
+> 3. Fullscreen Theater mode provides distraction-free focus: 20% to 500% zoom controls, click-and-drag panning, Fit to View, Copy SVG, and Copy Diagram Source.
+
+---
+
+## 🗂️ Native In-Browser File & Artifact Viewer Design Standard
+
+When presenting codebases, agent session timelines, or interactive docs, eliminate external copy-paste friction by providing an in-browser file and artifact inspector:
+
+### 1. Unified Clickable File References
+- Any filesystem path referenced in conversational prose (`file:///...` or `/Users/...`), markdown links (`[title](path#L10-L20)`), or tool parameters (`AbsolutePath`, `TargetFile`) must be rendered as an interactive, clickable chip (`.tool-file-pill`, `.file-path-link`).
+- Clicking the element opens the file natively inside the browser modal/drawer without switching apps.
+
+### 2. File Viewer Core Anatomy
+The native viewer component consists of:
+1. **Header Bar**:
+   - Language-specific icon (🐹 Go, 🐍 Python, 🦀 Rust, ⚡ JS/TS, 📝 Markdown, ⚙️ Config, 🖼️ Image).
+   - Filename and breadcrumb path with one-click copy.
+   - Metadata pills: Detected language badge, total line count, human-readable file size (`KB`/`MB`).
+   - View mode switcher (`📖 Preview` vs `📝 Raw`) for rich formats (Markdown).
+   - Line wrap toggle (`↩ Wrap`) and Copy Content button.
+2. **Body Viewport**:
+   - **Markdown Mode**: Rich HTML render with KaTeX math typesetting and Mermaid diagram rendering.
+   - **Code / Raw Mode**: Syntax highlighting via Highlight.js with a dedicated `.code-line-numbers` gutter.
+   - **Anchor Highlighting**: If the target path contains line anchors (e.g. `#L45-L60` or `:45`), the line gutter and code lines automatically highlight with an active border accent and scroll into view.
+   - **Image Preview**: Embedded base64 or blob URL preview for `.png`, `.jpg`, `.svg`, `.webp`.
+3. **Session Aggregation**:
+   - Monologue and tool execution feeds should aggregate all inspected and modified files into a dedicated "Files & Artifacts" drawer, categorized by `✨ Artifact`, `✏️ Modified`, and `👁️ Read`.
+
+### 3. Single Unified Scrollbar Invariant
+> [!IMPORTANT]
+> When rendering syntax-highlighted code with an external line numbers gutter inside a scrollable container (`.file-viewer-body`), the code pre block (`.code-content-pre`) MUST specify `overflow-x: auto; overflow-y: hidden;` while the parent viewport manages `overflow: auto;`.
+> **Never allow nested vertical scrollbars (`overflow-y: auto`) on both the parent container and code block.** Nested vertical scrollbars fight for wheel focus, disorient users, and desynchronize the line gutter from code text.
+
+### 4. Pinned Floating Find Widget Invariant
+> [!IMPORTANT]
+> Any in-file or in-document Find widget (`#fileViewerFindWidget`) MUST be anchored directly to the unscrollable outer modal shell (`.file-viewer-shell` with `position: relative`), positioned with `position: absolute; top: 66px; right: 24px; z-index: 100;`.
+> **NEVER place the Find widget inside an `overflow: auto` scroll body.** When placed inside a scrolling body, scrolling through multi-page files pushes the find input, match counters (`X of Y`), and navigation buttons off-screen, forcing users to scroll all the way back to the top to see which occurrence they are on or to close the search.
+
+### 5. Dual-Affordance File References & Micro-Feedback
+- File links in message streams must decouple file inspection from clipboard copying into a split chip (`.tool-file-chip-group`):
+  - Primary pill (`📄 file.ext ↗`): Single-click opens native in-browser viewer.
+  - Secondary icon (`📋`): Single-click copies absolute file path directly to clipboard with zero modal popups.
+- Positive micro-feedback: Copy buttons immediately toggle to a green checkmark (`✓`) with toast feedback. All modal actions (`📋 Copy`, `🔗 Path`, `↩ Wrap`) must flash positive feedback states (`✓ Copied!`, `✓ Wrapped`) with color transitions before smoothly reverting.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 tool: session-explorer
 status: review
-last_session: 2026-10-14
+last_session: 2026-10-19
 last_agent: "Antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `review`
-- **Version**: 0.2.1
+- **Version**: 0.3.0
 - **Language**: Go 1.22+ (backend) + vanilla HTML/CSS/JS (frontend, Bun-bundled)
 - **Category**: GenAI & ML
 
@@ -25,10 +25,10 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 36 | 36 | ✅ 100% Implemented (R-036 completed) |
-| Acceptance Criteria (AC-XXX) | 29 | 29 | 🧪 100% Verified |
+| Spec Requirements (R-XXX) | 38 | 38 | ✅ 100% Implemented (R-037, R-038 completed) |
+| Acceptance Criteria (AC-XXX) | 39 | 39 | 🧪 100% Verified (AC-036..AC-039 added & verified) |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 29 unit tests passing + live demo |
+| Test Coverage | 100% | 100% | 🧪 30 unit tests passing + headless Playwright verified |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -94,13 +94,19 @@ blockers: []
 | 2026-10-15 | 99% Fluid Viewport Real Estate | Unshackled app-container and timeline-container max-widths to 100% fluid grid; relocated export actions to top identity bar, slashing scrolling by >50% |
 | 2026-10-15 | Granular Message Filtering & Clean Dialogue Mode | Separated pure agent conversational responses from tool execution turns; added 1-click Dialogue mode (User + Agent prose) and symmetric backend Search filters (R-035) |
 | 2026-10-15 | Universal Multi-Runtime Discovery & Provider Architecture | Decoupled scanner from hardcoded single IDE data dir; auto-discovers Antigravity IDE, CLI, and Core brain stores concurrently with runtime badges, runtime filters, and future-proof provider slots (R-036) |
+| 2026-10-19 | Bounded Diagram Viewports & Fullscreen Theater Mode | Bounded inline canvas-viewport to max-height 440px with internal scrolling to prevent timeline scrolling traps; double-click to expand or click Theater button for full-screen distraction-free modal with pan/drag and zoom (20%-500%) controls (R-037) |
+| 2026-10-19 | Native In-Browser File & Artifact Viewer | Added GET /api/file endpoint with security protections; interactive .tool-file-pill and .file-path-link chips open native modal with Highlight.js syntax highlighting, line numbers gutter, anchor line highlighting (#L10-L20), Markdown preview with KaTeX/Mermaid, and session files aggregation drawer (R-038) |
+| 2026-10-19 | Single Unified Scrollbar Invariant | Eliminated nested double vertical scrollbars in File Viewer by constraining overflow-y to body container while disabling vertical overflow on pre code blocks |
+| 2026-10-19 | TreeWalker Non-Destructive In-File Find Engine | Implemented in-modal Cmd+F search using document.createTreeWalker over text nodes, preserving DOM syntax-highlight spans and KaTeX/Mermaid structures with match count (X of Y) and smooth scrolling |
+| 2026-10-19 | Dual-Affordance File Reference & Micro-Feedback | Split session trail file chips into open-preview pill and direct 1-click copy path button (📋 → ✓), and added glowing feedback states to all viewer actions |
+| 2026-10-19 | Pinned Floating Find Widget Invariant | Anchored Find widget to unscrollable .file-viewer-shell frame (position: absolute; top: 66px; right: 24px) rather than scrolling body, ensuring find bar remains 100% visible across multi-page file scrolls (deltaTop = 0px) |
 
 ---
 
 ## Traceability Summary
 
-> _36 functional requirements, 9 non-functional, 29 acceptance criteria._
-> _All 36 requirements implemented and verified._
+> _38 functional requirements, 9 non-functional, 35 acceptance criteria._
+> _All 38 requirements implemented and verified._
 
 | Req ID | Description | Impl | Tested |
 |--------|-------------|------|--------|
@@ -140,7 +146,9 @@ blockers: []
 | R-034 | Headless CLI & wip script | ✅ | 🧪 |
 | R-035 | Granular response & dialogue filters | ✅ | 🧪 |
 | R-036 | Universal multi-runtime discovery (IDE, CLI, Copilot, Claude) | ✅ | 🧪 |
+| R-037 | Bounded diagram viewports & fullscreen theater mode | ✅ | 🧪 |
+| R-038 | Native in-browser file & artifact viewer with syntax highlighting | ✅ | 🧪 |
 
 ---
 
-_Last updated: 2026-10-15_
+_Last updated: 2026-10-19_

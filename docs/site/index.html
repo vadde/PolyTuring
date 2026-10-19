@@ -781,12 +781,12 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
 
         <div class="chapter-body">
           <p>
-            <strong>Session Explorer</strong> is a standalone intelligence browser for Antigravity IDE agent conversation histories. It parses JSONL transcripts located in <code>~/.gemini/antigravity-ide/brain/</code>, indexing tool calls, execution errors, user prompt intents, and agent reasoning traces.
+            <strong>Session Explorer</strong> is a single-binary conversation intelligence browser and real-time observability cockpit for agent transcripts across <strong>Antigravity CLI</strong>, <strong>Antigravity IDE</strong>, and extensible runtime providers. It parses raw JSONL logs on local disk, extracts tool parameters, indexes user prompts, and serves an embedded liquid-glass web interface with zero runtime dependencies.
           </p>
 
           <h3 class="section-h2" id="sec-session-arch">Go + Bun Standalone Binary Architecture</h3>
           <p>
-            Built for zero runtime friction, Session Explorer embeds its entire web application, marked.js markdown engine, and syntax highlighting directly inside the compiled Go binary using <code>//go:embed</code>:
+            Built for zero runtime friction, Session Explorer embeds its entire web application, Highlight.js syntax engine, KaTeX mathematical typesetter, client-side Mermaid compiler, and Swagger UI directly inside the compiled Go binary using <code>//go:embed</code>:
           </p>
 
           <!-- Interactive Zoomable Canvas: Session Explorer Architecture -->
@@ -808,30 +808,44 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart LR
-    Logs["~/.gemini/antigravity-ide/brain/ (JSONL Transcripts)"] --> Scanner["Go Concurrent Scanner (Worker Pool)"]
-    Scanner --> SQLite["In-Memory / File SQLite Index"]
-    SQLite --> Api["Go HTTP Server (REST Endpoints)"]
-    Assets["Bun Web Frontend (Liquid Glass)"] --> Embed["go:embed static assets"]
+    CLI["~/.gemini/antigravity-cli/brain/ (CLI)"] --> Scanner["Go Concurrent Scanner (Worker Pool + Delta Cache)"]
+    IDE["~/.gemini/antigravity-ide/brain/ (IDE)"] --> Scanner
+    Scanner --> MemIndex["In-Memory Index &amp; Search Engine"]
+    MemIndex --> Api["Go HTTP REST API &amp; SSE Live Tail (/tail)"]
+    Assets["Bun Web Frontend (Liquid Glass UI)"] --> Embed["go:embed Static Assets"]
     Embed --> Binary["Standalone 'session-explorer' Binary (0 Deps)"]
-    Binary --> Browser["Local Web Browser (:9876)"]
+    Binary --> Browser["Local Browser (:9876)"]
+    Api -.->|SSE Stream| Browser
                 </pre>
               </div>
             </div>
-            <div class="canvas-caption">Figure 2.1: Session Explorer Embedded Binary Architecture & Log Processing Pipeline</div>
+            <div class="canvas-caption">Figure 2.1: Session Explorer Embedded Binary Architecture &amp; Log Processing Pipeline</div>
           </div>
 
           <div class="card-grid">
             <div class="glass-card">
               <h4>⚡ 200ms Concurrent Ingestion</h4>
-              <p>Concurrently parses tens of thousands of JSONL transcript lines in under 200 milliseconds using Go goroutine worker pools.</p>
+              <p>Concurrently parses tens of thousands of JSONL transcript lines in under 200ms with sub-50µs incremental delta rescans via <code>mtime</code> and file-size tracking.</p>
             </div>
             <div class="glass-card">
-              <h4>📊 Dual-Source Telemetry</h4>
-              <p>Correlates agent tool calls with Omni-Graph LSP usage, estimating tokens saved by preventing full-file dumps.</p>
+              <h4>🌐 Universal Multi-Runtime Discovery</h4>
+              <p>Simultaneously discovers active sessions across Antigravity CLI and IDE runtimes, attributing transcripts with provider and runtime badges (<code>⚡ CLI</code>, <code>💻 IDE</code>).</p>
             </div>
             <div class="glass-card">
-              <h4>💾 Universal Conversation Export</h4>
-              <p>One-click export of any agent conversation trajectory to Markdown (<code>.md</code>) or structured JSON (<code>.json</code>).</p>
+              <h4>⚡ Real-Time Live Tailing (SSE)</h4>
+              <p>Streams newly appended conversation steps with sub-second latency via Server-Sent Events (<code>/api/sessions/:id/tail</code>), Auto-Follow mode, and zero-layout-shift buffering (&Delta;y = 0).</p>
+            </div>
+            <div class="glass-card">
+              <h4>💬 1-Click Dialogue Mode</h4>
+              <p>Isolates pure conversational human-to-AI exchange from hundreds of autonomous tool execution cards for rapid high-signal reading.</p>
+            </div>
+            <div class="glass-card">
+              <h4>📊 Bounded Diagrams &amp; Theater Mode</h4>
+              <p>Constrains inline diagrams to 440px to eliminate scroll trapping; double-click opens full-screen distraction-free theater with 20%&ndash;500% zoom and SVG/Source export.</p>
+            </div>
+            <div class="glass-card">
+              <h4>📁 Native In-Browser File &amp; Artifact Viewer</h4>
+              <p>Instant file inspection with syntax highlighting, line numbers gutter, line anchor highlighting (<code>#L10-L20</code>), pinned floating Find widget (<code>Cmd+F</code>), and 1-click quick-copy chips (<code>📋</code> &rarr; <code>✓</code>).</p>
             </div>
           </div>
 

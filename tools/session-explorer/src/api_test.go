@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -476,6 +478,97 @@ func TestAPI_SessionTail_InitialReplay(t *testing.T) {
 	}
 	if !strings.Contains(output, "Test prompt for API") {
 		t.Errorf("expected 'Test prompt for API' in SSE output, got: %s", output)
+	}
+}
+
+func TestAPI_HandleFile(t *testing.T) {
+	idx := setupTestIndex(t)
+	handler := NewAPIHandler(idx, false)
+
+	// 1. Create a temporary test file with markdown and code
+	tmpDir := t.TempDir()
+	sampleMd := filepath.Join(tmpDir, "sample.md")
+	mdContent := "# Architecture Blueprint\n\n```mermaid\nflowchart TD\n  A --> B\n```\n\nDetailed specifications here."
+	if err := os.WriteFile(sampleMd, []byte(mdContent), 0644); err != nil {
+		t.Fatalf("failed to write sample md: %v", err)
+	}
+
+	// Test reading markdown file
+	req := httptest.NewRequest(http.MethodGet, "/api/file?path="+sampleMd, nil)
+	rec := httptest.NewRecorder()
+	handler.HandleFile(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp FileContentResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode FileContentResponse: %v", err)
+	}
+
+	if resp.Name != "sample.md" {
+		t.Errorf("expected name 'sample.md', got %q", resp.Name)
+	}
+	if resp.Extension != ".md" {
+		t.Errorf("expected extension '.md', got %q", resp.Extension)
+	}
+	if resp.IsBinary {
+		t.Errorf("expected is_binary false for markdown, got true")
+	}
+	if resp.Content != mdContent {
+		t.Errorf("expected content %q, got %q", mdContent, resp.Content)
+	}
+	if resp.LineCount != 8 {
+		t.Errorf("expected line_count 8, got %d", resp.LineCount)
+	}
+
+	// 2. Test reading with anchor suffix: sample.md#L3-L5
+	reqAnchor := httptest.NewRequest(http.MethodGet, "/api/file?path="+sampleMd+"%23L3-L5", nil)
+	recAnchor := httptest.NewRecorder()
+	handler.HandleFile(recAnchor, reqAnchor)
+	if recAnchor.Code != http.StatusOK {
+		t.Errorf("expected status 200 with #L anchor, got %d", recAnchor.Code)
+	}
+
+	// 3. Test reading with line number suffix: sample.md:3
+	reqColon := httptest.NewRequest(http.MethodGet, "/api/file?path="+sampleMd+":3", nil)
+	recColon := httptest.NewRecorder()
+	handler.HandleFile(recColon, reqColon)
+	if recColon.Code != http.StatusOK {
+		t.Errorf("expected status 200 with :3 line suffix, got %d", recColon.Code)
+	}
+
+	// 4. Test missing path parameter
+	reqNoPath := httptest.NewRequest(http.MethodGet, "/api/file", nil)
+	recNoPath := httptest.NewRecorder()
+	handler.HandleFile(recNoPath, reqNoPath)
+	if recNoPath.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for missing path, got %d", recNoPath.Code)
+	}
+
+	// 5. Test non-existent file (404)
+	reqMissing := httptest.NewRequest(http.MethodGet, "/api/file?path=/tmp/definitely_not_existent_file_12345.xyz", nil)
+	recMissing := httptest.NewRecorder()
+	handler.HandleFile(recMissing, reqMissing)
+	if recMissing.Code != http.StatusNotFound {
+		t.Errorf("expected status 404 for missing file, got %d", recMissing.Code)
+	}
+
+	// 6. Test directory path (400)
+	reqDir := httptest.NewRequest(http.MethodGet, "/api/file?path="+tmpDir, nil)
+	recDir := httptest.NewRecorder()
+	handler.HandleFile(recDir, reqDir)
+	if recDir.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for directory path, got %d", recDir.Code)
+	}
+
+	// 7. Test restricted sensitive path (403)
+	reqRestricted := httptest.NewRequest(http.MethodGet, "/api/file?path=/Users/test/.ssh/id_rsa", nil)
+	recRestricted := httptest.NewRecorder()
+	handler.HandleFile(recRestricted, reqRestricted)
+	if recRestricted.Code != http.StatusForbidden {
+		t.Errorf("expected status 403 for restricted .ssh path, got %d", recRestricted.Code)
 	}
 }
 

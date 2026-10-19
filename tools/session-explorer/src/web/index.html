@@ -169,8 +169,11 @@
             <span class="session-time" id="detailTime"></span>
           </div>
 
-          <!-- Relocated Export Actions in Top Section for Optimal Real Estate Usage -->
+          <!-- Relocated Export Actions and Artifacts in Top Section for Optimal Real Estate Usage -->
           <div class="detail-actions-group">
+            <button class="btn-pill" id="detailFilesBtn" title="Inspect files and artifacts touched in this session">
+              📁 Files &amp; Artifacts (<span id="detailFilesCountBadge">0</span>)
+            </button>
             <button class="btn-pill" id="exportMdBtn" title="Export conversation to Markdown">
               📄 Export MD
             </button>
@@ -340,6 +343,111 @@
     </div>
   </div>
 
+  <!-- DIAGRAM THEATER MODAL (R-037) -->
+  <div class="modal-overlay theater-modal" id="diagramTheaterModal" aria-label="Diagram Theater" role="dialog">
+    <div class="theater-shell">
+      <div class="theater-topbar">
+        <div class="theater-title" id="diagramTheaterTitle">
+          <span>📊</span> <span class="theater-title-text" id="diagramTheaterTitleText">Diagram Theater</span>
+        </div>
+        <div class="theater-controls-group">
+          <button class="canvas-tool-btn" id="theaterZoomOutBtn" title="Zoom Out">−</button>
+          <span class="zoom-level-badge" id="theaterZoomBadge">100%</span>
+          <button class="canvas-tool-btn" id="theaterZoomInBtn" title="Zoom In">+</button>
+          <button class="canvas-tool-btn" id="theaterZoomResetBtn" title="Reset Zoom">⟲</button>
+          <button class="canvas-tool-btn" id="theaterFitBtn" title="Fit to View">Fit</button>
+          <button class="canvas-tool-btn" id="theaterCopySvgBtn" title="Copy Diagram SVG">Copy SVG</button>
+          <button class="canvas-tool-btn" id="theaterCopySrcBtn" title="Copy Diagram Code">Copy Source</button>
+          <button class="btn-icon" id="closeDiagramTheaterBtn" title="Close Theater (Esc)">✕</button>
+        </div>
+      </div>
+      <div class="theater-body-viewport" id="diagramTheaterViewport">
+        <div class="theater-surface" id="diagramTheaterSurface">
+          <!-- Rendered SVG injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NATIVE FILE & ARTIFACT VIEWER MODAL (R-038) -->
+  <div class="modal-overlay file-viewer-modal" id="fileViewerModal" aria-label="File & Artifact Viewer" role="dialog">
+    <div class="file-viewer-shell">
+      <div class="file-viewer-topbar">
+        <div class="file-viewer-left">
+          <span class="file-viewer-icon" id="fileViewerIcon">📄</span>
+          <div class="file-viewer-title-group">
+            <div class="file-viewer-filename" id="fileViewerFilename">filename.ext</div>
+            <div class="file-viewer-filepath" id="fileViewerPath" title="Click to copy full path">/path/to/file</div>
+          </div>
+        </div>
+        <div class="file-viewer-meta">
+          <span class="file-meta-pill" id="fileViewerLangBadge">TEXT</span>
+          <span class="file-meta-pill" id="fileViewerLinesBadge">0 lines</span>
+          <span class="file-meta-pill" id="fileViewerSizeBadge">0 KB</span>
+        </div>
+        <div class="file-viewer-actions">
+          <div class="segmented-control" id="fileViewerModeControl" style="display: none;" role="group" aria-label="View mode">
+            <button class="segment-btn active" data-mode="preview">📖 Preview</button>
+            <button class="segment-btn" data-mode="raw">📝 Raw</button>
+          </div>
+          <button class="btn-ghost-sm" id="fileViewerOpenFindBtn" title="Find in file (Cmd+F / Ctrl+F)">🔍 Find</button>
+          <button class="btn-ghost-sm" id="fileViewerWrapBtn" title="Toggle Line Wrap">↩ Wrap</button>
+          <button class="btn-ghost-sm" id="fileViewerCopyContentBtn" title="Copy Content">📋 Copy</button>
+          <button class="btn-ghost-sm" id="fileViewerCopyPathBtn" title="Copy Path">🔗 Path</button>
+          <button class="btn-icon" id="closeFileViewerBtn" title="Close File Viewer (Esc)">✕</button>
+        </div>
+      </div>
+      <!-- Floating IDE-grade Find Widget (R-038) - Pinned to shell to remain visible across all scrolls -->
+      <div class="file-viewer-find-widget" id="fileViewerFindWidget" style="display: none;">
+        <div class="find-input-wrapper">
+          <span class="find-search-icon">🔍</span>
+          <input type="text" id="fileFindInput" placeholder="Find in file..." autocomplete="off" spellcheck="false">
+          <button class="find-opt-btn" id="fileFindCaseBtn" title="Match Case (Alt+C)">Aa</button>
+        </div>
+        <span class="find-count-badge" id="fileFindCountBadge">0 of 0</span>
+        <div class="find-nav-buttons">
+          <button class="find-nav-btn" id="fileFindPrevBtn" title="Previous match (Shift+Enter)">▲</button>
+          <button class="find-nav-btn" id="fileFindNextBtn" title="Next match (Enter)">▼</button>
+          <button class="find-nav-btn find-close-btn" id="fileFindCloseBtn" title="Close Find (Escape)">✕</button>
+        </div>
+      </div>
+      <div class="file-viewer-body" id="fileViewerBody">
+
+        <div class="file-viewer-loading" id="fileViewerLoading">
+          <div class="loading-spinner"></div>
+          <span>Loading file from disk...</span>
+        </div>
+        <div class="file-viewer-error" id="fileViewerError" style="display: none;"></div>
+        <div class="file-viewer-markdown markdown-body" id="fileViewerMarkdown" style="display: none;"></div>
+        <div class="file-viewer-code-container" id="fileViewerCodeContainer" style="display: none;">
+          <div class="code-line-numbers" id="fileViewerLineNumbers"></div>
+          <pre class="code-content-pre"><code id="fileViewerCodeBlock" class="hljs"></code></pre>
+        </div>
+        <div class="file-viewer-image-container" id="fileViewerImageContainer" style="display: none;">
+          <img id="fileViewerImage" src="" alt="File Preview">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SESSION FILES & ARTIFACTS MODAL -->
+  <div class="modal-overlay" id="sessionFilesModal" aria-label="Session Files and Artifacts" role="dialog">
+    <div class="modal-box" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">📁 Session Files &amp; Artifacts (<span id="sessionFilesTotalCount">0</span>)</div>
+        <button class="btn-icon" id="closeSessionFilesModalBtn">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem 1.5rem; max-height: 72vh; overflow-y: auto;">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          All artifacts generated, files modified, and documents inspected throughout this session. Click any file to open it natively in the browser.
+        </p>
+        <div id="sessionFilesListContainer">
+          <!-- Injected dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Feedback -->
   <div class="toast-notification" id="toastNotification">
     Copied to clipboard!
@@ -349,3 +457,4 @@
   <script src="app.bundle.js"></script>
 </body>
 </html>
+

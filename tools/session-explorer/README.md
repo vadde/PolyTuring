@@ -2,8 +2,8 @@
 
 > A high-performance, single-binary session intelligence explorer and browser for Antigravity IDE agent conversation histories.
 
-![Status](https://img.shields.io/badge/status-in--progress-blue)
-![Version](https://img.shields.io/badge/version-0.1.0-emerald)
+![Status](https://img.shields.io/badge/status-review-orange)
+![Version](https://img.shields.io/badge/version-0.3.0-emerald)
 ![Language](https://img.shields.io/badge/language-Go%201.22%2B%20%7C%20Bun-indigo)
 ![License](https://img.shields.io/badge/license-MIT-purple)
 
@@ -11,18 +11,19 @@
 
 ## Overview
 
-**Session Explorer** transforms raw Antigravity IDE session logs (`~/.gemini/antigravity-ide/brain/`) into an interactive, visual conversation library. It runs as a self-contained local web server that automatically scans your local agent transcripts, indexes user prompts, extracts workspaces and tool calls, and serves a modern, liquid-glass web interface.
+**Session Explorer** is a high-performance, single-binary conversation intelligence browser and real-time observability cockpit for agentic coding transcripts (Antigravity CLI & IDE, Claude Code, GitHub Copilot). It concurrently ingests local JSONL logs, extracts workspaces and tool execution cycles, and serves a modern liquid-glass web interface embedded directly inside the compiled binary.
 
 ### Key Capabilities
 
-- ⚡ **Blazing Fast Scanning**: Concurrently parses tens of thousands of JSONL transcript lines in under 200 milliseconds.
-- 📦 **Single Standalone Binary**: Go embeds the entire web application, marked.js markdown engine, and syntax highlighter. Zero runtime dependencies.
-- 🎨 **Liquid Glass Aesthetics**: Modern dark/light frosted glass UI with smooth micro-animations and responsive layouts.
-- 🔎 **Instant Full-Text Search**: Global search modal (`Cmd+K` / `Ctrl+K`) with live matching across all prompts.
-- 🧭 **Workspace Auto-Detection**: Automatically identifies project workspaces from active documents and tool call arguments.
-- 🛠️ **Tool Call Inspector**: Expandable inspection cards displaying tool execution parameters and JSON payloads.
-- 📊 **Prompt Insights & Analytics**: Analyzes tool invocation distribution and most frequently used user prompts.
-- 💾 **Export Anywhere**: One-click export of any conversation session to Markdown (`.md`) or JSON (`.json`).
+- ⚡ **Concurrent Delta Scanner**: Indexes tens of thousands of JSONL transcript lines in under 200ms using Go goroutines with sub-50µs incremental delta rescans.
+- 📦 **Zero-Dependency Binary**: Go embeds the entire web application, Highlight.js syntax engine, KaTeX LaTeX math, Mermaid diagram compiler, and Swagger UI via `//go:embed`.
+- 🌐 **Universal Multi-Runtime Discovery**: Simultaneously discovers sessions across Antigravity IDE (`~/.gemini/antigravity-ide/brain/`) and CLI (`~/.gemini/antigravity-cli/brain/`) with runtime badges (`⚡ CLI`, `💻 IDE`).
+- ⚡ **Real-Time Live Tailing**: Streams newly appended steps with sub-second latency via Server-Sent Events (`/api/sessions/{id}/tail`), Auto-Follow scroll mode, and zero-layout-shift staged buffering ($\Delta y = 0$).
+- 💬 **Granular Filtering & Dialogue Mode**: 1-click `💬 Dialogue` mode isolates pure human-to-AI conversation, filtering out hundreds of autonomous tool execution cards.
+- 📊 **Bounded Diagrams & Fullscreen Theater**: Inline Mermaid diagrams bounded to 440px to eliminate vertical scroll trapping; double-click or Theater button opens pan/drag 2D theater with 20%–500% zoom, Fit to View, and SVG/Source copy.
+- 📁 **Native In-Browser File & Artifact Viewer**: Instant file inspection with Highlight.js syntax highlighting, line numbers gutter, anchor line highlighting (`#L10-L20`), full-width Markdown preview, pinned floating Find widget (`Cmd+F`), and dual-affordance 1-click copy path chips (`📋` → `✓`).
+- 🛑 **Agent WIP Recovery & Disambiguation**: Sub-millisecond state restore (`/api/wip`, `make session-wip`) with mandatory agent halting when multiple parallel sessions exist in a workspace.
+- 📖 **Embedded Offline OpenAPI 3.0 & Swagger UI**: Zero-CDN interactive API explorer at `http://localhost:9876/docs`.
 
 ---
 
@@ -100,12 +101,14 @@ Every lifecycle action is managed through standard `make` targets:
 | Feature | Description | Keyboard Shortcut |
 |---------|-------------|-------------------|
 | **Global Search** | Instant prompt & transcript search across all sessions | `Cmd + K` or `Ctrl + K` or `/` |
-| **Close Dialogs** | Close search modal, insights, or return to dashboard | `Esc` |
+| **Find in File** | Search within active file in File Viewer with match count & cycling | `Cmd + F` or `Ctrl + F` |
+| **Find Navigation** | Jump to Next / Previous match in file | `Enter` / `Shift + Enter` (or `▲` / `▼`) |
+| **Close Dialogs** | Close Find widget, file viewer modal, search modal, or return to dashboard | `Esc` (hierarchical) |
 | **Theme Toggle** | Switch between Liquid Dark and Frosted Light mode | Header button `☀️ / 🌙` |
 | **Workspace Filter** | Filter sessions by detected workspace or project | Quick filter pills / Dropdown |
 | **Date Range Filter** | Filter sessions by date range with quick presets (`Today`, `7d`, `30d`) | Toolbar date picker |
-| **Sort Sessions** | Sort by newest, oldest, step count, prompt count, size | Toolbar sort dropdown |
-| **Timeline View** | Step-by-step user prompts, model reasoning, and tool calls | Click any session card |
+| **Dialogue Mode** | Filter out tool executions to read clean user-agent dialogue | Detail toolbar `💬 Dialogue` chip |
+| **Theater Mode** | Expand Mermaid diagram into full-screen pan/zoom canvas (20%–500%) | Double-click canvas or `Theater` button |
 | **Export Session** | Download session as clean Markdown (`.md`) or structured JSON (`.json`) | Detail header buttons |
 
 ---
@@ -116,10 +119,16 @@ The embedded HTTP server exposes a JSON REST API for integration:
 
 | Endpoint | Method | Parameters | Description |
 |----------|--------|------------|-------------|
-| `/api/sessions` | `GET` | `workspace`, `sort_by`, `sort_order`, `from`, `to` | List all discovered sessions with summary stats |
+| `/api/sessions` | `GET` | `workspace`, `runtime`, `sort_by`, `sort_order`, `from`, `to` | List all discovered sessions with summary stats |
 | `/api/sessions/{id}` | `GET` | — | Retrieve full conversation messages and tool calls for a session |
+| `/api/sessions/{id}/tail` | `GET` | `last_step` | Real-time Server-Sent Events (SSE) live tail stream |
+| `/api/file` | `GET` | `path` | Secure local file retrieval with language detection & line anchors |
 | `/api/search` | `GET` | `q`, `workspace`, `type`, `from`, `to` | Full-text search across transcripts |
-| `/api/stats` | `GET` | — | Global statistics, workspace list, top tools, and top prompt patterns |
+| `/api/stats` | `GET` | — | Global statistics, workspace list, runtime breakdown, and top tools |
+| `/api/wip` | `GET` | `workspace`, `session_id`, `limit`, `force_latest` | Recover agent WIP digest with multi-session disambiguation |
+| `/api/watch-interval` | `GET` / `POST` | `interval_seconds` | Query or update background file watch polling interval |
+| `/api/openapi.json` | `GET` | — | Raw OpenAPI 3.0 specification contract |
+| `/docs` | `GET` | — | Offline Swagger UI documentation explorer |
 
 ---
 

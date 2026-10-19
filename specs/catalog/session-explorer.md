@@ -95,6 +95,8 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-034 | Headless CLI Subcommand (`session-explorer wip`) & Fallback Companion Script | Should | ✅ | 🧪 | main.go, scripts/wip.sh |
 | R-035 | Granular Message Type Filtering: Separate Conversational Agent Responses from Tool Execution Steps, with Dialogue Mode | Should | ✅ | 🧪 | src/web/src/app.js, src/web/index.html, src/scanner.go |
 | R-036 | Universal Multi-Runtime Discovery & Provider Architecture (Antigravity IDE + CLI, Claude Code, GitHub Copilot) | Must | ✅ | 🧪 | src/types.go, src/scanner.go, src/main.go, src/api.go, src/web/ |
+| R-037 | Bounded Diagram Viewports & Fullscreen Theater Mode (constrained 440px scrollable canvas, distraction-free pan/zoom theater modal, double-click to expand) | Must | ✅ | 🧪 | src/web/src/styles.css, src/web/src/app.js, src/web/index.html |
+| R-038 | Native In-Browser File & Artifact Viewer (read files securely via GET /api/file, line number gutter, target line anchor scrolling/highlighting, markdown preview with KaTeX/Mermaid, session files aggregation drawer) | Must | ✅ | 🧪 | src/api.go HandleFile, src/web/src/app.js openFileViewer, src/web/index.html |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -311,6 +313,34 @@ Installs the `session-wip` recovery skill and lifecycle hooks to the workspace o
 
 Serves the offline OpenAPI 3.0 specification JSON and the embedded interactive Swagger API explorer.
 
+#### `GET /api/file?path=<clean_path>`
+
+Retrieves file content safely from local disk for the native in-browser file and artifact viewer (R-038).
+
+**Query Parameters:**
+- `path` (string, required): Absolute or relative filesystem path. Relative paths resolve against scanned workspace roots.
+
+**Response:**
+```json
+{
+  "path": "/path/to/README.md",
+  "name": "README.md",
+  "extension": "md",
+  "language": "markdown",
+  "size_bytes": 5214,
+  "size_formatted": "5.1 KB",
+  "line_count": 86,
+  "content": "# Tutor Intelligence Challenge...",
+  "is_binary": false,
+  "is_image": false
+}
+```
+
+**Security & Error Handling:**
+- Blocks access to sensitive files (`.ssh`, `.gnupg`, `.aws`, `/etc/shadow`) with HTTP 403 Forbidden.
+- Limits file size to 10MB ceiling with HTTP 413 Payload Too Large.
+- Returns HTTP 400 for directories or missing path, and HTTP 404 for nonexistent files.
+
 
 ### 3.3 Data Source Specification
 
@@ -425,6 +455,16 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-027 | Given discovered sessions, each session is attributed with provider and runtime_mode (ide, cli, desktop, core) and rendered with distinct visual badges | R-036 |
 | AC-028 | Given a session detail request or live SSE stream, engine dynamically resolves transcript path from the session's originating brain path | R-036 |
 | AC-029 | Given extensible SessionProvider interface, architecture supports plugging in Claude Code and GitHub Copilot providers without core scanner rewrites | R-036 |
+| AC-030 | Given an inline Mermaid diagram or chart, canvas viewport is bounded to max-height 440px with internal scrolling, preventing vertical scrolling trapping in conversation timeline | R-037 |
+| AC-031 | Given a diagram card, clicking the "Theater" button or double-clicking the canvas opens fullscreen distraction-free Theater mode with pan, drag, zoom (20%-500%), and SVG/source copy controls | R-037 |
+| AC-032 | Given file paths, markdown links (`[text](file://...)`), or tool parameters (`AbsolutePath`, `TargetFile`), user clicking the element opens the file natively inside the browser | R-038 |
+| AC-033 | Given a file loaded in File Viewer, viewer renders language badge, total line count, human-readable size, line number gutter, and highlights anchor lines (`#L10-L20` or `:10`) | R-038 |
+| AC-034 | Given a Markdown file in File Viewer, viewer provides segmented toggle between rich rendered Preview (supporting KaTeX and Mermaid) and syntax-highlighted Raw mode | R-038 |
+| AC-035 | Given a session with tool calls and markdown references, detail view aggregates all files into an interactive Files & Artifacts drawer categorized by Artifact, Modified, and Read | R-038 |
+| AC-036 | Given File Viewer is active, Cmd+F / Ctrl+F opens the in-file Find widget pinned to the outer shell (remaining 100% visible across all vertical scroll positions) with match counter (X of Y), case toggle (Aa), next/previous navigation (Enter/Shift+Enter, arrows), and syntax-preserving tree highlights | R-038 |
+| AC-037 | Given a Markdown file in File Viewer, the preview container dynamically expands to 100% pane width, and mode toggling guarantees strict visual separation without raw content leakage | R-038 |
+| AC-038 | Given a syntax-highlighted code block with line number gutter, vertical scrolling is unified into a single scrollbar on the viewer body, eliminating nested double scrollbars | R-038 |
+| AC-039 | Given file references on the session trail, the UI renders a dual-action chip with an immediate 1-click copy path button (`📋` → `✓`) alongside the open-file pill, and viewer action buttons provide instant micro-feedback (`✓ Copied!`, `✓ Path Copied!`, `✓ Wrapped`) | R-038 |
 
 ---
 
@@ -500,3 +540,4 @@ Tests that MUST pass for this spec to be considered satisfied:
 |------|--------|---------|
 | 2026-09-18 | @vadde | Initial draft |
 | 2026-09-18 | @vadde | Complete specification with all requirements |
+| 2026-10-19 | @vadde | Add R-037 (Bounded Diagram Viewports & Fullscreen Theater Mode) and R-038 (Native In-Browser File & Artifact Viewer) |

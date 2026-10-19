@@ -54,6 +54,7 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/api/refresh", api.HandleRefresh)
 	mux.HandleFunc("/api/watch-interval", api.HandleWatchInterval)
 	mux.HandleFunc("/api/wip", api.HandleWIP)
+	mux.HandleFunc("/api/file", api.HandleFile)
 	mux.HandleFunc("/api/skill/install", api.HandleInstallSkill)
 
 	// OpenAPI Spec & Interactive Swagger Docs

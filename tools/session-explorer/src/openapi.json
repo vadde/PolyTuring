@@ -213,6 +213,35 @@
         }
       }
     },
+    "/api/file": {
+      "get": {
+        "summary": "Retrieve file contents and metadata for native in-browser viewing",
+        "description": "Securely reads file from workspace or brain artifact directory with syntax detection, binary checks, and security boundaries. Implements R-038.",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "description": "Absolute or workspace-relative path to target file",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content and metadata",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileContentResponse" }
+              }
+            }
+          },
+          "400": { "description": "Invalid path or directory requested" },
+          "403": { "description": "Access to restricted path forbidden" },
+          "404": { "description": "File not found" },
+          "413": { "description": "File exceeds maximum size limit (10MB)" }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "summary": "Full-text search transcripts",
@@ -476,6 +505,21 @@
           "interval_seconds": { "type": "integer" },
           "status": { "type": "string", "enum": ["active", "paused"] },
           "message": { "type": "string" }
+        }
+      },
+      "FileContentResponse": {
+        "type": "object",
+        "required": ["path", "name", "extension", "size", "content", "is_binary"],
+        "properties": {
+          "path": { "type": "string", "description": "Absolute filesystem path" },
+          "name": { "type": "string", "description": "File basename" },
+          "extension": { "type": "string", "description": "File extension including dot" },
+          "size": { "type": "integer", "description": "File size in bytes" },
+          "mod_time": { "type": "string", "format": "date-time", "description": "Last modified timestamp" },
+          "content": { "type": "string", "description": "File text content or data URI for images" },
+          "is_binary": { "type": "boolean", "description": "True if file is binary or encoded image" },
+          "mime_type": { "type": "string", "description": "Detected MIME type" },
+          "line_count": { "type": "integer", "description": "Total number of lines in file" }
         }
       }
     }

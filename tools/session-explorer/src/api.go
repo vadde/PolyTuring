@@ -7,6 +7,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -515,6 +517,159 @@ func (h *APIHandler) HandleSessionTail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// HandleFile handles GET /api/file?path=<path>
+// Implements: R-038 (Native In-Browser File & Artifact Viewer)
+func (h *APIHandler) HandleFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	rawPath := r.URL.Query().Get("path")
+	if strings.TrimSpace(rawPath) == "" {
+		http.Error(w, "Query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+
+	// Strip file:// prefix if provided
+	cleanPath := strings.TrimPrefix(rawPath, "file://")
+
+	// Strip any trailing #L... line anchors from path for filesystem reading
+	if idx := strings.Index(cleanPath, "#"); idx != -1 {
+		cleanPath = cleanPath[:idx]
+	}
+	// Strip trailing :line if path doesn't exist directly
+	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
+		if lastColon := strings.LastIndex(cleanPath, ":"); lastColon != -1 {
+			candidate := cleanPath[:lastColon]
+			if _, err2 := os.Stat(candidate); err2 == nil {
+				cleanPath = candidate
+			}
+		}
+	}
+
+	cleanPath = filepath.Clean(cleanPath)
+
+	// Expand ~ to user home directory
+	if strings.HasPrefix(cleanPath, "~/") || cleanPath == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			cleanPath = filepath.Join(home, strings.TrimPrefix(cleanPath, "~"))
+		}
+	}
+
+	// Security guards against sensitive credential paths
+	lower := strings.ToLower(cleanPath)
+	if strings.Contains(lower, "/.ssh/") || strings.Contains(lower, "\\.ssh\\") ||
+		strings.Contains(lower, "/.gnupg/") || strings.Contains(lower, "\\.gnupg\\") ||
+		strings.Contains(lower, "/.aws/credentials") ||
+		strings.HasSuffix(lower, "/etc/shadow") || strings.HasSuffix(lower, "/etc/master.passwd") ||
+		strings.HasSuffix(lower, "/id_rsa") || strings.HasSuffix(lower, "/id_ed25519") {
+		http.Error(w, "Access to requested path is restricted", http.StatusForbidden)
+		return
+	}
+
+	// Resolve relative path against working directory or known project workspaces
+	if !filepath.IsAbs(cleanPath) {
+		if _, err := os.Stat(cleanPath); os.IsNotExist(err) && h.index != nil {
+			h.index.mu.RLock()
+			for _, projPath := range h.index.knownProjects {
+				cand := filepath.Join(projPath, cleanPath)
+				if _, err2 := os.Stat(cand); err2 == nil {
+					cleanPath = cand
+					break
+				}
+			}
+			h.index.mu.RUnlock()
+		}
+		if !filepath.IsAbs(cleanPath) {
+			if abs, err := filepath.Abs(cleanPath); err == nil {
+				cleanPath = abs
+			}
+		}
+	}
+
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "File not found: "+cleanPath, http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Error accessing file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if info.IsDir() {
+		http.Error(w, "Requested path is a directory, not a file", http.StatusBadRequest)
+		return
+	}
+
+	// 10MB file size ceiling to prevent OOM
+	const maxFileSize = 10 * 1024 * 1024
+	if info.Size() > maxFileSize {
+		http.Error(w, fmt.Sprintf("File size (%d bytes) exceeds maximum preview limit of 10MB", info.Size()), http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(cleanPath))
+	name := filepath.Base(cleanPath)
+
+	// Detect image types
+	isImage := ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".webp" || ext == ".ico"
+	isSvg := ext == ".svg"
+
+	data, err := os.ReadFile(cleanPath)
+	if err != nil {
+		http.Error(w, "Failed to read file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mimeType := http.DetectContentType(data)
+
+	var content string
+	var isBinary bool
+	var lineCount int
+
+	if isImage {
+		isBinary = true
+		content = fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(data))
+		lineCount = 1
+	} else if isSvg {
+		isBinary = false
+		content = string(data)
+		lineCount = bytes.Count(data, []byte("\n")) + 1
+		mimeType = "image/svg+xml"
+	} else {
+		// Check for binary content (null bytes)
+		if bytes.IndexByte(data, 0) != -1 {
+			isBinary = true
+			content = "[Binary file content not displayed]"
+			lineCount = 0
+		} else {
+			isBinary = false
+			content = string(data)
+			if len(data) > 0 {
+				lineCount = bytes.Count(data, []byte("\n")) + 1
+			} else {
+				lineCount = 0
+			}
+		}
+	}
+
+	resp := FileContentResponse{
+		Path:      cleanPath,
+		Name:      name,
+		Extension: ext,
+		Size:      info.Size(),
+		ModTime:   info.ModTime().UTC().Format(time.RFC3339),
+		Content:   content,
+		IsBinary:  isBinary,
+		MimeType:  mimeType,
+		LineCount: lineCount,
+	}
+
+	writeJSON(w, resp)
 }
 
 

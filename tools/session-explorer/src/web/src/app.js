@@ -144,11 +144,17 @@ const renderer = {
               <span class="zoom-level-badge">100%</span>
               <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
               <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+              <button class="canvas-tool-btn theater-btn" title="Open Fullscreen Theater">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+                <span>Theater</span>
+              </button>
               <button class="canvas-tool-btn toggle-mermaid-src-btn" data-target="${diagramId}-src" title="View Diagram Source">Source</button>
               <button class="canvas-tool-btn copy-mermaid-src-btn" data-code="${escapeHtml(text)}" title="Copy Diagram Code">Copy</button>
             </div>
           </div>
-          <div class="canvas-viewport" id="${diagramId}-viewport">
+          <div class="canvas-viewport" id="${diagramId}-viewport" title="Double click to open in Theater mode">
             <div class="canvas-content-surface">
               <pre class="mermaid" id="${diagramId}">${escapeHtml(text)}</pre>
             </div>
@@ -178,7 +184,12 @@ const renderer = {
     if (href.startsWith('file://') || href.startsWith('/')) {
       const cleanPath = href.replace(/^file:\/\//, '');
       const formattedPath = cleanPath.replace(/#L(\d+)(?:-L(\d+))?$/, ':$1');
-      return `<a href="${href}" class="file-path-link" data-filepath="${formattedPath}" title="Click to copy path: ${formattedPath}"><span>📄</span> ${textHtml}</a>`;
+      return `
+        <span class="file-link-chip-group">
+          <a href="${href}" class="file-path-link" data-filepath="${cleanPath}" title="Click to view file in browser"><span class="file-icon">📄</span> <span class="file-link-text">${textHtml}</span> <span class="file-chip-action" title="Open file in browser">↗</span></a>
+          <button class="file-link-quick-copy-btn" data-path="${cleanPath}" title="Copy file path directly to clipboard">📋</button>
+        </span>
+      `;
     }
     const titleAttr = token.title ? ` title="${token.title}"` : '';
     return `<a href="${href}" target="_blank" rel="noopener noreferrer"${titleAttr}>${textHtml}</a>`;
@@ -240,7 +251,21 @@ const state = {
   tailEventSource: null,
   tailStreaming: true,
   pendingStepsBuffer: [], // buffered incoming steps when user is detached (followStream: false)
-  renderedStepMap: new Map() // step_index -> HTMLElement
+  renderedStepMap: new Map(), // step_index -> HTMLElement
+  theaterZoom: 1.0,
+  theaterPanX: 0,
+  theaterPanY: 0,
+  theaterRawSrc: '',
+  fileViewerData: null,
+  fileViewerMode: 'preview', // 'preview' | 'raw'
+  fileViewerWrap: false,
+  fileViewerTargetLine: null,
+  fileViewerTargetLineEnd: null,
+  fileFindQuery: '',
+  fileFindCaseSensitive: false,
+  fileFindMatches: [],
+  fileFindActiveIndex: -1,
+  sessionFilesMap: new Map() // cleanPath -> { path, name, type, tool, stepIndex }
 };
 
 // DOM Elements
@@ -273,6 +298,8 @@ const el = {
   detailWorkspaceBadge: document.getElementById('detailWorkspaceBadge'),
   detailRuntimeBadge: document.getElementById('detailRuntimeBadge'),
   detailTime: document.getElementById('detailTime'),
+  detailFilesBtn: document.getElementById('detailFilesBtn'),
+  detailFilesCountBadge: document.getElementById('detailFilesCountBadge'),
   exportMdBtn: document.getElementById('exportMdBtn'),
   exportJsonBtn: document.getElementById('exportJsonBtn'),
   timelineContainer: document.getElementById('timelineContainer'),
@@ -303,6 +330,54 @@ const el = {
   doInstallSkillBtn: document.getElementById('doInstallSkillBtn'),
   copyInstallCmdBtn: document.getElementById('copyInstallCmdBtn'),
   installStatusText: document.getElementById('installStatusText'),
+  // Theater Modal Elements (R-037)
+  diagramTheaterModal: document.getElementById('diagramTheaterModal'),
+  diagramTheaterTitleText: document.getElementById('diagramTheaterTitleText'),
+  diagramTheaterViewport: document.getElementById('diagramTheaterViewport'),
+  diagramTheaterSurface: document.getElementById('diagramTheaterSurface'),
+  theaterZoomOutBtn: document.getElementById('theaterZoomOutBtn'),
+  theaterZoomBadge: document.getElementById('theaterZoomBadge'),
+  theaterZoomInBtn: document.getElementById('theaterZoomInBtn'),
+  theaterZoomResetBtn: document.getElementById('theaterZoomResetBtn'),
+  theaterFitBtn: document.getElementById('theaterFitBtn'),
+  theaterCopySvgBtn: document.getElementById('theaterCopySvgBtn'),
+  theaterCopySrcBtn: document.getElementById('theaterCopySrcBtn'),
+  closeDiagramTheaterBtn: document.getElementById('closeDiagramTheaterBtn'),
+  // File & Artifact Viewer Elements (R-038)
+  fileViewerModal: document.getElementById('fileViewerModal'),
+  fileViewerIcon: document.getElementById('fileViewerIcon'),
+  fileViewerFilename: document.getElementById('fileViewerFilename'),
+  fileViewerPath: document.getElementById('fileViewerPath'),
+  fileViewerLangBadge: document.getElementById('fileViewerLangBadge'),
+  fileViewerLinesBadge: document.getElementById('fileViewerLinesBadge'),
+  fileViewerSizeBadge: document.getElementById('fileViewerSizeBadge'),
+  fileViewerModeControl: document.getElementById('fileViewerModeControl'),
+  fileViewerWrapBtn: document.getElementById('fileViewerWrapBtn'),
+  fileViewerCopyContentBtn: document.getElementById('fileViewerCopyContentBtn'),
+  fileViewerCopyPathBtn: document.getElementById('fileViewerCopyPathBtn'),
+  closeFileViewerBtn: document.getElementById('closeFileViewerBtn'),
+  fileViewerBody: document.getElementById('fileViewerBody'),
+  fileViewerLoading: document.getElementById('fileViewerLoading'),
+  fileViewerError: document.getElementById('fileViewerError'),
+  fileViewerMarkdown: document.getElementById('fileViewerMarkdown'),
+  fileViewerCodeContainer: document.getElementById('fileViewerCodeContainer'),
+  fileViewerLineNumbers: document.getElementById('fileViewerLineNumbers'),
+  fileViewerCodeBlock: document.getElementById('fileViewerCodeBlock'),
+  fileViewerImageContainer: document.getElementById('fileViewerImageContainer'),
+  fileViewerImage: document.getElementById('fileViewerImage'),
+  fileViewerOpenFindBtn: document.getElementById('fileViewerOpenFindBtn'),
+  fileViewerFindWidget: document.getElementById('fileViewerFindWidget'),
+  fileFindInput: document.getElementById('fileFindInput'),
+  fileFindCaseBtn: document.getElementById('fileFindCaseBtn'),
+  fileFindCountBadge: document.getElementById('fileFindCountBadge'),
+  fileFindPrevBtn: document.getElementById('fileFindPrevBtn'),
+  fileFindNextBtn: document.getElementById('fileFindNextBtn'),
+  fileFindCloseBtn: document.getElementById('fileFindCloseBtn'),
+  // Session Files Modal
+  sessionFilesModal: document.getElementById('sessionFilesModal'),
+  closeSessionFilesModalBtn: document.getElementById('closeSessionFilesModalBtn'),
+  sessionFilesTotalCount: document.getElementById('sessionFilesTotalCount'),
+  sessionFilesListContainer: document.getElementById('sessionFilesListContainer'),
   toast: document.getElementById('toastNotification')
 };
 
@@ -494,6 +569,13 @@ function initEventListeners() {
       e.preventDefault();
       openSearchModal();
     }
+    // Cmd+F or Ctrl+F inside File Viewer (Find in File)
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
+      if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open')) {
+        e.preventDefault();
+        openFileFindWidget();
+      }
+    }
     // / to focus search if not inside input
     if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
       e.preventDefault();
@@ -501,7 +583,15 @@ function initEventListeners() {
     }
     // Esc closes modals and detail view
     if (e.key === 'Escape') {
-      if (el.searchModal && el.searchModal.classList.contains('active')) {
+      if (el.fileViewerFindWidget && el.fileViewerFindWidget.style.display !== 'none') {
+        closeFileFindWidget();
+      } else if (el.diagramTheaterModal && el.diagramTheaterModal.classList.contains('theater-open')) {
+        closeDiagramTheater();
+      } else if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open')) {
+        closeFileViewer();
+      } else if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
+        closeSessionFilesModal();
+      } else if (el.searchModal && el.searchModal.classList.contains('active')) {
         closeSearchModal();
       } else if (el.insightsModal && el.insightsModal.classList.contains('active')) {
         closeInsightsModal();
@@ -716,6 +806,194 @@ function initEventListeners() {
       showDashboard();
       loadSessions();
     });
+  }
+
+  // Diagram Theater Listeners (R-037)
+  if (el.closeDiagramTheaterBtn) {
+    el.closeDiagramTheaterBtn.addEventListener('click', closeDiagramTheater);
+  }
+  if (el.theaterZoomInBtn) {
+    el.theaterZoomInBtn.addEventListener('click', () => {
+      state.theaterZoom = Math.min(4.0, +(state.theaterZoom + 0.25).toFixed(2));
+      updateDiagramTheaterTransform();
+    });
+  }
+  if (el.theaterZoomOutBtn) {
+    el.theaterZoomOutBtn.addEventListener('click', () => {
+      state.theaterZoom = Math.max(0.4, +(state.theaterZoom - 0.25).toFixed(2));
+      updateDiagramTheaterTransform();
+    });
+  }
+  if (el.theaterZoomResetBtn) {
+    el.theaterZoomResetBtn.addEventListener('click', () => {
+      state.theaterZoom = 1.0;
+      state.theaterPanX = 0;
+      state.theaterPanY = 0;
+      updateDiagramTheaterTransform();
+    });
+  }
+  if (el.theaterFitBtn) {
+    el.theaterFitBtn.addEventListener('click', () => {
+      state.theaterZoom = 1.0;
+      state.theaterPanX = 0;
+      state.theaterPanY = 0;
+      updateDiagramTheaterTransform();
+    });
+  }
+  if (el.theaterCopySvgBtn) {
+    el.theaterCopySvgBtn.addEventListener('click', () => {
+      const svg = el.diagramTheaterSurface?.querySelector('svg');
+      if (svg) {
+        copyToClipboard(svg.outerHTML, 'Diagram SVG copied to clipboard!');
+      } else {
+        showToast('No SVG diagram found');
+      }
+    });
+  }
+  if (el.theaterCopySrcBtn) {
+    el.theaterCopySrcBtn.addEventListener('click', () => {
+      copyToClipboard(state.theaterRawSrc, 'Diagram code copied to clipboard!');
+    });
+  }
+  if (el.diagramTheaterViewport) {
+    el.diagramTheaterViewport.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      isTheaterPanning = true;
+      theaterStartX = e.clientX - state.theaterPanX;
+      theaterStartY = e.clientY - state.theaterPanY;
+      el.diagramTheaterViewport.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isTheaterPanning) return;
+      state.theaterPanX = e.clientX - theaterStartX;
+      state.theaterPanY = e.clientY - theaterStartY;
+      updateDiagramTheaterTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (isTheaterPanning) {
+        isTheaterPanning = false;
+        if (el.diagramTheaterViewport) el.diagramTheaterViewport.style.cursor = 'grab';
+      }
+    });
+    el.diagramTheaterViewport.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+        state.theaterZoom = Math.min(4.0, Math.max(0.4, +(state.theaterZoom + delta).toFixed(2)));
+        updateDiagramTheaterTransform();
+      }
+    }, { passive: false });
+  }
+
+  // File Viewer Listeners (R-038)
+  if (el.closeFileViewerBtn) {
+    el.closeFileViewerBtn.addEventListener('click', closeFileViewer);
+  }
+  if (el.fileViewerWrapBtn) {
+    el.fileViewerWrapBtn.addEventListener('click', () => {
+      state.fileViewerWrap = !state.fileViewerWrap;
+      el.fileViewerWrapBtn.classList.toggle('active', state.fileViewerWrap);
+      el.fileViewerWrapBtn.innerHTML = state.fileViewerWrap ? '✓ Wrapped' : '↩ Wrap';
+      const pre = el.fileViewerCodeContainer?.querySelector('.code-content-pre');
+      if (pre) pre.classList.toggle('wrap-code', state.fileViewerWrap);
+      showToast(state.fileViewerWrap ? 'Line wrap enabled' : 'Line wrap disabled');
+    });
+  }
+  if (el.fileViewerCopyContentBtn) {
+    el.fileViewerCopyContentBtn.addEventListener('click', () => {
+      if (state.fileViewerData && state.fileViewerData.content) {
+        copyToClipboard(state.fileViewerData.content, 'File content copied to clipboard!');
+        const origHtml = el.fileViewerCopyContentBtn.innerHTML;
+        el.fileViewerCopyContentBtn.innerHTML = '✓ Copied!';
+        el.fileViewerCopyContentBtn.classList.add('btn-action-success');
+        setTimeout(() => {
+          el.fileViewerCopyContentBtn.innerHTML = origHtml;
+          el.fileViewerCopyContentBtn.classList.remove('btn-action-success');
+        }, 1500);
+      }
+    });
+  }
+  if (el.fileViewerCopyPathBtn) {
+    el.fileViewerCopyPathBtn.addEventListener('click', () => {
+      if (state.fileViewerData && state.fileViewerData.path) {
+        copyToClipboard(state.fileViewerData.path, 'File path copied to clipboard!');
+        const origHtml = el.fileViewerCopyPathBtn.innerHTML;
+        el.fileViewerCopyPathBtn.innerHTML = '✓ Path Copied!';
+        el.fileViewerCopyPathBtn.classList.add('btn-action-success');
+        setTimeout(() => {
+          el.fileViewerCopyPathBtn.innerHTML = origHtml;
+          el.fileViewerCopyPathBtn.classList.remove('btn-action-success');
+        }, 1500);
+      }
+    });
+  }
+  if (el.fileViewerPath) {
+    el.fileViewerPath.addEventListener('click', () => {
+      if (state.fileViewerData && state.fileViewerData.path) {
+        copyToClipboard(state.fileViewerData.path, 'File path copied to clipboard!');
+        el.fileViewerPath.classList.add('copied-flash');
+        setTimeout(() => {
+          el.fileViewerPath.classList.remove('copied-flash');
+        }, 1500);
+      }
+    });
+  }
+  if (el.fileViewerModeControl) {
+    el.fileViewerModeControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.fileViewerMode = btn.dataset.mode;
+        renderFileViewerContent();
+      });
+    });
+  }
+
+  // In-File Find Listeners (R-038)
+  if (el.fileViewerOpenFindBtn) {
+    el.fileViewerOpenFindBtn.addEventListener('click', openFileFindWidget);
+  }
+  if (el.fileFindCloseBtn) {
+    el.fileFindCloseBtn.addEventListener('click', closeFileFindWidget);
+  }
+  if (el.fileFindCaseBtn) {
+    el.fileFindCaseBtn.addEventListener('click', toggleFileFindCase);
+  }
+  if (el.fileFindNextBtn) {
+    el.fileFindNextBtn.addEventListener('click', goToNextFindMatch);
+  }
+  if (el.fileFindPrevBtn) {
+    el.fileFindPrevBtn.addEventListener('click', goToPrevFindMatch);
+  }
+  if (el.fileFindInput) {
+    el.fileFindInput.addEventListener('input', () => {
+      executeFileFind();
+    });
+    el.fileFindInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          goToPrevFindMatch();
+        } else {
+          goToNextFindMatch();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeFileFindWidget();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        goToNextFindMatch();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        goToPrevFindMatch();
+      }
+    });
+  }
+
+  // Session Files Modal Listeners
+  if (el.detailFilesBtn) {
+    el.detailFilesBtn.addEventListener('click', openSessionFilesModal);
+  }
+  if (el.closeSessionFilesModalBtn) {
+    el.closeSessionFilesModalBtn.addEventListener('click', closeSessionFilesModal);
   }
 }
 
@@ -1660,6 +1938,7 @@ function showDetailView(detail) {
     if (el.timelineContainer) el.timelineContainer.innerHTML = '';
   }
 
+  updateSessionFilesBadge(detail);
   renderTimelineMessages();
 
   startSessionLiveTail(s.id);
@@ -1992,13 +2271,46 @@ function buildStepHtml(msg) {
           ⚡ Invoked Tools (${msg.tool_calls.length})
         </div>
         ${msg.tool_calls.map(tc => {
+          const args = tc.args || {};
           const argsPretty = tc.args ? JSON.stringify(tc.args, null, 2) : (tc.args_preview || '{}');
+
+          const rawFilePath = args.AbsolutePath || args.TargetFile || args.path || args.file_path || (typeof args.file === 'string' ? args.file : '');
+          let fileChipHtml = '';
+          if (rawFilePath && typeof rawFilePath === 'string') {
+            const cleanP = rawFilePath.replace(/^file:\/\//, '');
+            const fileName = cleanP.split('/').pop() || cleanP;
+            const lineInfo = args.StartLine ? `#L${args.StartLine}${args.EndLine ? `-L${args.EndLine}` : ''}` : '';
+            const fullTarget = cleanP + lineInfo;
+            fileChipHtml = `
+              <div class="tool-file-chip-group">
+                <button class="tool-file-pill" data-filepath="${escapeHtml(fullTarget)}" title="Open ${escapeHtml(fileName)} in browser">📄 ${escapeHtml(fileName)} ↗</button>
+                <button class="tool-file-copy-btn" data-path="${escapeHtml(fullTarget)}" title="Copy file path directly to clipboard">📋</button>
+              </div>
+            `;
+          }
+
+          let artifactHtml = '';
+          if (args.ArtifactMetadata && typeof args.ArtifactMetadata === 'object') {
+            const summary = args.ArtifactMetadata.Summary || 'Artifact';
+            const targetFile = args.TargetFile || rawFilePath;
+            artifactHtml = `
+              <div class="tool-artifact-badge">
+                <span>✨ Artifact: ${escapeHtml(summary)}</span>
+                ${targetFile ? `<button class="open-artifact-btn" data-filepath="${escapeHtml(targetFile)}">View Artifact ↗</button>` : ''}
+              </div>
+            `;
+          }
+
           return `
             <details class="tool-call-card">
               <summary class="tool-call-header">
-                <span class="tool-call-name">🛠️ ${escapeHtml(tc.name)}</span>
-                <button class="copy-tool-args-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem;" title="Copy Args" data-args="${escapeHtml(argsPretty)}">📋</button>
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow: hidden;">
+                  <span class="tool-call-name">🛠️ ${escapeHtml(tc.name)}</span>
+                  ${fileChipHtml}
+                </div>
+                <button class="copy-tool-args-btn btn-icon" style="width: 26px; height: 26px; font-size: 0.75rem; flex-shrink: 0;" title="Copy Args" data-args="${escapeHtml(argsPretty)}">📋</button>
               </summary>
+              ${artifactHtml}
               <pre class="tool-call-args"><code>${escapeHtml(argsPretty)}</code></pre>
             </details>
           `;
@@ -2085,7 +2397,55 @@ function attachStepInteractivity(container) {
       e.preventDefault();
       e.stopPropagation();
       const path = link.dataset.filepath || link.getAttribute('href');
-      copyToClipboard(path, `Copied path to clipboard: ${path}`);
+      openFileViewer(path);
+    };
+  });
+
+  container.querySelectorAll('.file-link-quick-copy-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const path = btn.dataset.path;
+      copyToClipboard(path, 'File path copied to clipboard!');
+      const origText = btn.textContent;
+      btn.textContent = '✓';
+      btn.classList.add('copy-success');
+      setTimeout(() => {
+        btn.textContent = origText;
+        btn.classList.remove('copy-success');
+      }, 1500);
+    };
+  });
+
+  container.querySelectorAll('.tool-file-pill').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openFileViewer(btn.dataset.filepath);
+    };
+  });
+
+  container.querySelectorAll('.tool-file-copy-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const path = btn.dataset.path;
+      copyToClipboard(path, 'File path copied to clipboard!');
+      const origText = btn.textContent;
+      btn.textContent = '✓';
+      btn.classList.add('copy-success');
+      setTimeout(() => {
+        btn.textContent = origText;
+        btn.classList.remove('copy-success');
+      }, 1500);
+    };
+  });
+
+  container.querySelectorAll('.open-artifact-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openFileViewer(btn.dataset.filepath);
     };
   });
 
@@ -2343,15 +2703,19 @@ async function renderAllMermaidDiagrams(container = document) {
   initCanvasZoomInteractions(container);
 }
 
-// Wire interactive zoom controls for diagram canvases
+// Wire interactive zoom controls and theater triggers for diagram canvases
 function initCanvasZoomInteractions(container = document) {
   container.querySelectorAll('.canvas-container:not([data-zoom-initialized="true"])').forEach(card => {
     card.setAttribute('data-zoom-initialized', 'true');
     const surface = card.querySelector('.canvas-content-surface');
+    const viewport = card.querySelector('.canvas-viewport');
     const zoomInBtn = card.querySelector('.zoom-in-btn');
     const zoomOutBtn = card.querySelector('.zoom-out-btn');
     const zoomResetBtn = card.querySelector('.zoom-reset-btn');
+    const theaterBtn = card.querySelector('.theater-btn');
     const badge = card.querySelector('.zoom-level-badge');
+    const titleTag = card.querySelector('.canvas-type-tag')?.textContent || 'Diagram Canvas';
+    const srcCode = card.querySelector('.mermaid-source-pre code')?.textContent || '';
     if (!surface) return;
 
     let zoom = 1.0;
@@ -2379,6 +2743,18 @@ function initCanvasZoomInteractions(container = document) {
         e.stopPropagation();
         zoom = 1.0;
         update();
+      });
+    }
+    if (theaterBtn) {
+      theaterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDiagramTheater(titleTag, surface.innerHTML, srcCode);
+      });
+    }
+    if (viewport) {
+      viewport.addEventListener('dblclick', (e) => {
+        if (e.target.closest('button')) return;
+        openDiagramTheater(titleTag, surface.innerHTML, srcCode);
       });
     }
   });
@@ -2662,3 +3038,574 @@ function escapeHtml(str) {
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// ============================================================================
+//  Diagram Theater Engine (R-037)
+// ============================================================================
+let isTheaterPanning = false;
+let theaterStartX = 0;
+let theaterStartY = 0;
+
+function openDiagramTheater(title, surfaceHtml, rawSrc = '') {
+  if (!el.diagramTheaterModal || !el.diagramTheaterSurface) return;
+  if (el.diagramTheaterTitleText) el.diagramTheaterTitleText.textContent = title || 'Diagram Theater';
+  el.diagramTheaterSurface.innerHTML = surfaceHtml;
+  state.theaterRawSrc = rawSrc;
+  state.theaterZoom = 1.15;
+  state.theaterPanX = 0;
+  state.theaterPanY = 0;
+  updateDiagramTheaterTransform();
+
+  el.diagramTheaterModal.classList.add('theater-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDiagramTheater() {
+  if (!el.diagramTheaterModal) return;
+  el.diagramTheaterModal.classList.remove('theater-open');
+  document.body.style.overflow = '';
+}
+
+function updateDiagramTheaterTransform() {
+  if (!el.diagramTheaterSurface) return;
+  el.diagramTheaterSurface.style.transform = `scale(${state.theaterZoom}) translate(${state.theaterPanX}px, ${state.theaterPanY}px)`;
+  if (el.theaterZoomBadge) el.theaterZoomBadge.textContent = `${Math.round(state.theaterZoom * 100)}%`;
+}
+
+// ============================================================================
+//  Native File & Artifact Viewer Engine (R-038)
+// ============================================================================
+function getFileIcon(path) {
+  const ext = (path || '').split('.').pop().toLowerCase();
+  switch (ext) {
+    case 'md': case 'markdown': return '📝';
+    case 'go': return '🐹';
+    case 'js': case 'ts': case 'jsx': case 'tsx': return '⚡';
+    case 'py': return '🐍';
+    case 'rs': return '🦀';
+    case 'json': case 'yaml': case 'yml': case 'toml': return '⚙️';
+    case 'sh': case 'bash': case 'zsh': return '💻';
+    case 'html': case 'css': case 'scss': return '🎨';
+    case 'png': case 'jpg': case 'jpeg': case 'svg': case 'webp': case 'gif': return '🖼️';
+    default: return '📄';
+  }
+}
+
+async function openFileViewer(filePathWithAnchor) {
+  if (!filePathWithAnchor || !el.fileViewerModal) return;
+
+  // Parse optional line anchor e.g. /path/to/file.go#L45-L60 or /path/to/file.go:45
+  let cleanPath = filePathWithAnchor.trim().replace(/^file:\/\//, '');
+  let lineStart = null;
+  let lineEnd = null;
+
+  const hashIdx = cleanPath.indexOf('#');
+  if (hashIdx !== -1) {
+    const anchor = cleanPath.substring(hashIdx + 1);
+    cleanPath = cleanPath.substring(0, hashIdx);
+    const m = anchor.match(/L(\d+)(?:-L(\d+))?/i);
+    if (m) {
+      lineStart = parseInt(m[1], 10);
+      lineEnd = m[2] ? parseInt(m[2], 10) : lineStart;
+    }
+  } else {
+    const colonMatch = cleanPath.match(/:(\d+)(?::(\d+))?$/);
+    if (colonMatch) {
+      cleanPath = cleanPath.substring(0, colonMatch.index);
+      lineStart = parseInt(colonMatch[1], 10);
+      lineEnd = colonMatch[2] ? parseInt(colonMatch[2], 10) : lineStart;
+    }
+  }
+
+  state.fileViewerTargetLine = lineStart;
+  state.fileViewerTargetLineEnd = lineEnd;
+  state.fileViewerMode = 'preview';
+  state.fileViewerWrap = false;
+
+  el.fileViewerModal.classList.add('file-viewer-open');
+  document.body.style.overflow = 'hidden';
+
+  if (el.fileViewerLoading) el.fileViewerLoading.style.display = 'flex';
+  if (el.fileViewerError) el.fileViewerError.style.display = 'none';
+  if (el.fileViewerMarkdown) el.fileViewerMarkdown.style.display = 'none';
+  if (el.fileViewerCodeContainer) el.fileViewerCodeContainer.style.display = 'none';
+  if (el.fileViewerImageContainer) el.fileViewerImageContainer.style.display = 'none';
+  if (el.fileViewerModeControl) el.fileViewerModeControl.style.display = 'none';
+
+  const fileName = cleanPath.split('/').pop() || cleanPath;
+  if (el.fileViewerFilename) el.fileViewerFilename.textContent = fileName;
+  if (el.fileViewerPath) el.fileViewerPath.textContent = cleanPath;
+  if (el.fileViewerIcon) el.fileViewerIcon.textContent = getFileIcon(cleanPath);
+
+  try {
+    const res = await fetch(`/api/file?path=${encodeURIComponent(cleanPath)}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `HTTP ${res.status}`);
+    }
+    const fileData = await res.json();
+    state.fileViewerData = fileData;
+    renderFileViewerContent();
+  } catch (err) {
+    if (el.fileViewerLoading) el.fileViewerLoading.style.display = 'none';
+    if (el.fileViewerError) {
+      el.fileViewerError.style.display = 'block';
+      el.fileViewerError.innerHTML = `
+        <div style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-rose, #f43f5e);">⚠️ File Read Error</div>
+        <p style="margin-bottom: 0.75rem; font-size: 0.92rem;">${escapeHtml(err.message)}</p>
+        <code style="font-size: 0.78rem; opacity: 0.85; word-break: break-all; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">${escapeHtml(cleanPath)}</code>
+      `;
+    }
+  }
+}
+
+function closeFileViewer() {
+  if (!el.fileViewerModal) return;
+  closeFileFindWidget();
+  el.fileViewerModal.classList.remove('file-viewer-open');
+  document.body.style.overflow = '';
+  state.fileViewerData = null;
+}
+
+function renderFileViewerContent() {
+  const data = state.fileViewerData;
+  if (!data) return;
+
+  if (el.fileViewerLoading) el.fileViewerLoading.style.display = 'none';
+  if (el.fileViewerError) el.fileViewerError.style.display = 'none';
+  if (el.fileViewerMarkdown) el.fileViewerMarkdown.style.display = 'none';
+  if (el.fileViewerCodeContainer) el.fileViewerCodeContainer.style.display = 'none';
+  if (el.fileViewerImageContainer) el.fileViewerImageContainer.style.display = 'none';
+
+  const ext = (data.extension || '').replace('.', '').toUpperCase() || 'FILE';
+  if (el.fileViewerLangBadge) el.fileViewerLangBadge.textContent = ext;
+  if (el.fileViewerLinesBadge) el.fileViewerLinesBadge.textContent = `${(data.line_count || 0).toLocaleString()} lines`;
+  if (el.fileViewerSizeBadge) {
+    const kb = (data.size / 1024).toFixed(1);
+    el.fileViewerSizeBadge.textContent = data.size > 1048576 ? `${(data.size / 1048576).toFixed(2)} MB` : `${kb} KB`;
+  }
+
+  const isMarkdown = data.extension === '.md' || data.extension === '.markdown';
+  const isImage = data.is_binary && (data.content.startsWith('data:image/') || ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'ICO'].includes(ext));
+
+  if (isImage) {
+    if (el.fileViewerImageContainer && el.fileViewerImage) {
+      el.fileViewerImage.src = data.content;
+      el.fileViewerImageContainer.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (isMarkdown) {
+    if (el.fileViewerModeControl) {
+      el.fileViewerModeControl.style.display = 'inline-flex';
+      el.fileViewerModeControl.querySelectorAll('.segment-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === state.fileViewerMode);
+      });
+    }
+
+    if (state.fileViewerMode === 'preview') {
+      if (el.fileViewerMarkdown) {
+        el.fileViewerMarkdown.innerHTML = marked.parse(data.content);
+        attachStepInteractivity(el.fileViewerMarkdown);
+        el.fileViewerMarkdown.style.display = 'block';
+        renderAllMermaidDiagrams(el.fileViewerMarkdown);
+      }
+      return;
+    }
+  }
+
+  // Code or Raw Display Mode
+  if (el.fileViewerWrapBtn) {
+    el.fileViewerWrapBtn.classList.toggle('active', state.fileViewerWrap);
+    el.fileViewerWrapBtn.innerHTML = state.fileViewerWrap ? '✓ Wrapped' : '↩ Wrap';
+  }
+  if (el.fileViewerCodeContainer && el.fileViewerCodeBlock && el.fileViewerLineNumbers) {
+    el.fileViewerCodeContainer.style.display = 'flex';
+    const pre = el.fileViewerCodeContainer.querySelector('.code-content-pre');
+    if (pre) {
+      pre.classList.toggle('wrap-code', state.fileViewerWrap);
+    }
+
+    const lines = data.content.split('\n');
+    const totalLines = lines.length;
+
+    let gutterHtml = '';
+    const startL = state.fileViewerTargetLine;
+    const endL = state.fileViewerTargetLineEnd || startL;
+
+    for (let i = 1; i <= totalLines; i++) {
+      const isTarget = startL && i >= startL && i <= endL;
+      gutterHtml += `<span class="${isTarget ? 'line-highlight' : ''}" data-line="${i}">${i}</span>`;
+    }
+    el.fileViewerLineNumbers.innerHTML = gutterHtml;
+
+    const lang = (data.extension || '').replace('.', '').toLowerCase();
+    const validLang = lang && hljs.getLanguage(lang);
+    let highlighted = validLang
+      ? hljs.highlight(data.content, { language: lang, ignoreIllegals: true }).value
+      : escapeHtml(data.content);
+
+    if (startL) {
+      const highlightedLines = highlighted.split('\n');
+      highlighted = highlightedLines.map((line, idx) => {
+        const lineNum = idx + 1;
+        if (lineNum >= startL && lineNum <= endL) {
+          return `<mark class="line-highlight" id="file-line-${lineNum}">${line}</mark>`;
+        }
+        return line;
+      }).join('\n');
+    }
+
+    el.fileViewerCodeBlock.className = `hljs ${validLang ? 'language-' + lang : ''}`;
+    el.fileViewerCodeBlock.innerHTML = highlighted;
+
+    if (startL) {
+      setTimeout(() => {
+        const targetEl = document.getElementById(`file-line-${startL}`) || el.fileViewerLineNumbers.querySelector(`[data-line="${startL}"]`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 60);
+    }
+  }
+
+  // If Find widget is open, re-evaluate find matches in the current view
+  if (el.fileViewerFindWidget && el.fileViewerFindWidget.style.display !== 'none' && state.fileFindQuery) {
+    setTimeout(() => executeFileFind(), 40);
+  }
+}
+
+// ============================================================================
+//  In-File Find & Navigation Engine (R-038)
+// ============================================================================
+function openFileFindWidget() {
+  if (!el.fileViewerFindWidget || !el.fileFindInput) return;
+  el.fileViewerFindWidget.style.display = 'flex';
+  el.fileFindInput.focus();
+  el.fileFindInput.select();
+  if (el.fileFindInput.value.trim()) {
+    executeFileFind();
+  }
+}
+
+function closeFileFindWidget() {
+  if (!el.fileViewerFindWidget) return;
+  el.fileViewerFindWidget.style.display = 'none';
+  clearFileFindHighlights();
+  state.fileFindQuery = '';
+  state.fileFindMatches = [];
+  state.fileFindActiveIndex = -1;
+  if (el.fileFindCountBadge) {
+    el.fileFindCountBadge.textContent = '0 of 0';
+    el.fileFindCountBadge.className = 'find-count-badge';
+  }
+}
+
+function toggleFileFindCase() {
+  state.fileFindCaseSensitive = !state.fileFindCaseSensitive;
+  if (el.fileFindCaseBtn) {
+    el.fileFindCaseBtn.classList.toggle('active', state.fileFindCaseSensitive);
+  }
+  executeFileFind();
+}
+
+function clearFileFindHighlights() {
+  const containers = [el.fileViewerMarkdown, el.fileViewerCodeBlock];
+  containers.forEach(container => {
+    if (!container) return;
+    const marks = container.querySelectorAll('mark.find-match');
+    marks.forEach(mark => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) {
+        parent.insertBefore(mark.firstChild, mark);
+      }
+      parent.removeChild(mark);
+      parent.normalize();
+    });
+  });
+}
+
+function executeFileFind() {
+  clearFileFindHighlights();
+  state.fileFindMatches = [];
+  state.fileFindActiveIndex = -1;
+
+  const query = el.fileFindInput ? el.fileFindInput.value : '';
+  state.fileFindQuery = query;
+
+  if (!query) {
+    if (el.fileFindCountBadge) {
+      el.fileFindCountBadge.textContent = '0 of 0';
+      el.fileFindCountBadge.className = 'find-count-badge';
+    }
+    return;
+  }
+
+  const flags = state.fileFindCaseSensitive ? 'g' : 'gi';
+  let regex;
+  try {
+    regex = new RegExp(escapeRegExp(query), flags);
+  } catch (_) {
+    return;
+  }
+
+  // Determine active view container
+  const activeContainer = (state.fileViewerMode === 'preview' && el.fileViewerMarkdown && el.fileViewerMarkdown.style.display !== 'none')
+    ? el.fileViewerMarkdown
+    : el.fileViewerCodeBlock;
+
+  if (!activeContainer) return;
+
+  // Walk text nodes and wrap matches in <mark class="find-match">
+  const walker = document.createTreeWalker(
+    activeContainer,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
+        const parent = node.parentNode;
+        if (parent && (parent.nodeName === 'SCRIPT' || parent.nodeName === 'STYLE' || parent.classList?.contains('find-match'))) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  const textNodes = [];
+  let currentNode;
+  while ((currentNode = walker.nextNode())) {
+    textNodes.push(currentNode);
+  }
+
+  let matchIndex = 0;
+  textNodes.forEach(node => {
+    const text = node.nodeValue;
+    regex.lastIndex = 0;
+    if (!regex.test(text)) return;
+
+    regex.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIdx) {
+        frag.appendChild(document.createTextNode(text.substring(lastIdx, match.index)));
+      }
+      const mark = document.createElement('mark');
+      mark.className = 'find-match';
+      mark.dataset.findIdx = matchIndex++;
+      mark.textContent = match[0];
+      frag.appendChild(mark);
+      state.fileFindMatches.push(mark);
+
+      lastIdx = regex.lastIndex;
+    }
+
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.substring(lastIdx)));
+    }
+
+    if (node.parentNode) {
+      node.parentNode.replaceChild(frag, node);
+    }
+  });
+
+  const total = state.fileFindMatches.length;
+  if (total === 0) {
+    if (el.fileFindCountBadge) {
+      el.fileFindCountBadge.textContent = '0 of 0';
+      el.fileFindCountBadge.className = 'find-count-badge no-matches';
+    }
+  } else {
+    state.fileFindActiveIndex = 0;
+    highlightActiveFindMatch();
+  }
+}
+
+function highlightActiveFindMatch() {
+  const total = state.fileFindMatches.length;
+  if (total === 0 || state.fileFindActiveIndex < 0) return;
+
+  state.fileFindMatches.forEach((mark, idx) => {
+    mark.classList.toggle('find-match-current', idx === state.fileFindActiveIndex);
+  });
+
+  if (el.fileFindCountBadge) {
+    el.fileFindCountBadge.textContent = `${state.fileFindActiveIndex + 1} of ${total}`;
+    el.fileFindCountBadge.className = 'find-count-badge has-matches';
+  }
+
+  const currentMark = state.fileFindMatches[state.fileFindActiveIndex];
+  if (currentMark) {
+    currentMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function goToNextFindMatch() {
+  if (state.fileFindMatches.length === 0) return;
+  state.fileFindActiveIndex = (state.fileFindActiveIndex + 1) % state.fileFindMatches.length;
+  highlightActiveFindMatch();
+}
+
+function goToPrevFindMatch() {
+  if (state.fileFindMatches.length === 0) return;
+  state.fileFindActiveIndex = (state.fileFindActiveIndex - 1 + state.fileFindMatches.length) % state.fileFindMatches.length;
+  highlightActiveFindMatch();
+}
+
+// ============================================================================
+//  Session Files & Artifacts Aggregator
+// ============================================================================
+function updateSessionFilesBadge(detail) {
+  state.sessionFilesMap.clear();
+  if (!detail || !detail.messages) {
+    if (el.detailFilesCountBadge) el.detailFilesCountBadge.textContent = '0';
+    return;
+  }
+
+  detail.messages.forEach(msg => {
+    if (msg.tool_calls) {
+      msg.tool_calls.forEach(tc => {
+        const args = tc.args || {};
+        const p = args.AbsolutePath || args.TargetFile || args.path || args.file_path;
+        if (p && typeof p === 'string') {
+          const cleanP = p.replace(/^file:\/\//, '');
+          const name = cleanP.split('/').pop() || cleanP;
+          let fileType = 'read';
+          if (tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
+            fileType = 'modified';
+          }
+          if (args.ArtifactMetadata || cleanP.includes('/brain/')) {
+            fileType = 'artifact';
+          }
+          if (!state.sessionFilesMap.has(cleanP) || fileType === 'artifact') {
+            state.sessionFilesMap.set(cleanP, {
+              path: cleanP,
+              name: name,
+              type: fileType,
+              tool: tc.name,
+              stepIndex: msg.step_index
+            });
+          }
+        }
+      });
+    }
+
+    if (msg.content) {
+      const linkRegex = /\[([^\]]+)\]\((?:file:\/\/)?([^)]+)\)/g;
+      let match;
+      while ((match = linkRegex.exec(msg.content)) !== null) {
+        const rawHref = match[2];
+        if (rawHref.startsWith('/') || rawHref.startsWith('file://')) {
+          const cleanP = rawHref.replace(/^file:\/\//, '').split('#')[0];
+          const name = match[1] || cleanP.split('/').pop() || cleanP;
+          if (!state.sessionFilesMap.has(cleanP)) {
+            state.sessionFilesMap.set(cleanP, {
+              path: cleanP,
+              name: name,
+              type: 'reference',
+              tool: 'markdown',
+              stepIndex: msg.step_index
+            });
+          }
+        }
+      }
+    }
+  });
+
+  if (el.detailFilesCountBadge) {
+    el.detailFilesCountBadge.textContent = state.sessionFilesMap.size.toString();
+  }
+}
+
+function openSessionFilesModal() {
+  if (!el.sessionFilesModal || !el.sessionFilesListContainer) return;
+  const files = Array.from(state.sessionFilesMap.values());
+  if (el.sessionFilesTotalCount) el.sessionFilesTotalCount.textContent = files.length.toString();
+
+  if (files.length === 0) {
+    el.sessionFilesListContainer.innerHTML = `
+      <div class="empty-state" style="padding: 2.5rem; text-align: center;">
+        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📄</div>
+        <p style="color: var(--text-muted);">No file operations or artifacts detected in this session.</p>
+      </div>
+    `;
+  } else {
+    const typeOrder = { artifact: 0, modified: 1, read: 2, reference: 3 };
+    files.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
+
+    el.sessionFilesListContainer.innerHTML = files.map(f => {
+      const typeBadge = f.type === 'artifact'
+        ? '<span class="file-meta-pill" style="border-color: rgba(168, 85, 247, 0.5); color: #c084fc; background: rgba(168, 85, 247, 0.15);">✨ Artifact</span>'
+        : f.type === 'modified'
+        ? '<span class="file-meta-pill" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; background: rgba(245, 158, 11, 0.15);">✏️ Modified</span>'
+        : '<span class="file-meta-pill">👁️ Read</span>';
+
+      return `
+        <div class="session-file-item" data-path="${escapeHtml(f.path)}">
+          <div class="session-file-item-left">
+            <span style="font-size: 1.3rem;">${getFileIcon(f.path)}</span>
+            <div class="session-file-item-info">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="session-file-name">${escapeHtml(f.name)}</span>
+                ${typeBadge}
+                <span style="font-size: 0.72rem; color: var(--text-dim);">Step ${f.stepIndex}</span>
+              </div>
+              <div class="session-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn-ghost-sm open-file-item-btn" data-path="${escapeHtml(f.path)}" title="Open in Browser">Open ↗</button>
+            <button class="btn-icon copy-file-path-btn" style="width: 28px; height: 28px; font-size: 0.75rem;" data-path="${escapeHtml(f.path)}" title="Copy Path">📋</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    el.sessionFilesListContainer.querySelectorAll('.open-file-item-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        closeSessionFilesModal();
+        openFileViewer(btn.dataset.path);
+      };
+    });
+
+    el.sessionFilesListContainer.querySelectorAll('.session-file-item').forEach(item => {
+      item.onclick = () => {
+        closeSessionFilesModal();
+        openFileViewer(item.dataset.path);
+      };
+    });
+
+    el.sessionFilesListContainer.querySelectorAll('.copy-file-path-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        copyToClipboard(btn.dataset.path, 'File path copied to clipboard!');
+      };
+    });
+  }
+
+  el.sessionFilesModal.classList.add('active');
+}
+
+function closeSessionFilesModal() {
+  if (el.sessionFilesModal) el.sessionFilesModal.classList.remove('active');
+}
+
+// Expose modal functions to window for testing, extensions, and automated verification
+window.openDiagramTheater = openDiagramTheater;
+window.closeDiagramTheater = closeDiagramTheater;
+window.openFileViewer = openFileViewer;
+window.closeFileViewer = closeFileViewer;
+window.openFileFindWidget = openFileFindWidget;
+window.closeFileFindWidget = closeFileFindWidget;
+window.executeFileFind = executeFileFind;
+window.goToNextFindMatch = goToNextFindMatch;
+window.goToPrevFindMatch = goToPrevFindMatch;
+window.openSessionFilesModal = openSessionFilesModal;
+window.closeSessionFilesModal = closeSessionFilesModal;
+
