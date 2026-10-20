@@ -19,7 +19,9 @@ PolyTuring/
 │   ├── _templates/        Spec templates
 │   └── catalog/           Active specifications (one per tool)
 │
-├── tools/                 🔧 Tool Layer (the products)
+├── tools/                 🔧 Tool Layer (The PolyTuring Product Suite)
+│   ├── omni-graph/        🌌 Deterministic AST & Louvain/Leiden Galaxy Hub (Rust)
+│   ├── session-explorer/  🔎 Trajectory Intelligence & Memory Cockpit (Go+Bun)
 │   ├── _template/         Canonical tool template
 │   └── <tool-name>/       Each tool is self-contained
 │

@@ -610,11 +610,14 @@ function initCopyButtons() {
 
 // ─── 7. Search Modal & Index ──────────────────────────────────────────────────
 const SEARCH_DOCS = [
-  { id: 'ch0-overview', title: 'Grand Central: Overview & Monorepo Governance', snippet: 'Monorepo architecture, Spec-Driven Development (SDD), Agentic Constitution.', category: 'Overview' },
-  { id: 'sec-sdd-governance', title: 'Spec-Driven Development (SDD) & SDLC Finite State Machine', snippet: 'Contract before code, numbered requirements (R-XXX), status verification gates.', category: 'Governance' },
-  { id: 'sec-agent-shield', title: 'The Agentic Defense Shield & Reconnaissance Gates', snippet: '3-tier recon ladder, pre-invocation hook, 150-line gate, recon markers.', category: 'Agent Shield' },
+  { id: 'ch0-manifesto', title: 'Platform Manifesto: The Deterministic Intelligence Substrate for AI Coding Assistants', snippet: 'Bridging raw LLM reasoning and real-world codebases with deterministic AST knowledge.', category: 'Manifesto' },
+  { id: 'sec-context-crisis', title: 'The Context Window Crisis & The Myth of Raw Grep', snippet: 'Context window saturation, token exhaustion, blind file grepping, and code hallucinations.', category: 'Manifesto' },
+  { id: 'sec-polyturing-triad', title: 'The PolyTuring Triad: Omni-Graph, Session Explorer, Living Docs', snippet: 'Deterministic AST substrate, trajectory intelligence cockpit, and architectural contract engine.', category: 'Manifesto' },
+  { id: 'sec-antigravity-native', title: 'Antigravity-Native Substrate & Multi-Assistant Roadmap', snippet: 'Built natively for Google Antigravity (agy, brain, hooks) with extensibility for Copilot & Claude Code.', category: 'Manifesto' },
   { id: 'ch1-omni-graph', title: 'Omni-Graph: 100% Local Semantic Knowledge Hub', snippet: 'AST graph algebra, 384-dim TEI vector embeddings, HNSW index, SurrealDB v2.', category: 'Omni-Graph' },
   { id: 'sec-omni-arch', title: 'Omni-Graph: 4-Tier Container Architecture', snippet: 'SurrealDB, HuggingFace TEI, Rust Axum Orchestrator, Cosmograph WebGL Visualizer.', category: 'Omni-Graph' },
+  { id: 'sec-omni-galaxies', title: 'Galaxy Subsystems & Louvain / Leiden Modularity Clustering', snippet: 'Scale-free code networks, Modularity Q optimization, edge-weighted affinity, Leiden guarantees.', category: 'Omni-Graph' },
+  { id: 'sec-omni-coupling', title: 'Robert C. Martin Coupling Metrics (Ca, Ce, I) & Blast Radius Contracts', snippet: 'Afferent/Efferent coupling, Instability metric, Core Foundation vs Leaf roles, boundary contracts.', category: 'Omni-Graph' },
   { id: 'sec-omni-ebf', title: 'Ephemeral Branch Fabric (EBF) & Git Worktrees', snippet: 'O(1) worktree peeking, Prior LPA seed inheritance, zero-storm rebase suppression.', category: 'Omni-Graph' },
   { id: 'sec-omni-ast', title: 'Polyglot AST Grammar & Struct Field Extraction', snippet: 'Rust fields/impls/macros, Go methods/structs/fields, TS arrow fns/interfaces/properties.', category: 'Omni-Graph' },
   { id: 'sec-omni-budget', title: 'Two-Tier Context Condenser Token Budget Math (<1500 tokens)', snippet: 'Strict character bounding: 3,800 chars for definitions, >=1,800 chars for call traces.', category: 'Omni-Graph' },
@@ -623,9 +626,18 @@ const SEARCH_DOCS = [
   { id: 'api-playground', title: 'Omni-Graph Live API Playground & Curl Generator', snippet: '/api/symbol, /api/references, /api/condense, /api/query, /api/workspaces, /api/worktrees.', category: 'Interactive' },
   { id: 'ch2-session-explorer', title: 'Session Explorer: Agent Observability & Telemetry', snippet: 'Fast JSONL parser, prompt indexing, tool invocation insights, SQLite cache, Go binary.', category: 'Session Explorer' },
   { id: 'sec-session-arch', title: 'Session Explorer: Go + Bun Standalone Binary Architecture', snippet: 'Go backend, Bun frontend, marked.js markdown engine, single standalone binary.', category: 'Session Explorer' },
+  { id: 'sec-session-wip', title: 'Agent Work-in-Progress (WIP) Recovery & Disambiguation', snippet: 'Instant context recovery from brain logs, mandatory halt on ambiguous sessions, /most-recent-wip.', category: 'Session Explorer' },
+  { id: 'sec-session-viewer', title: 'In-Browser Code Viewer: 22px Gutter Invariant & Persistent In-Page Find', snippet: 'Zero dual-scroll, 0px line drift across 10k lines, floating sticky find widget with count.', category: 'Session Explorer' },
+  { id: 'sec-session-swagger', title: 'Embedded OpenAPI 3.0 & Swagger UI', snippet: 'Offline API explorer at /docs, raw OpenAPI JSON contract at /api/openapi.json.', category: 'Session Explorer' },
   { id: 'sec-session-usage', title: 'Session Explorer: Telemetry & CLI Quickstart', snippet: 'make session-explorer, make run PORT=9876, --no-open headless mode, export markdown.', category: 'Session Explorer' },
-  { id: 'ch3-ci-pipeline', title: 'CI/CD & GitHub Actions Workflows', snippet: 'ci.yml, tool-ci.yml, docs-publish.yml, polyglot test runners, specs validation.', category: 'CI/CD' },
-  { id: 'sec-docs-drift', title: 'The Documentation Synchronization Gate', snippet: '4-point documentation gate, zero drift policy, Rule 06 standards.', category: 'Governance' }
+  { id: 'ch3-assistant-matrix', title: 'Universal Coding Assistant Matrix & Extensibility Blueprint', snippet: 'Native Google Antigravity vs. GitHub Copilot, Claude Code, and Cursor roadmap.', category: 'Ecosystem' },
+  { id: 'sec-assistant-roadmap', title: 'Multi-Assistant Phasing: Antigravity, Copilot, Claude Code, Cursor', snippet: 'Three-phase rollout: Native substrate, Model Context Protocol (MCP), and Copilot LSP sidecars.', category: 'Ecosystem' },
+  { id: 'sec-assistant-mcp', title: 'Universal Model Context Protocol (MCP) Architecture', snippet: 'MCP server bridge connecting any coding assistant to local AST knowledge and session telemetry.', category: 'Ecosystem' },
+  { id: 'sec-appendix-rigor', title: 'Engineering Rigor, SDD Constitution & Verification Gates', snippet: 'Spec-Driven Development, Reflexion loops, 3-tier reconnaissance ladder, CI/CD gates.', category: 'Governance' },
+  { id: 'sec-sdd-governance', title: 'Spec-Driven Development (SDD) & SDLC Finite State Machine', snippet: 'Contract before code, numbered requirements (R-XXX), status verification gates.', category: 'Governance' },
+  { id: 'sec-agent-shield', title: 'The Agentic Defense Shield & Reconnaissance Gates', snippet: '3-tier recon ladder, pre-invocation hook, 150-line gate, recon markers.', category: 'Governance' },
+  { id: 'sec-ci-gates', title: 'Continuous Integration Matrix & Polyglot Test Runners', snippet: 'ci.yml, tool-ci.yml, docs-publish.yml, polyglot test runners, specs validation.', category: 'Governance' },
+  { id: 'sec-docs-drift', title: 'The Documentation Synchronization Gate & Rule 06 Verification', snippet: '4-point documentation gate, zero drift policy, Rule 06 standards.', category: 'Governance' }
 ];
 
 function initSearchModal() {

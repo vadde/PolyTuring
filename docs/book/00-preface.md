@@ -54,13 +54,15 @@ Python for data science. Go for performance. Rust for safety. Shell for
 automation. TypeScript for web. Each tool chooses the language that fits.
 The repository structure is language-agnostic.
 
-### 4. Agent-Native
+### 4. Agent-Native & Deterministic Substrate
 
-This repository is built for AI agents as much as for humans. Every rule,
-convention, and structure is designed to be discoverable and parseable by
-autonomous coding agents.
+This repository is built for autonomous AI coding agents (Google Antigravity, GitHub Copilot, Claude Code) as much as for human engineers. Rather than relying on stochastic LLM "blind grep", the platform provides deterministic AST knowledge graph retrieval (Omni-Graph with Louvain/Leiden Galaxy Subsystems) and trajectory intelligence (Session Explorer).
 
-### 5. Quality Is Non-Negotiable
+### 5. Antigravity-First, Universally Extensible
+
+Engineered natively and verified first against Google Antigravity (`agy` CLI, IDE, brain trajectory logs, and lifecycle hooks). Its protocol-neutral core (MCP, REST, SSE) is architected for seamless multi-assistant extensibility across Claude Code, GitHub Copilot, and Cursor.
+
+### 6. Quality Is Non-Negotiable
 
 Every tool has tests. Every tool has documentation. Every tool has a spec.
 No exceptions.
