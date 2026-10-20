@@ -8,7 +8,7 @@ import hljs from 'highlight.js';
 import katex from 'katex';
 import mermaid from 'mermaid';
 
-// Initialize Mermaid with Dark Glass theme matching tool-scripts docs portal
+// Initialize Mermaid with Dark Glass theme matching PolyTuring docs portal
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',

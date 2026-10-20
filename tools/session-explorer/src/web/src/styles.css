@@ -1601,7 +1601,7 @@ body {
   max-width: 100%;
 }
 
-/* Mermaid SVG Readability & Natural Scale Overrides (from tool-scripts docs portal) */
+/* Mermaid SVG Readability & Natural Scale Overrides (from PolyTuring docs portal) */
 .mermaid {
   display: inline-block !important;
   margin: 0 auto !important;
