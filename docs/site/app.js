@@ -7,6 +7,8 @@ let isFocusModeActive = false; // When true, expanding one chapter auto-collapse
 document.addEventListener('DOMContentLoaded', () => {
   initReadingProgressBar();
   initMathRendering();
+  initSidebarResizer();
+  initMobileDrawer();
   initTreeNavigation();
   initCollapsibleChapters();
   initCanvasZoomAndTheater();
@@ -147,6 +149,176 @@ function initTreeNavigation() {
             history.pushState(null, null, href);
           }
         }
+      }
+    });
+  });
+
+  // Smooth scroll for mobile drawer quick tool links
+  document.querySelectorAll('.mobile-tool-link').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const href = link.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        e.preventDefault();
+        const targetEl = document.querySelector(href);
+        if (targetEl) {
+          ensureSectionExpanded(targetEl);
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          pulseElement(targetEl);
+          if (history.pushState) {
+            history.pushState(null, null, href);
+          }
+        }
+      }
+    });
+  });
+}
+
+// ─── 2b. Dynamic Drag-to-Resize Sidebar Splitter ─────────────────────────────
+function initSidebarResizer() {
+  const resizer = document.getElementById('sidebar-resizer');
+  const sidebar = document.getElementById('main-sidebar');
+  if (!resizer || !sidebar) return;
+
+  const MIN_WIDTH = 240;
+  const MAX_WIDTH = 560;
+  const DEFAULT_WIDTH = 320;
+
+  // 1. Restore persisted width from localStorage
+  try {
+    const savedWidth = localStorage.getItem('polyturing_sidebar_width');
+    if (savedWidth) {
+      const parsed = parseInt(savedWidth, 10);
+      if (!isNaN(parsed) && parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
+        document.documentElement.style.setProperty('--sidebar-width', `${parsed}px`);
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read sidebar width from localStorage:', e);
+  }
+
+  let isDragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  function onPointerDown(e) {
+    // Only left click or primary touch
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    if (sidebar.classList.contains('rail-collapsed')) return;
+    if (window.innerWidth <= 1024) return; // Drawer mode on mobile
+
+    isDragging = true;
+    startX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    startWidth = sidebar.getBoundingClientRect().width;
+
+    resizer.classList.add('is-resizing');
+    document.body.classList.add('resizing-sidebar');
+
+    window.addEventListener('mousemove', onPointerMove, { passive: false });
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchend', onPointerUp);
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+
+    const currentX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    const deltaX = currentX - startX;
+    let newWidth = Math.round(startWidth + deltaX);
+
+    if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
+    if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
+
+    document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+  }
+
+  function onPointerUp() {
+    if (!isDragging) return;
+    isDragging = false;
+
+    resizer.classList.remove('is-resizing');
+    document.body.classList.remove('resizing-sidebar');
+
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('touchmove', onPointerMove);
+    window.removeEventListener('mouseup', onPointerUp);
+    window.removeEventListener('touchend', onPointerUp);
+
+    // Persist final width
+    const styleVal = parseInt(document.documentElement.style.getPropertyValue('--sidebar-width'), 10);
+    const finalWidth = !isNaN(styleVal) ? styleVal : Math.round(sidebar.getBoundingClientRect().width);
+    try {
+      localStorage.setItem('polyturing_sidebar_width', finalWidth);
+    } catch (e) {
+      console.warn('Could not save sidebar width to localStorage:', e);
+    }
+  }
+
+  resizer.addEventListener('mousedown', onPointerDown);
+  resizer.addEventListener('touchstart', onPointerDown, { passive: true });
+
+  // Double click resets to default
+  resizer.addEventListener('dblclick', () => {
+    document.documentElement.style.setProperty('--sidebar-width', `${DEFAULT_WIDTH}px`);
+    try {
+      localStorage.setItem('polyturing_sidebar_width', DEFAULT_WIDTH);
+    } catch (e) {
+      console.warn('Could not reset sidebar width in localStorage:', e);
+    }
+  });
+}
+
+// ─── 2c. Mobile Slide-out Navigation Drawer ──────────────────────────────────
+function initMobileDrawer() {
+  const toggleBtn = document.getElementById('mobile-nav-toggle');
+  const closeBtn = document.getElementById('mobile-drawer-close');
+  const backdrop = document.getElementById('mobile-drawer-backdrop');
+  const sidebar = document.getElementById('main-sidebar');
+
+  if (!sidebar) return;
+
+  function openDrawer() {
+    sidebar.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeDrawer() {
+    sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDrawer();
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeDrawer();
+    });
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener('click', closeDrawer);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
+      closeDrawer();
+    }
+  });
+
+  // Automatically close mobile drawer when any link is clicked on mobile screen
+  sidebar.querySelectorAll('.nav-tree-link, .mobile-tool-link').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 1024) {
+        closeDrawer();
       }
     });
   });

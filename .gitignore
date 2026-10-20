@@ -13,6 +13,7 @@ ehthumbs.db
 Thumbs.db
 Desktop.ini
 _site/
+.playwright-mcp/
 
 # ─── IDE / Editors ──────────────────────────────────────────────────────────
 .idea/

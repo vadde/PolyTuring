@@ -21,18 +21,27 @@
 
   <!-- Top Glass Header -->
   <header class="header-glass">
-    <a href="#ch0-overview" class="brand-section">
-      <div class="brand-logo">PT</div>
-      <div>
-        <div class="brand-title">PolyTuring</div>
-        <div style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">vadde/PolyTuring monorepo</div>
-      </div>
-      <span class="brand-badge">v0.2.2 Living Docs</span>
-    </a>
+    <div class="header-left-cluster">
+      <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Toggle navigation drawer" title="Open Navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <a href="#ch0-manifesto" class="brand-section">
+        <div class="brand-logo">PT</div>
+        <div class="brand-text-wrap">
+          <div class="brand-title">PolyTuring</div>
+          <div class="brand-sub">vadde/PolyTuring monorepo</div>
+        </div>
+        <span class="brand-badge">v0.2.2 Living Docs</span>
+      </a>
+    </div>
 
     <div class="search-trigger" id="search-trigger">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      <span>Quick search documentation...</span>
+      <span class="search-trigger-text">Quick search documentation...</span>
       <span class="shortcut-kbd">⌘K</span>
     </div>
 
@@ -87,8 +96,40 @@
   <!-- Master Layout -->
   <div class="layout-container">
     
-    <!-- Left Navigation Sidebar (Calibrated Hierarchical Tree) -->
-    <aside class="sidebar" id="main-sidebar">
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" aria-hidden="true"></div>
+    
+    <!-- Left Navigation Sidebar (Calibrated Hierarchical Tree / Slide-out Mobile Drawer) -->
+    <aside class="sidebar" id="main-sidebar" aria-label="Documentation Navigation">
+      
+      <!-- Mobile Drawer Top Bar (Visible on mobile/tablet) -->
+      <div class="mobile-drawer-header">
+        <div class="brand-section">
+          <div class="brand-logo">PT</div>
+          <div>
+            <div class="brand-title" style="font-size: 1.05rem;">PolyTuring</div>
+            <div style="font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono);">Living Documentation</div>
+          </div>
+        </div>
+        <button class="mobile-drawer-close" id="mobile-drawer-close" aria-label="Close navigation" title="Close Menu">✕</button>
+      </div>
+
+      <!-- Mobile Quick Tools Cluster -->
+      <div class="mobile-drawer-tools">
+        <a href="#token-simulator" class="mobile-tool-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span>Token Simulator</span>
+        </a>
+        <a href="#api-playground" class="mobile-tool-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+          <span>API Playground</span>
+        </a>
+        <a href="https://github.com/vadde/PolyTuring" target="_blank" rel="noopener noreferrer" class="mobile-tool-link" style="color: var(--accent-cyan);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub Repo</span>
+        </a>
+      </div>
+
       <div class="sidebar-controls-bar">
         <button class="sidebar-rail-btn" id="sidebar-rail-toggle" title="Toggle Compact Rail">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
@@ -102,11 +143,11 @@
 
       <!-- Tree Group 0: Platform Manifesto -->
       <div class="nav-tree-group expanded">
-        <div class="nav-tree-header active-branch" data-target="#ch0-manifesto-chapter">
+        <div class="nav-tree-header active-branch" data-target="#ch0-manifesto" title="00. Platform Manifesto">
           <div class="tree-title-group">
             <span class="tree-chevron">▶</span>
             <span class="tree-icon">🧭</span>
-            <span class="tree-title-text">00. Platform Manifesto</span>
+            <span class="tree-title-text" title="00. Platform Manifesto">00. Platform Manifesto</span>
           </div>
           <span class="nav-pill pill-core">Vision</span>
         </div>
@@ -120,72 +161,72 @@
 
       <!-- Tree Group 1: Omni-Graph -->
       <div class="nav-tree-group expanded">
-        <div class="nav-tree-header" data-target="#ch1-omni-graph">
+        <div class="nav-tree-header" data-target="#ch1-omni-graph" title="01. Omni-Graph Nervous System">
           <div class="tree-title-group">
             <span class="tree-chevron">▶</span>
             <span class="tree-icon">🌌</span>
-            <span class="tree-title-text">01. Omni-Graph Nervous System</span>
+            <span class="tree-title-text" title="01. Omni-Graph Nervous System">01. Omni-Graph Nervous System</span>
           </div>
           <span class="nav-pill pill-rust">Rust</span>
         </div>
         <div class="nav-tree-children">
           <a href="#ch1-omni-graph" class="nav-tree-link">System Overview</a>
           <a href="#sec-omni-arch" class="nav-tree-link">4-Tier Container Topology</a>
-          <a href="#sec-omni-galaxies" class="nav-tree-link">✨ Galaxy Subsystems & Louvain/Leiden</a>
-          <a href="#sec-omni-coupling" class="nav-tree-link">Coupling Metrics & Blast Radius</a>
+          <a href="#sec-omni-galaxies" class="nav-tree-link">✨ Galaxy Subsystems &amp; Louvain/Leiden</a>
+          <a href="#sec-omni-coupling" class="nav-tree-link">Coupling Metrics &amp; Blast Radius</a>
           <a href="#sec-omni-ebf" class="nav-tree-link">Ephemeral Branch Fabric (EBF)</a>
-          <a href="#sec-omni-ast" class="nav-tree-link">Polyglot AST & Struct Fields</a>
+          <a href="#sec-omni-ast" class="nav-tree-link">Polyglot AST &amp; Struct Fields</a>
           <a href="#sec-omni-budget" class="nav-tree-link">Two-Tier Token Budget Math</a>
           <a href="#sec-omni-relational" class="nav-tree-link">SurrealDB Relational Indexing</a>
           <a href="#token-simulator" class="nav-tree-link">Token Budget Simulator</a>
-          <a href="#api-playground" class="nav-tree-link">REST API Playbook & Curl</a>
+          <a href="#api-playground" class="nav-tree-link">REST API Playbook &amp; Curl</a>
         </div>
       </div>
 
       <!-- Tree Group 2: Session Explorer -->
       <div class="nav-tree-group expanded">
-        <div class="nav-tree-header" data-target="#ch2-session-explorer">
+        <div class="nav-tree-header" data-target="#ch2-session-explorer" title="02. Session Explorer">
           <div class="tree-title-group">
             <span class="tree-chevron">▶</span>
             <span class="tree-icon">🔎</span>
-            <span class="tree-title-text">02. Session Explorer</span>
+            <span class="tree-title-text" title="02. Session Explorer">02. Session Explorer</span>
           </div>
           <span class="nav-pill pill-go">Go</span>
         </div>
         <div class="nav-tree-children">
           <a href="#ch2-session-explorer" class="nav-tree-link">Trajectory Intelligence</a>
           <a href="#sec-session-arch" class="nav-tree-link">Go + Bun Standalone Binary</a>
-          <a href="#sec-session-wip" class="nav-tree-link">Agent WIP Recovery & Disambiguation</a>
-          <a href="#sec-session-viewer" class="nav-tree-link">Code Viewer & In-Page Find</a>
-          <a href="#sec-session-swagger" class="nav-tree-link">OpenAPI 3.0 & Swagger UI</a>
-          <a href="#sec-session-usage" class="nav-tree-link">Telemetry & CLI Quickstart</a>
+          <a href="#sec-session-wip" class="nav-tree-link">Agent WIP Recovery &amp; Disambiguation</a>
+          <a href="#sec-session-viewer" class="nav-tree-link">Code Viewer &amp; In-Page Find</a>
+          <a href="#sec-session-swagger" class="nav-tree-link">OpenAPI 3.0 &amp; Swagger UI</a>
+          <a href="#sec-session-usage" class="nav-tree-link">Telemetry &amp; CLI Quickstart</a>
         </div>
       </div>
 
       <!-- Tree Group 3: Universal Assistant Matrix -->
       <div class="nav-tree-group expanded">
-        <div class="nav-tree-header" data-target="#ch3-assistant-matrix">
+        <div class="nav-tree-header" data-target="#ch3-assistant-matrix" title="03. Universal Assistant Matrix">
           <div class="tree-title-group">
             <span class="tree-chevron">▶</span>
             <span class="tree-icon">⚡</span>
-            <span class="tree-title-text">03. Universal Assistant Matrix</span>
+            <span class="tree-title-text" title="03. Universal Assistant Matrix">03. Universal Assistant Matrix</span>
           </div>
           <span class="nav-pill pill-core">Matrix</span>
         </div>
         <div class="nav-tree-children">
           <a href="#ch3-assistant-matrix" class="nav-tree-link">Antigravity Native Engine</a>
-          <a href="#sec-assistant-roadmap" class="nav-tree-link">Copilot & Claude Code Roadmap</a>
+          <a href="#sec-assistant-roadmap" class="nav-tree-link">Copilot &amp; Claude Code Roadmap</a>
           <a href="#sec-assistant-mcp" class="nav-tree-link">Universal MCP Blueprint</a>
         </div>
       </div>
 
       <!-- Tree Group 4: Engineering Rigor & Governance -->
       <div class="nav-tree-group expanded">
-        <div class="nav-tree-header" data-target="#sec-appendix-rigor">
+        <div class="nav-tree-header" data-target="#sec-appendix-rigor" title="04. Engineering Rigor">
           <div class="tree-title-group">
             <span class="tree-chevron">▶</span>
             <span class="tree-icon">🛡️</span>
-            <span class="tree-title-text">04. Engineering Rigor</span>
+            <span class="tree-title-text" title="04. Engineering Rigor">04. Engineering Rigor</span>
           </div>
           <span class="nav-pill pill-core">Governance</span>
         </div>
@@ -197,6 +238,9 @@
         </div>
       </div>
     </aside>
+
+    <!-- Interactive Sidebar Resizer Splitter -->
+    <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize navigation sidebar" title="Drag to adjust sidebar width (Double-click to reset)"></div>
 
     <!-- Main Notebook Reading Pane -->
     <main class="content-area">
