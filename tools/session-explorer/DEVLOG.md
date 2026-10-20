@@ -969,5 +969,46 @@
    - Living Docs Portal test suite passed 100% via headless Chrome.
    - All SDD specifications validated (`make validate-specs` — 0 errors, 0 warnings).
 
+---
+
+### 2026-10-20 — Unified Markdown Hierarchy & Maximum Real Estate Utilization for Native File Viewer
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Visual UX, Fluid Real Estate & Markdown Standardization)  
+**Duration**: ~15m
+
+#### Forensic Root Cause & Design Decisions
+1. **Isolated Markdown Scoping & Missing File Viewer Styles**:
+   - In `tools/session-explorer/src/web/src/styles.css`, markdown typography rules (`p`, `h1`-`h4`, `a`, `pre`, `code`, `ul`, `ol`, `li`, `blockquote`, `table`, `hr`) were previously siloed strictly under `.message-body`.
+   - The file viewer container (`<div class="file-viewer-markdown markdown-body">`) lacked typography rules, causing user-agent fallbacks with collapsed headings and unstyled block elements.
+   - Inside `.message-body`, `h1` through `h4` had shared identical flat font sizes without visual differentiation.
+2. **Maximum Viewport Real Estate Mandate**:
+   - Capping `.file-viewer-shell` at `1280px` and `.file-viewer-markdown` at `960px` constricted technical documents and caused unnecessary line wrapping and table squishing on ultrawide displays.
+   - Removed artificial width caps:
+     - `.file-viewer-shell`: Expanded from `1280px` to `width: 97.5vw; max-width: 97.5vw; height: 96vh;` with minimal `1.25vh 1.25vw` backdrop padding.
+     - `.file-viewer-markdown`: Expanded to `width: 100%; max-width: 100%; margin: 0; padding: 2rem 2.5rem;` (with responsive mobile scaling `1.25rem 0.85rem`).
+     - Tables, code blocks, and diagrams now leverage 100% fluid horizontal real estate while maintaining optimal typographic hierarchy.
+3. **Unified Document-Grade Typographic Scale**:
+   - Unified all markdown selectors under `.markdown-body, .message-body, .file-viewer-markdown`.
+   - `h1`: `1.85rem`, `font-weight: 800`, `#ffffff`, glass bottom border, `2.25rem` top margin.
+   - `h2`: `1.45rem`, `font-weight: 700`, `#f8fafc`, subtle glass divider, `1.85rem` top margin.
+   - `h3`: `1.22rem`, `font-weight: 600`, `#38bdf8` (cyan accent), `1.5rem` top margin.
+   - `h4`: `1.05rem`, `font-weight: 600`, `#e2e8f0`, `1.25rem` top margin.
+   - `h5, h6`: `0.88rem`, `font-weight: 700`, uppercase tracked subtitle (`0.06em`).
+   - Normalizers: `:first-child { margin-top: 0 !important; }`, `:last-child { margin-bottom: 0 !important; }`.
+   - Paragraphs: `line-height: 1.75; margin-bottom: 1.05rem;`.
+   - Blockquotes: frosted acrylic cyan callouts with `rgba(15, 23, 42, 0.55)` background.
+
+#### Verification
+- Bundled frontend assets via Bun (`make -C tools/session-explorer build-web` — 2,128 modules in 114ms).
+- Recompiled Go binary (`make -C tools/session-explorer build-go`).
+- All 29 Go unit tests pass cleanly (`ok 0.727s`).
+- Headless Playwright verification confirmed:
+  - File Viewer modal occupies 97.5vw $\times$ 96vh across the display.
+  - Markdown content flows fluidly across 100% pane width.
+  - Prominent headings, crisp dividers, cyan H3 accents, and proportional paragraph rhythm verified.
+  - Visual artifacts: `playwright_file_viewer_fullscreen.png` and `playwright_file_viewer_md.png`.
+
+
 
 

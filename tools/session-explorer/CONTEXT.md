@@ -1,7 +1,7 @@
 ---
 tool: session-explorer
 status: review
-last_session: 2026-10-19
+last_session: 2026-10-20
 last_agent: "Antigravity"
 blockers: []
 ---
@@ -104,6 +104,7 @@ blockers: []
 | 2026-10-19 | TreeWalker Non-Destructive In-File Find Engine | Implemented in-modal Cmd+F search using document.createTreeWalker over text nodes, preserving DOM syntax-highlight spans and KaTeX/Mermaid structures with match count (X of Y) and smooth scrolling |
 | 2026-10-19 | Dual-Affordance File Reference & Micro-Feedback | Split session trail file chips into open-preview pill and direct 1-click copy path button (📋 → ✓), and added glowing feedback states to all viewer actions |
 | 2026-10-19 | Pinned Floating Find Widget Invariant | Anchored Find widget to unscrollable .file-viewer-shell frame (position: absolute; top: 66px; right: 24px) rather than scrolling body, ensuring find bar remains 100% visible across multi-page file scrolls (deltaTop = 0px) |
+| 2026-10-20 | Unified Document Typography & 98% Fluid File Viewer Real Estate | Unified markdown hierarchy across session trail and file viewer (.markdown-body, .message-body, .file-viewer-markdown); expanded .file-viewer-shell to 97.5vw and .file-viewer-markdown to 100% fluid width |
 
 ---
 
@@ -155,4 +156,4 @@ blockers: []
 
 ---
 
-_Last updated: 2026-10-19_
+_Last updated: 2026-10-20_

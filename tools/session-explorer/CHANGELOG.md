@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Unified Markdown Document Hierarchy & Reading Lane**:
+  - Replaced isolated timeline-only `.message-body` markdown CSS rules with a shared typography system covering `.markdown-body`, `.message-body`, and `.file-viewer-markdown`.
+  - Implemented an editorial-grade typographic scale (`h1` at 1.85rem with glass divider, `h2` at 1.45rem, `h3` at 1.22rem in cyan, `h4` at 1.05rem, `h5/h6` uppercase tracked at 0.88rem) with proportional spacing.
+  - Standardized paragraph margins (`1.05rem`), nested list spacing (`1.75rem`), frosted acrylic blockquotes, and table border matrices.
+  - Applied comfortable reading lane constraints to `.file-viewer-markdown` (`max-width: 960px; margin: 0 auto;`) with responsive mobile padding (`1.5rem 1rem`), preventing line stretching on ultrawide monitors and delivering 100% visual and structural parity between the session trail and native file viewer.
 - **Code Viewer Flex Layout Clipping & Line Gutter Height Drift**:
   - Replaced constrained flex layout on `.file-viewer-body` with natural block container layout (`display: block; overflow: auto;`) and `.code-content-pre { overflow: visible; }`, resolving empty blank rendering below viewport height on long code files.
   - Standardized `.code-line-numbers` and `code` font metrics (`font-size: 0.84rem; line-height: 22px;`) to eliminate vertical alignment drift over multi-hundred-line files.
