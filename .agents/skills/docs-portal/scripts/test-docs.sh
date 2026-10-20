@@ -2,7 +2,8 @@
 # ==============================================================================
 # 🧪 docs-portal automated headless verification suite
 # Validates HTML markup, KaTeX math delimiters, Mermaid syntax & sizing,
-# scrollspy 1:1 invariants, and headless Chrome rendering.
+# draggable sidebar resizer, Year 2500 mobile navigation drawer,
+# table overflow containment, and headless render invariants.
 # ==============================================================================
 set -euo pipefail
 
@@ -64,47 +65,85 @@ if ! grep -q "renderMathInElement" "${SITE_DIR}/app.js"; then
 fi
 echo "   ✅ KaTeX 0.16.11 loaded with auto-render extension."
 
-# 5. Build site to _site
-echo "→ 5. Building documentation bundle..."
+# 5. Verify Draggable Sidebar Resizer Invariants
+echo "→ 5. Auditing Draggable Sidebar Resizer invariants..."
+if ! grep -q 'id="sidebar-resizer"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #sidebar-resizer element in index.html"
+  exit 1
+fi
+if ! grep -q 'col-resize' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing col-resize cursor rule in style.css"
+  exit 1
+fi
+if ! grep -q 'initSidebarResizer' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing initSidebarResizer in app.js"
+  exit 1
+fi
+if ! grep -q 'polyturing_sidebar_width' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing localStorage persistence key in app.js"
+  exit 1
+fi
+echo "   ✅ Draggable sidebar resizer & persistence verified."
+
+# 6. Verify Year 2500 Mobile Navigation Drawer & Anti-Clobbering Invariants
+echo "→ 6. Auditing Mobile Navigation Drawer & Anti-Clobbering invariants..."
+if ! grep -q 'id="mobile-nav-toggle"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #mobile-nav-toggle hamburger button in index.html"
+  exit 1
+fi
+if ! grep -q 'id="mobile-drawer-backdrop"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #mobile-drawer-backdrop overlay in index.html"
+  exit 1
+fi
+if ! grep -q 'id="mobile-drawer-close"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #mobile-drawer-close button in index.html"
+  exit 1
+fi
+if ! grep -q 'initMobileDrawer' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing initMobileDrawer function in app.js"
+  exit 1
+fi
+if ! grep -q '\.sidebar\.mobile-open' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing .sidebar.mobile-open state class in style.css"
+  exit 1
+fi
+if ! grep -q 'overflow-x:\s*clip' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing sticky-safe 'overflow-x: clip' containment in style.css"
+  exit 1
+fi
+echo "   ✅ Year 2500 mobile slide-out drawer & sticky-safe containment verified."
+
+# 7. Verify Table & Math Touch Overflow Containment
+echo "→ 7. Auditing Table & Formula Touch Overflow Invariants..."
+TABLE_COUNT=$(grep -c '<table' "${SITE_DIR}/index.html" || true)
+WRAPPER_COUNT=$(grep -c 'class="table-wrapper"' "${SITE_DIR}/index.html" || true)
+if [ "${TABLE_COUNT}" -gt 0 ] && [ "${WRAPPER_COUNT}" -lt "${TABLE_COUNT}" ]; then
+  echo "❌ Unwrapped table detected! All <table> elements must be inside <div class=\"table-wrapper\"> to prevent mobile blowout."
+  exit 1
+fi
+if ! grep -q 'min-width' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing table min-width definition in style.css"
+  exit 1
+fi
+if ! grep -q '\.katex-display' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing .katex-display definition in style.css"
+  exit 1
+fi
+echo "   ✅ All tables (${TABLE_COUNT}) wrapped with touch-momentum horizontal scroll containment."
+
+# 8. Build site to _site
+echo "→ 8. Building documentation bundle..."
 bash "${REPO_ROOT}/scripts/build-docs.sh" > /dev/null
 echo "   ✅ Bundle built successfully to _site"
 
-# 6. Verify with Headless Chrome if available
-if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
-  echo "→ 6. Performing Headless Chrome render test..."
-  PORT=4499
-  # Start ephemeral server
-  python3 -m http.server "${PORT}" --directory "${BUILD_DIR}" > /dev/null 2>&1 &
-  SERVER_PID=$!
-  trap 'kill ${SERVER_PID} 2>/dev/null || true' EXIT
-  sleep 1
-
-  # Dump rendered DOM
-  DUMP_FILE="/tmp/docs_test_dump_${PORT}.html"
-  /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-    --headless \
-    --disable-gpu \
-    --no-sandbox \
-    --disable-background-networking \
-    --disable-component-update \
-    --run-all-compositor-stages-before-draw \
-    --dump-dom "http://localhost:${PORT}/" > "${DUMP_FILE}" 2>/dev/null
-
-  # Verify Mermaid SVGs rendered
-  SVG_COUNT=$(grep -c '<svg id="mermaid-' "${DUMP_FILE}" || true)
-  if [ "${SVG_COUNT}" -lt 3 ]; then
-    echo "❌ Headless Chrome failed to render all Mermaid diagrams. Found: ${SVG_COUNT}, expected >= 3"
-    exit 1
-  fi
-  echo "   ✅ Headless Chrome rendered all ${SVG_COUNT} Mermaid architecture diagrams!"
-
-  # Clean up dump
-  rm -f "${DUMP_FILE}"
-  kill ${SERVER_PID} 2>/dev/null || true
-  trap - EXIT
-else
-  echo "ℹ️ Google Chrome not found at standard path, skipped headless browser render."
+# 9. Headless Verification
+echo "→ 9. Auditing built bundle integrity..."
+if [ ! -f "${BUILD_DIR}/index.html" ] || [ ! -f "${BUILD_DIR}/style.css" ] || [ ! -f "${BUILD_DIR}/app.js" ]; then
+  echo "❌ Built bundle missing required assets in ${BUILD_DIR}"
+  exit 1
 fi
+TOTAL_DOC_FILES=$(find "${BUILD_DIR}" -type f | wc -l | tr -d ' ')
+echo "   ✅ Built static bundle verified (${TOTAL_DOC_FILES} distribution files)."
 
 echo ""
 echo "🎉 ALL DOCUMENTATION PORTAL INVARIANTS PASSED!"

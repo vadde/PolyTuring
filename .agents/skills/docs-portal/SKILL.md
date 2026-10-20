@@ -1,14 +1,14 @@
 ---
 name: docs-portal
 description: >-
-  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers liquid-glass design system, 1:1 bi-directional navigation sync, Mermaid diagram canvas invariants, KaTeX mathematical typesetting, interactive simulators, and headless Chrome verification.
+  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers cosmic liquid-glass design system, dynamic draggable sidebar resizer, Year 2500 mobile navigation drawer, strict touch-overflow containment, 1:1 bi-directional navigation sync, Mermaid diagram canvas invariants, KaTeX mathematical typesetting, interactive simulators, and headless verification.
 ---
 
 # 📚 Living Documentation Portal Engineering Skill
 
-This skill is the **single source of truth** for maintaining, styling, extending, and testing the `vadde/PolyTuring` Living Documentation Portal ([https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/)).
+This skill is the **single source of truth** for maintaining, styling, extending, and verifying the `vadde/PolyTuring` Living Documentation Portal ([https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/)).
 
-Follow this guide whenever adding chapters, modifying CSS styles, rendering architecture diagrams, typesetting mathematical equations, or building interactive simulator widgets.
+Follow this guide whenever adding chapters, modifying CSS styles, rendering architecture diagrams, typesetting mathematical equations, building interactive simulator widgets, or supporting small commute gadgets.
 
 ---
 
@@ -19,15 +19,15 @@ The documentation portal is built with **zero build toolchain dependencies** (pu
 ```
 PolyTuring/
 ├── docs/site/
-│   ├── index.html        → Semantic HTML5 layout, chapter disclosure trees, widgets
-│   ├── style.css         → Liquid-glass design tokens, animations, canvas layout
-│   └── app.js            → 1:1 ScrollSpy, zoomable canvas pan/zoom, simulator engines
+│   ├── index.html        → Semantic HTML5 layout, chapter disclosure trees, widgets, mobile drawer
+│   ├── style.css         → Liquid-glass design tokens, draggable resizer, responsive queries, canvas layout
+│   └── app.js            → 1:1 ScrollSpy, sidebar resizer, mobile drawer, zoomable canvas pan/zoom, simulator engines
 ├── scripts/
 │   └── build-docs.sh     → Static bundle packaging script (outputs to _site/)
 ├── .agents/skills/docs-portal/
 │   ├── SKILL.md          → YOU ARE HERE — Authoritative design & engineering protocol
 │   └── scripts/
-│       └── test-docs.sh  → Automated headless Chrome verification suite
+│       └── test-docs.sh  → Automated 9-gate verification suite
 └── .github/workflows/
     └── docs-publish.yml  → CI/CD workflow deploying main pushes to GitHub Pages
 ```
@@ -42,33 +42,210 @@ The portal uses a **deep cosmic liquid-glass design system**. Always use CSS var
 
 | Token | CSS Variable | Hex / RGBA Value | Purpose |
 |---|---|---|---|
-| **Canvas Deep Base** | `--bg-deep` | `#070a13` | Deep space background canvas |
-| **Card Surface** | `--bg-card` | `rgba(15, 23, 42, 0.75)` | Glassmorphism card background |
+| **Canvas Deep Base** | `--bg-deep` | `#0b0f19` | Deep space background canvas |
+| **Card Surface** | `--bg-card` | `rgba(18, 26, 47, 0.55)` | Glassmorphism card background |
 | **Card Border** | `--bg-card-border` | `rgba(255, 255, 255, 0.08)` | Subtle translucent glass card edge |
-| **Hover Border** | `--bg-card-border-hover` | `rgba(0, 242, 254, 0.4)` | Interactive element border focus |
+| **Hover Border** | `--bg-card-border-glow` | `rgba(0, 242, 254, 0.25)` | Interactive element border focus |
 | **Cyan Accent** | `--accent-cyan` | `#00f2fe` | Primary interactive focus, metrics, active items |
 | **Violet Accent** | `--accent-violet` | `#a855f7` | Diagram relational links, secondary badges |
 | **Emerald Accent** | `--accent-emerald` | `#10b981` | Passing SLA badges, Rust indicators, health |
 | **Amber Accent** | `--accent-amber` | `#f59e0b` | Cautionary callouts, architectural invariant warnings |
 | **Rose Accent** | `--accent-rose` | `#f43f5e` | SLA breaches, error indicators, fatal alerts |
-| **Primary Text** | `--text-primary` | `#f8fafc` | High-contrast body text and titles |
+| **Primary Text** | `--text-main` | `#f1f5f9` | High-contrast body text and titles |
 | **Muted Text** | `--text-muted` | `#94a3b8` | Subtitles, parameter descriptions |
 | **Dim Text** | `--text-dim` | `#64748b` | Captions, footnotes, table metadata |
 
 ### Glassmorphism Recipe
 ```css
 /* Canonical frosted glass surface */
-background: rgba(15, 23, 42, 0.75);
-backdrop-filter: blur(20px);
--webkit-backdrop-filter: blur(20px);
+background: rgba(15, 23, 42, 0.65);
+backdrop-filter: blur(24px) saturate(190%);
+-webkit-backdrop-filter: blur(24px) saturate(190%);
 border: 1px solid var(--bg-card-border);
-border-radius: var(--radius-lg);
+border-radius: var(--radius-md);
 ```
 
 ### Typography Hierarchy
-- **Display Headings (`h1`, `h2`, `.chapter-title`)**: `'Outfit', sans-serif`, font-weight 700–800.
-- **Body & Controls**: `'Plus Jakarta Sans', sans-serif`, font-weight 400–600.
+- **Display Headings (`h1`, `h2`, `.chapter-title`)**: `'Outfit', sans-serif`, font-weight 700–800. Fluid sizing via `clamp()`.
+- **Body & Controls**: `'Inter', sans-serif`, font-weight 400–600.
 - **Code, Metrics & Data**: `'JetBrains Mono', monospace`, font-weight 500–700.
+
+---
+
+## ↔️ Interactive Draggable Sidebar Resizer Standard
+
+Fixed-width sidebars degrade user experience by clipping titles on ultra-wide screens or consuming excessive reading space on medium displays.
+
+### 1. Splitter DOM & Styling Invariants
+The draggable splitter `.sidebar-resizer` must sit directly between `<aside class="sidebar">` and `<main class="content-area">`:
+
+```html
+<aside class="sidebar" id="main-sidebar">...</aside>
+<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize navigation sidebar" title="Drag to adjust sidebar width (Double-click to reset)"></div>
+<main class="content-area">...</main>
+```
+
+```css
+.sidebar-resizer {
+  width: 10px;
+  margin-left: -5px;
+  margin-right: -5px;
+  cursor: col-resize;
+  position: sticky;
+  top: var(--topbar-height);
+  height: calc(100vh - var(--topbar-height));
+  z-index: 35;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: '';
+  width: 2px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer.is-resizing::after {
+  height: 84px;
+  width: 3px;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 14px var(--accent-cyan);
+}
+```
+
+### 2. Operational Invariants for Sidebar Resizing
+1. **Bounds Clamping**: Resizing must be strictly clamped between `MIN_WIDTH = 240px` and `MAX_WIDTH = 560px`.
+2. **Dragging Performance**: During drag, `body.resizing-sidebar` must set `cursor: col-resize !important; user-select: none !important;`, and `.sidebar` must set `transition: none !important;` to eliminate pointer lag.
+3. **Persistence**: The chosen width must be persisted to `localStorage.setItem('polyturing_sidebar_width', width)` on pointer up, and restored on `DOMContentLoaded`.
+4. **Double-Click Reset**: Double-clicking the splitter resets `--sidebar-width` to the default optimal width (`320px`).
+5. **The Zero-Truncation Invariant**: Never clip titles with single-line ellipses (`white-space: nowrap; text-overflow: ellipsis;`). All navigation titles must use:
+   ```css
+   .tree-title-text {
+     white-space: normal;
+     word-break: break-word;
+     line-height: 1.35;
+     font-size: 0.85rem;
+   }
+   ```
+   This ensures chapter names like `01. Omni-Graph Nervous System` wrap cleanly without ugly ellipsis truncation dots.
+
+---
+
+## 📱 Year 2500 Visionary Mobile Architecture (Commute Gadget Standard)
+
+Modern software engineers and architects scout tools on mobile devices during commutes (smartphones, foldable devices, compact tablets) before testing on workstations. The portal must deliver a flawless, high-density, touch-optimized experience.
+
+### 1. The Mobile Navigation Drawer Pattern
+On viewports $\le 1024\text{px}$, the sidebar transforms into an off-canvas slide-out drawer:
+
+```html
+<header class="header-glass">
+  <div class="header-left-cluster">
+    <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Open Navigation">
+      <svg width="20" height="20" ...></svg>
+    </button>
+    ...
+  </div>
+</header>
+
+<div class="layout-container">
+  <!-- Backdrop MUST be inside layout container to share stacking context with sidebar -->
+  <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" aria-hidden="true"></div>
+  
+  <aside class="sidebar" id="main-sidebar">
+    <div class="mobile-drawer-header">
+      <div class="brand-section">...</div>
+      <button class="mobile-drawer-close" id="mobile-drawer-close">✕</button>
+    </div>
+    <div class="mobile-drawer-tools">
+      <!-- Token Simulator, API Playground, GitHub Repo links -->
+    </div>
+    ...
+  </aside>
+  ...
+</div>
+```
+
+```css
+@media (max-width: 1024px) {
+  .mobile-nav-toggle { display: flex; }
+  .sidebar-resizer { display: none !important; }
+
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 12, 0.75);
+    backdrop-filter: blur(12px);
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .mobile-drawer-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: min(86vw, 360px);
+    height: 100dvh;
+    z-index: 1200;
+    background: #090e1a;
+    backdrop-filter: blur(32px) saturate(200%);
+    box-shadow: 16px 0 60px rgba(0, 0, 0, 0.95);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}
+```
+
+### 2. The Stacking Context Invariant (CRITICAL)
+> [!CAUTION]
+> If `.layout-container` defines a CSS `z-index` and `position: relative`, placing `#mobile-drawer-backdrop` outside `.layout-container` traps the sidebar's stacking context below the backdrop.
+> **Invariant**: Always place `#mobile-drawer-backdrop` inside `.layout-container` right before `<aside class="sidebar">`. This guarantees `.sidebar` (`z-index: 1200`) cleanly layers above the backdrop (`z-index: 1100`), which in turn dims `.content-area` (`z-index: 1`).
+
+### 3. Strict Anti-Clobbering & Sticky-Safe Containment
+1. **The Sticky Overflow Invariant**:
+   - **NEVER use `overflow-x: hidden` on `html` or `body`** when sticky headers or sticky sidebars exist. In WebKit/Blink, `overflow-x: hidden` forces an implicit scroll container that destroys `position: sticky`.
+   - **Always use `overflow-x: clip;`** on `html, body, .layout-container`. `clip` prevents horizontal scroll blowouts without creating a scroll container!
+2. **The Table Containment Invariant**:
+   - Every `<table>` must be wrapped in `<div class="table-wrapper">`.
+   - CSS must enforce:
+     ```css
+     .table-wrapper {
+       width: 100%;
+       max-width: 100%;
+       overflow-x: auto;
+       -webkit-overflow-scrolling: touch;
+     }
+     table {
+       min-width: 520px; /* Prevents columns from crushing into illegible slivers */
+     }
+     ```
+3. **KaTeX & Code Blocks Containment**:
+   - `.katex-display` must define `overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; max-width: 100%;`.
+   - `.code-container pre` must define `overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;`.
+4. **Fluid Typography (`clamp`)**:
+   - Hero Headings: `font-size: clamp(1.6rem, 5.5vw, 2.2rem);`
+   - Chapter Titles: `font-size: clamp(1.25rem, 4.2vw, 1.75rem);`
+   - Section H2: `font-size: clamp(1.1rem, 3vw, 1.4rem);`
+   - Mode Buttons: `flex: 1; min-width: 80px; justify-content: center;`
 
 ---
 
@@ -87,11 +264,39 @@ The left sidebar is composed of `.nav-tree-group` sections containing:
   3. Smooth-scrolls to the target element with sticky-header offset (`160px`).
   4. Applies temporary `.flash-focus` neon glow (1.8s) to the target element.
   5. Sets `isNavClicking = true` for `850ms` to prevent smooth-scroll events from overriding the active highlight.
+  6. On mobile ($\le 1024\text{px}$), automatically dismisses the mobile navigation drawer.
 * **ScrollSpy Tracking (CRITICAL)**:
   - ScrollSpy tracks **EVERY TARGET ELEMENT LINKED IN THE NAVIGATION** individually, NOT just `.chapter-section`!
-  - Targets include: `#sec-omni-arch`, `#sec-omni-ebf`, `#sec-omni-ast`, `#sec-omni-budget`, `#sec-omni-relational`, etc.
+  - Targets include: `#sec-omni-arch`, `#sec-omni-galaxies`, `#sec-omni-coupling`, `#sec-omni-ebf`, `#sec-omni-ast`, etc.
   - **INVARIANT**: ScrollSpy must **NEVER** mutate tree open/close state (`classList.add('expanded')`) while scrolling! It ONLY updates `.active` on the link and `.active-branch` on the group header.
-  - **INVARIANT**: When "Collapse All" is clicked, scrolling to the bottom must **NEVER** forcefully pop open Sections 00 or 01.
+  - **INVARIANT**: When "Collapse All" is clicked, scrolling must **NEVER** forcefully pop open closed chapters.
+
+---
+
+## 🔬 Theoretical & Mathematical Foundations Standard
+
+When documenting tools in PolyTuring, avoid superficial descriptions of CLI flags. Present the **rigorous computer science and graph theory foundations** that empower the architecture:
+
+### 1. Omni-Graph: Galaxy Subsystems & Louvain/Leiden Modularity Clustering
+Document how the polyglot AST call graph is partitioned into architectural galaxy subsystems using Louvain / Leiden modularity optimization ($Q$):
+$$Q = \frac{1}{2m} \sum_{ij} \left( A_{ij} - \gamma \frac{k_i k_j}{2m} \right) \delta(c_i, c_j)$$
+
+### 2. Robert C. Martin Coupling Metrics & Dynamic Blast Radius Contracts
+Document how cross-boundary dependency vectors are quantified before writing refactored code:
+- **Afferent Coupling ($C_a$)**: Incoming external symbols depending on this subsystem.
+- **Efferent Coupling ($C_e$)**: Outgoing dependencies this subsystem calls.
+- **Instability Metric ($I$)**:
+  $$I = \frac{C_e}{C_a + C_e}, \quad I \in [0, 1]$$
+- **Architectural SLA Thresholds**:
+  - **Core Foundation**: $I \le 0.25$ (High stability, maximum caution).
+  - **Domain Service**: $0.25 < I \le 0.65$ (Balanced volatility).
+  - **Orchestrator / Leaf**: $I > 0.65$ (High volatility, safe to patch).
+
+### 3. Session Explorer: Trajectory Observability & Memory Recovery
+Document how standalone Go + Bun binaries index JSONL agent trajectory logs into SQLite3 WAL, enabling instant WIP memory recovery for agent context crashes.
+
+### 4. Universal Assistant Matrix
+Position every tool as natively integrated with Google Antigravity today, while providing an architectural blueprint for Model Context Protocol (MCP) server integration with GitHub Copilot, Claude Code, and Cursor.
 
 ---
 
@@ -109,7 +314,7 @@ Every architecture diagram and complex table must be wrapped in a zoomable canva
       <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
       <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
       <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+        <svg width="13" height="13" ...></svg>
         <span>Theater</span>
       </button>
     </div>
@@ -129,11 +334,10 @@ flowchart TB
 ### 2. The Critical SVG Layout Invariant (DO NOT VIOLATE)
 > [!CAUTION]
 > **NEVER apply `width: auto !important` or `height: auto !important` to `.mermaid svg` inside nested flex containers!**
-> In modern browser rendering engines (WebKit, Blink), overriding SVG width/height with `auto` inside flex containers collapses the SVG's flex basis to **0px by 0px**, rendering diagrams completely invisible.
+> Overriding SVG width/height with `auto` inside flex containers collapses the SVG's flex basis to **0px by 0px**, rendering diagrams invisible.
 
 **The Golden Layout Rules for Mermaid:**
 ```css
-/* 1. Viewport handles overflow and scroll */
 .canvas-viewport {
   overflow: auto;
   padding: 28px 24px;
@@ -145,7 +349,6 @@ flowchart TB
   user-select: none;
 }
 
-/* 2. Surfaces flow as inline-block */
 .canvas-content-surface {
   transform-origin: center top;
   transition: transform 0.12s ease-out;
@@ -162,7 +365,6 @@ flowchart TB
   overflow: visible !important;
 }
 
-/* 3. SVG respects its native responsive coordinate space */
 .mermaid svg {
   display: inline-block !important;
   max-width: 100% !important;
@@ -172,150 +374,36 @@ flowchart TB
 
 ### 3. Mermaid Node Label Escaping Rule
 > [!WARNING]
-> Unescaped `<` or `>` characters inside Mermaid node labels (e.g. `[Condenser (<1500 Tokens)]`) are parsed as HTML tags and **crash the Mermaid parser**!
+> Unescaped `<` or `>` characters inside Mermaid node labels (e.g. `[Condenser (<1500 Tokens)]`) parse as HTML tags and **crash the Mermaid parser**!
 > **Always write:** `≤ 1,500 Tokens` or `&lt;1500 Tokens`.
-
-### 4. Theater Button Layout Rule
-The theater button contains an SVG icon and text ("Theater"). Its CSS class `.canvas-tool-btn.fullscreen-btn` (or `.theater-btn`) must specify:
-`min-width: 32px; padding: 0 14px; gap: 8px; font-weight: 600;`
-Never constrain it to `width: 28px` (which is reserved for single-character zoom buttons like `+` and `−`).
-
-### 5. Diagram Viewport Bounding & Theater Mode Invariants
-> [!IMPORTANT]
-> **The Vertical Rhythm Invariant**: Diagrams in vertical conversational monologue feeds or long-form documentation must **NEVER** expand with unbounded vertical height that traps user scrolling.
-> 1. Constrain inline `.canvas-viewport` to `max-height: 440px` (or `600px` for static docs) with internal scroll (`overflow: auto`) and custom scrollbars.
-> 2. Double-clicking any `.canvas-viewport` MUST immediately launch the Fullscreen Theater modal.
-> 3. Fullscreen Theater mode provides distraction-free focus: 20% to 500% zoom controls, click-and-drag panning, Fit to View, Copy SVG, and Copy Diagram Source.
-
----
-
-## 🗂️ Native In-Browser File & Artifact Viewer Design Standard
-
-When presenting codebases, agent session timelines, or interactive docs, eliminate external copy-paste friction by providing an in-browser file and artifact inspector:
-
-### 1. Unified Clickable File References
-- Any filesystem path referenced in conversational prose (`file:///...` or `/Users/...`), markdown links (`[title](path#L10-L20)`), or tool parameters (`AbsolutePath`, `TargetFile`) must be rendered as an interactive, clickable chip (`.tool-file-pill`, `.file-path-link`).
-- Clicking the element opens the file natively inside the browser modal/drawer without switching apps.
-
-### 2. File Viewer Core Anatomy
-The native viewer component consists of:
-1. **Header Bar**:
-   - Language-specific icon (🐹 Go, 🐍 Python, 🦀 Rust, ⚡ JS/TS, 📝 Markdown, ⚙️ Config, 🖼️ Image).
-   - Filename and breadcrumb path with one-click copy.
-   - Metadata pills: Detected language badge, total line count, human-readable file size (`KB`/`MB`).
-   - View mode switcher (`📖 Preview` vs `📝 Raw`) for rich formats (Markdown).
-   - Line wrap toggle (`↩ Wrap`) and Copy Content button.
-2. **Body Viewport**:
-   - **Markdown Mode**: Rich HTML render with KaTeX math typesetting and Mermaid diagram rendering.
-   - **Code / Raw Mode**: Syntax highlighting via Highlight.js with a dedicated `.code-line-numbers` gutter.
-   - **Anchor Highlighting**: If the target path contains line anchors (e.g. `#L45-L60` or `:45`), the line gutter and code lines automatically highlight with an active border accent and scroll into view.
-   - **Image Preview**: Embedded base64 or blob URL preview for `.png`, `.jpg`, `.svg`, `.webp`.
-3. **Session Aggregation**:
-   - Monologue and tool execution feeds should aggregate all inspected and modified files into a dedicated "Files & Artifacts" drawer, categorized by `✨ Artifact`, `✏️ Modified`, and `👁️ Read`.
-
-### 3. Single Unified Scrollbar Invariant
-> [!IMPORTANT]
-> When rendering syntax-highlighted code with an external line numbers gutter inside a scrollable container (`.file-viewer-body`), the code pre block (`.code-content-pre`) MUST specify `overflow-x: auto; overflow-y: hidden;` while the parent viewport manages `overflow: auto;`.
-> **Never allow nested vertical scrollbars (`overflow-y: auto`) on both the parent container and code block.** Nested vertical scrollbars fight for wheel focus, disorient users, and desynchronize the line gutter from code text.
-
-### 4. Pinned Floating Find Widget Invariant
-> [!IMPORTANT]
-> Any in-file or in-document Find widget (`#fileViewerFindWidget`) MUST be anchored directly to the unscrollable outer modal shell (`.file-viewer-shell` with `position: relative`), positioned with `position: absolute; top: 66px; right: 24px; z-index: 100;`.
-> **NEVER place the Find widget inside an `overflow: auto` scroll body.** When placed inside a scrolling body, scrolling through multi-page files pushes the find input, match counters (`X of Y`), and navigation buttons off-screen, forcing users to scroll all the way back to the top to see which occurrence they are on or to close the search.
-
-### 5. Dual-Affordance File References & Micro-Feedback
-- File links in message streams must decouple file inspection from clipboard copying into a split chip (`.tool-file-chip-group`):
-  - Primary pill (`📄 file.ext ↗`): Single-click opens native in-browser viewer.
-  - Secondary icon (`📋`): Single-click copies absolute file path directly to clipboard with zero modal popups.
-- Positive micro-feedback: Copy buttons immediately toggle to a green checkmark (`✓`) with toast feedback. All modal actions (`📋 Copy`, `🔗 Path`, `↩ Wrap`) must flash positive feedback states (`✓ Copied!`, `✓ Wrapped`) with color transitions before smoothly reverting.
-
----
-
-## 📐 Mathematical Typesetting (KaTeX)
-
-All LaTeX mathematical expressions must render crisply in dark glass containers:
-- **Inline Math**: Wrapped in `$ ... $` (e.g. `$\le 1,500$`, `$\approx 1$ms`, `$C_{\text{max}}$`).
-- **Display Math**: Wrapped in `$$ ... $$` (e.g. `$$C_{\text{total}} = C_{\text{root}} + \dots$$`).
-
-### KaTeX Invariants
-1. Loaded in `<head>` via jsDelivr CDN (`katex.min.css`, `katex.min.js`, `auto-render.min.js`).
-2. Auto-render extension must ignore preformatted code blocks:
-   ```javascript
-   ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "annotation"]
-   ```
-   *Why this matters:* If `<pre>` is not ignored, KaTeX will attempt to parse Mermaid diagram source code and destroy the diagrams before Mermaid executes!
 
 ---
 
 ## 🎛️ Interactive Simulators & Playgrounds
 
-Interactive modules (such as the **Context Condenser Token Simulator** and **API Playground**) are first-class citizens of Chapter 01:
+Interactive modules (such as the **Context Condenser Token Simulator** and **API Playground**) are first-class citizens of the portal:
 
-### 1. Module Placement & Disclosure
-- Must use `<section class="chapter-section" id="token-simulator">` with standard `.chapter-header-trigger`.
-- Must include a badge: `Chapter 01 · Interactive Module 1.1`.
-- Must expand and collapse in harmony with "Expand All", "Collapse All", and "Focus Mode".
-
-### 2. Parameter Control Card Anatomy (The 2-Line Rule)
-Never squeeze the parameter title and value into a single row with `justify-content: space-between`. On narrow cards or multi-word titles, this forces ugly multi-line wrapping (e.g. `Neighbor \n Cap` and `4500 \n chars`).
+### 1. Parameter Control Card Anatomy (The 2-Line Rule)
+Never squeeze parameter titles and values into a single row with `justify-content: space-between`. On narrow cards or multi-word titles, this forces ugly multi-line wrapping.
 
 **Always use the 2-Line Stack inside isolated frosted cards:**
 ```html
 <div class="control-item">
   <!-- Line 1: Parameter Title -->
   <div class="control-title">Neighbor Signatures Cap</div>
-  <!-- Line 2: Prominent Monospace Quantitative Value -->
+  <!-- Line 2: Monospace Quantitative Value -->
   <div class="control-value" id="val-neighbor-chars">2400 chars</div>
   <!-- Line 3: Range Slider Track -->
   <input type="range" id="sim-neighbor-chars" min="500" max="4500" step="100" value="2400">
 </div>
 ```
 
-```css
-.control-item {
-  display: flex;
-  flex-direction: column;
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid var(--bg-card-border);
-  border-radius: var(--radius-md);
-  padding: 16px 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.control-item .control-title {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 6px;
-}
-
-.control-item .control-value {
-  font-family: var(--font-mono);
-  font-size: 1.18rem;
-  font-weight: 700;
-  color: var(--accent-cyan);
-  margin-bottom: 12px;
-}
-
-.control-item input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent-cyan);
-  cursor: pointer;
-  margin-top: auto;
-}
-```
-
 ---
 
-## 🧪 Automated Testing Protocol (Zero Guesswork)
+## 🧪 Automated Testing Protocol (9-Gate Audit)
 
 Never push documentation portal changes without running the automated test suite!
 
-### 1. Run the Automated Verification Suite
 ```bash
 # Run the all-in-one headless audit:
 bash .agents/skills/docs-portal/scripts/test-docs.sh
@@ -324,107 +412,50 @@ bash .agents/skills/docs-portal/scripts/test-docs.sh
 make docs-test
 ```
 
-The script automatically executes:
+### The 9 Automated Verification Gates
 1. **Core Asset Presence**: Verifies `index.html`, `style.css`, and `app.js`.
 2. **Mermaid Syntax Auditing**: Detects unescaped `<` or `>` characters in node labels.
 3. **SVG Sizing Invariants**: Validates that CSS does not contain collapsing `width: auto !important` on `.mermaid svg`.
 4. **KaTeX Integration**: Verifies stylesheet, scripts, and auto-render calls.
-5. **Static Bundle Build**: Compiles to `_site/` and checks size/file counts.
-6. **Headless Chrome Render Test**: Spins up an ephemeral local server, launches headless Chrome, dumps the rendered DOM, and verifies that **all 3 Mermaid SVGs** rendered with non-zero dimensions.
-
-### 2. Manual Local Preview
-```bash
-# Build and serve locally on http://localhost:4000:
-make docs-serve
-
-# Or direct Python server:
-python3 -m http.server 4000 --directory _site
-```
-
-### 3. Verify Live Deployment
-After pushing to `main`:
-```bash
-# 1. Watch GitHub Actions workflow:
-gh run list --workflow="docs-publish.yml" --limit 1
-
-# 2. Verify HTTP 200 on live GitHub Pages:
-curl -sI https://vadde.github.io/PolyTuring/
-```
-
----
-
-## 🖥️ Code Viewer & Preformatted Gutter Invariants
-
-When implementing or styling code viewers with line numbers gutters and inline highlights:
-
-### 1. The Preformatted Block Highlight Invariant
-Inside preformatted code tags (`<pre><code>...</code></pre>`), NEVER apply `display: block` to line highlight marks (`<mark>` or `<span>`).
-* **Root Cause**: In `<pre>` tags, combining `display: block` with a literal trailing newline (`\n`) forces modern browser layout engines to create a second line break, doubling the rendered height (e.g. 22px &rarr; 44px) and progressively shifting highlighted code downward out of sync with the gutter.
-* **Invariant**: Always style `<mark class="line-highlight">` as `display: inline` (e.g., `padding: 1px 4px; border-radius: 3px;`).
-
-### 2. Gutter & Code Metric Synchronization Invariant
-The line numbers gutter (`.code-line-numbers`) and code text (`.code-content-pre code`) must share **IDENTICAL** font metrics:
-* Same `font-family` (e.g. `'JetBrains Mono', monospace`).
-* Same `font-size` (e.g. `0.84rem`).
-* Same fixed pixel `line-height` (e.g. `22px`).
-* Any fractional `rem` line-height variation accumulates vertical drift across large files (by line 100, a 1px delta causes a 100px / ~4.5 line offset).
-
-### 3. Flex Column Scroll Containment
-When an `overflow: auto` scroll container uses `display: flex; flex-direction: column`, nested child code blocks (`<pre>`) with `overflow-y: hidden; flex: 1;` will get clamped to the viewport height (e.g. 770px). When scrolled down, the code box scrolls out of view, revealing an empty background void.
-* **Invariant**: Use `display: block; overflow: auto;` on the scroll parent, and allow the child `<pre>` to expand to its full content height (`overflow: visible`), ensuring all lines (1 to N) remain fully visible during multi-page scroll.
+5. **Draggable Sidebar Resizer Invariants**: Audits `#sidebar-resizer`, `col-resize`, `initSidebarResizer`, `localStorage` key, and non-clipping text wrapping.
+6. **Year 2500 Mobile Navigation Drawer & Anti-Clobbering**: Audits `#mobile-nav-toggle`, `#mobile-drawer-backdrop`, `#mobile-drawer-close`, `initMobileDrawer`, `.sidebar.mobile-open`, and sticky-safe `overflow-x: clip`.
+7. **Table & Math Touch Overflow Containment**: Ensures all `<table>` tags are inside `.table-wrapper`, min-width is specified, and `.katex-display` has `overflow-x: auto`.
+8. **Static Bundle Build**: Compiles to `_site/` and checks size/file counts.
+9. **Built Bundle Integrity**: Verifies compiled distribution files.
 
 ---
 
 ## 🚀 Playbook: Adding a New Chapter or Tool
 
-When documenting a new tool (e.g. `Chapter 04 · New Tool`):
+When documenting a new tool (e.g. `Chapter 05 · New Tool`):
 
 1. **Update Left Navigation (`docs/site/index.html`)**:
    Add a new `.nav-tree-group`:
    ```html
    <div class="nav-tree-group">
-     <div class="nav-tree-header" data-target="#ch4-new-tool">
+     <div class="nav-tree-header" data-target="#ch5-new-tool" title="05. New Tool Name">
        <div class="tree-title-group">
          <span class="tree-chevron">▶</span>
          <span class="tree-icon">🚀</span>
-         <span class="tree-title-text">04. New Tool Name</span>
+         <span class="tree-title-text" title="05. New Tool Name">05. New Tool Name</span>
        </div>
        <span class="nav-pill pill-rust">Rust</span>
      </div>
      <div class="nav-tree-children">
-       <a href="#ch4-new-tool" class="nav-tree-link">System Overview</a>
+       <a href="#ch5-new-tool" class="nav-tree-link">System Overview</a>
        <a href="#sec-new-arch" class="nav-tree-link">Architecture Topology</a>
+       <a href="#sec-new-theory" class="nav-tree-link">Theoretical Foundations</a>
        <a href="#sec-new-usage" class="nav-tree-link">Usage & Quickstart</a>
      </div>
    </div>
    ```
 
 2. **Add Chapter Section (`docs/site/index.html`)**:
-   ```html
-   <section class="chapter-section" id="ch4-new-tool">
-     <div class="chapter-header-trigger">
-       <div>
-         <div class="chapter-badge">Chapter 04 · Tool Category</div>
-         <h2 class="chapter-title">Tool Name: Purpose</h2>
-         <div style="font-size: 0.85rem; color: var(--text-dim);">Subtitle</div>
-       </div>
-       <div class="chapter-toggle-indicator">
-         <div class="chapter-toggle-icon">▼</div>
-       </div>
-     </div>
-     <div class="chapter-body">
-       <p>Overview text...</p>
-       <h3 class="section-h2" id="sec-new-arch">Architecture Topology</h3>
-       <!-- Diagram Canvas here -->
-       <h3 class="section-h2" id="sec-new-usage">Usage & Quickstart</h3>
-       <!-- Code block here -->
-     </div>
-   </section>
-   ```
+   Enclose all comparison tables in `<div class="table-wrapper">`, KaTeX in `$$ ... $$`, and diagrams in `.canvas-container`.
 
 3. **Verify and Deploy**:
    ```bash
-   bash .agents/skills/docs-portal/scripts/test-docs.sh
-   git commit -am "feat(docs): add Chapter 04 documentation"
+   make docs-test
+   git commit -am "feat(docs): add Chapter 05 documentation"
    git push origin main
    ```
