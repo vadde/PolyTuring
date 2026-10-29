@@ -86,7 +86,7 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-025 | Show "most frequently used prompts" or prompt frequency analysis | Could | ✅ | 🧪 | scanner.go computeStats(), app.js Insights modal |
 | R-026 | Copy prompt text to clipboard with one click | Should | ✅ | 🧪 | src/web/src/app.js copy buttons + toast |
 | R-027 | Lazy loading / virtual scrolling for large conversation timelines | Should | ✅ | 🧪 | src/web/src/app.js DOM rendering |
-| R-028 | Project and repository clustering: dynamically identify repos from tool paths and prompts | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
+| R-028 | Multi-tier repository and workspace clustering: authoritative DB metadata, weighted empirical tool touches, boundary sanitization, and graceful non-git folder fallback | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
 | R-029 | Flexible user-driven grouping modes: Project Hub, Date Timeline, or Flat List | Must | ✅ | 🧪 | src/web/src/app.js renderView(), index.html segmented control |
 | R-030 | Agent Work-In-Progress (WIP) Recovery API (`/api/wip`) | Must | ✅ | 🧪 | scanner.go GetWorkspaceWIP(), api.go HandleWIP |
 | R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | ✅ | 🧪 | api.go, scripts/wip.sh, session-wip skill |
@@ -349,7 +349,9 @@ Retrieves file content safely from local disk for the native in-browser file and
 | Session ID | UUID string | Directory name under `brain/` |
 | Transcript | JSONL file | `brain/<id>/.system_generated/logs/transcript.jsonl` |
 | Full Transcript | JSONL file | `brain/<id>/.system_generated/logs/transcript_full.jsonl` |
-| Workspace | string (path) | Extracted from `ADDITIONAL_METADATA` in `USER_INPUT` entries |
+| Trajectory Metadata | SQLite DB | `conversations/<id>.db` (`trajectory_metadata_blob` table: git repo, branch, workspace URI) |
+| Workspace / Project | string (path / name) | Multi-tier clustering engine: Authoritative DB → Empirical Tool Touches → Prompt Metadata → Folder Name → "Default" |
+| Git Repo & Branch | string | Extracted from SQLite `trajectory_metadata_blob` or filesystem `.git` traversal |
 
 **JSONL Entry Schema (per line):**
 

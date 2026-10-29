@@ -679,3 +679,109 @@ func TestR036_MultiRuntimeDiscovery(t *testing.T) {
 	}
 }
 
+// TestIntelligentClustering_EmpiricalTouchDominance tests that empirical tool touches (Path, CommandLine)
+// completely supersede casual conversational prompt mentions.
+func TestIntelligentClustering_EmpiricalTouchDominance(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Prompt mentions Personal and PolyTuring, but agent tool calls exclusively edit DSA files
+	transcript := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-27T10:00:00Z","content":"<USER_REQUEST>Look at Personal and PolyTuring and build DSA website</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-27T10:01:00Z","content":"Inspecting DSA code","tool_calls":[{"name":"read_file","args":{"Path":"/Users/test/knowledge/DSA/docs/site/app.js"}},{"name":"edit_file","args":{"Path":"/Users/test/knowledge/DSA/docs/site/style.css"}},{"name":"run_command","args":{"CommandLine":"cd /Users/test/knowledge/DSA && make test"}}]}
+{"step_index":2,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-27T10:05:00Z","content":"<USER_REQUEST>This is my personal note</USER_REQUEST>"}`
+
+	createMockSession(t, tmpDir, "sess-dsa-empirical", transcript)
+
+	idx := NewSessionIndex(tmpDir, false)
+	idx.knownProjects["Personal"] = "/Users/test/knowledge/Personal"
+	idx.knownProjects["PolyTuring"] = "/Users/test/knowledge/PolyTuring"
+	idx.knownProjects["DSA"] = "/Users/test/knowledge/DSA"
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	if len(idx.sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(idx.sessions))
+	}
+
+	s := idx.sessions[0]
+	if s.ProjectName != "DSA" {
+		t.Errorf("expected ProjectName 'DSA', got %q", s.ProjectName)
+	}
+	if s.Workspace != "/Users/test/knowledge/DSA" {
+		t.Errorf("expected Workspace '/Users/test/knowledge/DSA', got %q", s.Workspace)
+	}
+	// Verify ProjectsTouched has DSA first
+	if len(s.ProjectsTouched) == 0 || s.ProjectsTouched[0] != "DSA" {
+		t.Errorf("expected ProjectsTouched[0] == 'DSA', got %v", s.ProjectsTouched)
+	}
+}
+
+// TestIntelligentClustering_NonGitFolderFallback verifies graceful degradation to folder name
+// when there is no git repository and no known project.
+func TestIntelligentClustering_NonGitFolderFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	transcript := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-27T10:00:00Z","content":"<USER_REQUEST>Edit scratch files</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-27T10:01:00Z","content":"Editing","tool_calls":[{"name":"write_file","args":{"Path":"/Users/test/adhoc-scripts/data-pipeline/etl.py"}}]}`
+
+	createMockSession(t, tmpDir, "sess-adhoc", transcript)
+
+	idx := NewSessionIndex(tmpDir, false)
+	idx.knownProjects = make(map[string]string)
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	if len(idx.sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(idx.sessions))
+	}
+
+	s := idx.sessions[0]
+	if s.ProjectName != "data-pipeline" {
+		t.Errorf("expected ProjectName 'data-pipeline', got %q", s.ProjectName)
+	}
+}
+
+// TestWorkspaceFilter_NoOneDrivePersonalCollision verifies that OneDrive-Personal path noise
+// does NOT cause false-positive matches for 'Personal' project.
+func TestWorkspaceFilter_NoOneDrivePersonalCollision(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	sDSA := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-27T10:00:00Z","content":"<USER_REQUEST>DSA task</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-27T10:01:00Z","content":"ok","tool_calls":[{"name":"read_file","args":{"Path":"/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/DSA/main.go"}}]}`
+
+	sPersonal := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-27T11:00:00Z","content":"<USER_REQUEST>Personal task</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-27T11:01:00Z","content":"ok","tool_calls":[{"name":"read_file","args":{"Path":"/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/Personal/notes.md"}}]}`
+
+	createMockSession(t, tmpDir, "sess-dsa", sDSA)
+	createMockSession(t, tmpDir, "sess-personal", sPersonal)
+
+	idx := NewSessionIndex(tmpDir, false)
+	idx.knownProjects["DSA"] = "/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/DSA"
+	idx.knownProjects["Personal"] = "/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/Personal"
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	// Filter specifically by "Personal"
+	personalSessions := idx.GetSessions("Personal", "date", "desc", time.Time{}, time.Time{})
+	if len(personalSessions) != 1 {
+		t.Fatalf("expected exactly 1 Personal session, got %d", len(personalSessions))
+	}
+	if personalSessions[0].ID != "sess-personal" {
+		t.Errorf("expected session 'sess-personal', got %q", personalSessions[0].ID)
+	}
+
+	// Filter specifically by "DSA"
+	dsaSessions := idx.GetSessions("DSA", "date", "desc", time.Time{}, time.Time{})
+	if len(dsaSessions) != 1 {
+		t.Fatalf("expected exactly 1 DSA session, got %d", len(dsaSessions))
+	}
+	if dsaSessions[0].ID != "sess-dsa" {
+		t.Errorf("expected session 'sess-dsa', got %q", dsaSessions[0].ID)
+	}
+}
+

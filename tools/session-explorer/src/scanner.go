@@ -7,10 +7,12 @@ package main
 
 import (
 	"bufio"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -396,6 +398,20 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 		HasFullTranscript:   hasFull,
 	}
 
+	// Probe authoritative conversation metadata (Tier 0)
+	trajMeta := extractTrajectoryMetadata(loc.Path, sessionID)
+	if trajMeta != nil {
+		if trajMeta.GitRepo != "" {
+			session.GitRepo = trajMeta.GitRepo
+		}
+		if trajMeta.GitBranch != "" {
+			session.GitBranch = trajMeta.GitBranch
+		}
+		if trajMeta.WorkspaceURI != "" && (session.Workspace == "" || strings.HasPrefix(session.Workspace, "/Untitled")) {
+			session.Workspace = trajMeta.WorkspaceURI
+		}
+	}
+
 	scanner := bufio.NewScanner(file)
 	// Increase buffer size for large lines (some transcript lines can be very long)
 	buf := make([]byte, 0, 1024*1024) // 1MB initial
@@ -405,6 +421,8 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	firstUserPromptFound := false
 	toolCounts := make(map[string]int)
 	projectScores := make(map[string]int)
+	empiricalTouches := make(map[string]int)
+	projectWorkspaces := make(map[string]string)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -474,63 +492,130 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 				for _, tc := range entry.ToolCalls {
 					toolCounts[tc.Name]++
 
-					for _, key := range []string{"Cwd", "DirectoryPath", "SearchPath", "TargetFile", "AbsolutePath", "TargetDirectory"} {
+					// Collect candidate paths from tool arguments (Tier 2: Empirical Touch Matrix)
+					var candidatePaths []string
+
+					// Direct path arguments from file editing/reading tools
+					for _, key := range []string{"Path", "TargetFile", "AbsolutePath", "FilePath", "File", "Directory", "Cwd", "DirectoryPath", "SearchPath", "TargetDirectory"} {
 						if rawVal, exists := tc.Args[key]; exists {
 							if valStr, ok := rawVal.(string); ok && valStr != "" {
-								valStr = strings.Trim(valStr, `"'`)
-								if (strings.HasPrefix(valStr, "/") || strings.HasPrefix(valStr, "~")) &&
-									!strings.Contains(valStr, ".gemini/antigravity-ide/brain") &&
-									!strings.Contains(valStr, "/.gemini/") &&
-									!strings.HasPrefix(valStr, "/Untitled") {
+								candidatePaths = append(candidatePaths, strings.Trim(valStr, `"'`))
+							}
+						}
+					}
 
-									matched := false
-									// Check against known projects (ignoring OneDrive-Personal path segment for Personal project)
-									for name, path := range idx.knownProjects {
-										if !isValidWorkspaceName(name) {
-											continue
-										}
-										if name == "Personal" && strings.Contains(valStr, "OneDrive-Personal") && !strings.Contains(valStr, "/knowledge/Personal") {
-											continue
-										}
-										if strings.Contains(valStr, "/"+name+"/") || strings.HasSuffix(valStr, "/"+name) || strings.Contains(valStr, "/knowledge/"+name) {
-											projectScores[name] += 20
-											matched = true
-										} else if path != "" && strings.Contains(valStr, path) {
-											projectScores[name] += 20
-											matched = true
-										}
-									}
+					// Extract paths from CommandLine (run_command)
+					if cmdVal, exists := tc.Args["CommandLine"]; exists {
+						if cmdStr, ok := cmdVal.(string); ok && cmdStr != "" {
+							matches := reCommandPath.FindAllString(cmdStr, -1)
+							for _, p := range matches {
+								candidatePaths = append(candidatePaths, strings.Trim(p, `"'`))
+							}
+						}
+					}
 
-									// Extract repo name directly from /knowledge/<repo> or /Interviews/<repo>
-									if !matched {
-										if kIdx := strings.Index(valStr, "/knowledge/"); kIdx != -1 {
-											sub := valStr[kIdx+len("/knowledge/"):]
-											parts := strings.Split(sub, "/")
-											if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
-												projectScores[parts[0]] += 25
-												matched = true
-											}
-										} else if iIdx := strings.Index(valStr, "/Interviews/"); iIdx != -1 {
-											sub := valStr[iIdx+len("/Interviews/"):]
-											parts := strings.Split(sub, "/")
-											if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
-												projectScores[parts[0]] += 25
-												matched = true
-											}
-										}
-									}
-
-									// Fallback: derive project name directly from path if no known project matched
-									if !matched {
-										derived := extractProjectName(valStr)
-										if isValidWorkspaceName(derived) {
-											projectScores[derived] += 15
-											if session.Workspace == "" || strings.HasPrefix(session.Workspace, "/Untitled") {
-												session.Workspace = filepath.Dir(valStr)
-											}
-										}
-									}
+					// Extract paths from MCP tool Arguments
+					if argsVal, exists := tc.Args["Arguments"]; exists {
+						if argMap, ok := argsVal.(map[string]interface{}); ok {
+							for _, v := range argMap {
+								if s, ok := v.(string); ok && strings.HasPrefix(s, "/") {
+									candidatePaths = append(candidatePaths, strings.Trim(s, `"'`))
 								}
+							}
+						} else if argStr, ok := argsVal.(string); ok && strings.Contains(argStr, "/") {
+							matches := reCommandPath.FindAllString(argStr, -1)
+							for _, p := range matches {
+								candidatePaths = append(candidatePaths, strings.Trim(p, `"'`))
+							}
+						}
+					}
+
+					for _, rawPath := range candidatePaths {
+						if rawPath == "" ||
+							strings.HasPrefix(rawPath, "/Untitled") ||
+							strings.Contains(rawPath, "/.gemini/antigravity") ||
+							strings.Contains(rawPath, "/.gemini/") {
+							continue
+						}
+
+						var projectName string
+						var projectWorkspace string
+
+						// 1. Check if path belongs to a Git repository boundary (.git)
+						gitRoot := findGitRoot(rawPath)
+						if gitRoot != "" {
+							pName := filepath.Base(gitRoot)
+							if isValidWorkspaceName(pName) {
+								projectName = pName
+								projectWorkspace = gitRoot
+							}
+						}
+
+						// 2. Check against knownProjects map
+						if projectName == "" {
+							for name, path := range idx.knownProjects {
+								if !isValidWorkspaceName(name) {
+									continue
+								}
+								if name == "Personal" && strings.Contains(rawPath, "OneDrive-Personal") && !strings.Contains(rawPath, "/knowledge/Personal") {
+									continue
+								}
+								if strings.Contains(rawPath, "/"+name+"/") || strings.HasSuffix(rawPath, "/"+name) {
+									projectName = name
+									projectWorkspace = path
+									break
+								} else if path != "" && strings.Contains(rawPath, path) {
+									projectName = name
+									projectWorkspace = path
+									break
+								}
+							}
+						}
+
+						// 3. Check knowledge/ or Interviews/ parent path
+						if projectName == "" {
+							if kIdx := strings.Index(rawPath, "/knowledge/"); kIdx != -1 {
+								sub := rawPath[kIdx+len("/knowledge/"):]
+								parts := strings.Split(sub, "/")
+								if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
+									projectName = parts[0]
+									projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", parts[0])
+								}
+							} else if iIdx := strings.Index(rawPath, "/Interviews/"); iIdx != -1 {
+								sub := rawPath[iIdx+len("/Interviews/"):]
+								parts := strings.Split(sub, "/")
+								if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
+									projectName = parts[0]
+									projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews", parts[0])
+								}
+							}
+						}
+
+						// 4. Graceful Degradation: Not a Git repo and not known -> fall back to directory/folder name!
+						if projectName == "" {
+							derived := extractProjectName(rawPath)
+							if isValidWorkspaceName(derived) {
+								projectName = derived
+								if pIdx := strings.Index(rawPath, "/"+derived); pIdx != -1 {
+									projectWorkspace = rawPath[:pIdx+len("/"+derived)]
+								} else {
+									projectWorkspace = rawPath
+								}
+							}
+						}
+
+						if projectName != "" && isValidWorkspaceName(projectName) {
+							// Weight file mutations higher than inspections
+							weight := 15
+							if tc.Name == "write_file" || tc.Name == "edit_file" || tc.Name == "write_to_file" {
+								weight = 50
+							} else if tc.Name == "run_command" {
+								weight = 25
+							}
+							projectScores[projectName] += weight
+							empiricalTouches[projectName] += weight
+							if projectWorkspace != "" {
+								projectWorkspaces[projectName] = projectWorkspace
 							}
 						}
 					}
@@ -552,9 +637,28 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	session.LastMessageAt = lastTimestamp
 	session.ToolCallsMap = toolCounts
 
-	// Determine best project from projectScores
-	var bestProject string
-	maxScore := 0
+	// Authoritative identity resolution
+	var authoritativeProject string
+	var authoritativeWorkspace string
+	if trajMeta != nil {
+		if trajMeta.GitRepo != "" {
+			parts := strings.Split(trajMeta.GitRepo, "/")
+			slugName := parts[len(parts)-1]
+			if isValidWorkspaceName(slugName) {
+				authoritativeProject = slugName
+			}
+		}
+		if trajMeta.WorkspaceURI != "" {
+			authoritativeWorkspace = trajMeta.WorkspaceURI
+			if authoritativeProject == "" {
+				derived := extractProjectName(authoritativeWorkspace)
+				if isValidWorkspaceName(derived) {
+					authoritativeProject = derived
+				}
+			}
+		}
+	}
+
 	type pScore struct {
 		name  string
 		score int
@@ -563,10 +667,6 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	for name, score := range projectScores {
 		if score > 0 && isValidWorkspaceName(name) {
 			scoredList = append(scoredList, pScore{name: name, score: score})
-			if score > maxScore {
-				maxScore = score
-				bestProject = name
-			}
 		}
 	}
 
@@ -574,37 +674,66 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 		return scoredList[i].score > scoredList[j].score
 	})
 
-	session.ProjectsTouched = make([]string, 0, len(scoredList))
-	seenTouched := make(map[string]bool)
-	for _, ps := range scoredList {
-		if isValidWorkspaceName(ps.name) && !seenTouched[ps.name] {
-			seenTouched[ps.name] = true
-			session.ProjectsTouched = append(session.ProjectsTouched, ps.name)
-		}
-	}
-
-	if bestProject != "" && isValidWorkspaceName(bestProject) {
-		session.ProjectName = bestProject
-		if p, ok := idx.knownProjects[bestProject]; ok {
-			session.Workspace = p
-		} else if session.Workspace == "" || strings.HasPrefix(session.Workspace, "/Untitled") {
-			knowledgePath := filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", bestProject)
-			if _, err := os.Stat(knowledgePath); err == nil {
-				session.Workspace = knowledgePath
-			} else {
-				session.Workspace = "/" + bestProject
+	var bestProject string
+	if len(scoredList) > 0 {
+		bestProject = scoredList[0].name
+		// If authoritativeProject from DB is present and has empirical touches, prefer it:
+		if authoritativeProject != "" && authoritativeProject != bestProject {
+			if projectScores[authoritativeProject] > 0 {
+				bestProject = authoritativeProject
 			}
+		}
+	} else if authoritativeProject != "" && isValidWorkspaceName(authoritativeProject) {
+		// Pure chat session with zero tool calls, but authoritative DB exists!
+		bestProject = authoritativeProject
+		if session.Workspace == "" || strings.HasPrefix(session.Workspace, "/Untitled") {
+			session.Workspace = authoritativeWorkspace
 		}
 	} else if session.Workspace != "" {
 		derived := extractProjectName(session.Workspace)
 		if isValidWorkspaceName(derived) {
-			session.ProjectName = derived
-			session.ProjectsTouched = []string{derived}
-		} else {
-			session.ProjectName = "Default"
+			bestProject = derived
 		}
-	} else {
-		session.ProjectName = "Default"
+	}
+
+	if bestProject == "" || !isValidWorkspaceName(bestProject) {
+		bestProject = "Default"
+	}
+
+	session.ProjectName = bestProject
+
+	// Build ProjectsTouched: primary project first, then any other project with actual empirical tool touches
+	session.ProjectsTouched = make([]string, 0)
+	seenTouched := make(map[string]bool)
+	if bestProject != "Default" {
+		seenTouched[bestProject] = true
+		session.ProjectsTouched = append(session.ProjectsTouched, bestProject)
+	}
+
+	for _, ps := range scoredList {
+		if isValidWorkspaceName(ps.name) && !seenTouched[ps.name] {
+			// Only include secondary projects in ProjectsTouched if tools genuinely touched them
+			if empiricalTouches[ps.name] > 0 {
+				seenTouched[ps.name] = true
+				session.ProjectsTouched = append(session.ProjectsTouched, ps.name)
+			}
+		}
+	}
+
+	// Assign workspace path with container normalization
+	if p, ok := projectWorkspaces[bestProject]; ok && p != "" {
+		session.Workspace = p
+	} else if authoritativeWorkspace != "" && !isGenericParentContainer(authoritativeWorkspace) {
+		session.Workspace = authoritativeWorkspace
+	} else if p, ok := idx.knownProjects[bestProject]; ok {
+		session.Workspace = p
+	} else if session.Workspace == "" || isGenericParentContainer(session.Workspace) {
+		knowledgePath := filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", bestProject)
+		if _, err := os.Stat(knowledgePath); err == nil {
+			session.Workspace = knowledgePath
+		} else {
+			session.Workspace = "/" + bestProject
+		}
 	}
 
 	idx.mu.Lock()
@@ -631,16 +760,16 @@ func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, 
 	for _, s := range idx.sessions {
 		// Filter by workspace
 		if workspace != "" {
-			wsLower := strings.ToLower(workspace)
-			matched := strings.Contains(strings.ToLower(s.Workspace), wsLower) ||
-				strings.Contains(strings.ToLower(s.ProjectName), wsLower)
+			wsClean := strings.TrimSpace(workspace)
+			wsLower := strings.ToLower(wsClean)
+			matched := strings.EqualFold(s.ProjectName, wsClean) || strings.EqualFold(strings.ToLower(s.ProjectName), wsLower)
 			if !matched {
-				for _, pt := range s.ProjectsTouched {
-					if strings.Contains(strings.ToLower(pt), wsLower) {
-						matched = true
-						break
-					}
-				}
+				sanitizedWs := sanitizeWorkspacePath(s.Workspace)
+				sanitizedTarget := sanitizeWorkspacePath(wsClean)
+				matched = strings.HasSuffix(sanitizedWs, "/"+sanitizedTarget) ||
+					strings.Contains(sanitizedWs, "/"+sanitizedTarget+"/") ||
+					strings.EqualFold(sanitizedWs, sanitizedTarget) ||
+					strings.Contains(strings.ToLower(sanitizedWs), "/"+strings.ToLower(sanitizedTarget))
 			}
 			if !matched {
 				continue
@@ -1149,6 +1278,161 @@ func extractUserPrompt(content string) string {
 	return content
 }
 
+// TrajectoryMeta holds authoritative metadata extracted from conversations/<id>.db
+type TrajectoryMeta struct {
+	WorkspaceURI string
+	GitRepo      string
+	GitURL       string
+	GitBranch    string
+}
+
+var (
+	reFileURI     = regexp.MustCompile(`file://(/Users/[a-zA-Z0-9_\-\./]+)`)
+	reGitURL      = regexp.MustCompile(`https://github\.com/([a-zA-Z0-9_\-\.]+)/([a-zA-Z0-9_\-\.]+?)(?:\.git|\")`)
+	reGitBranch   = regexp.MustCompile(`\b(main|master|feat/[a-zA-Z0-9_\-\.]+|fix/[a-zA-Z0-9_\-\.]+)\b`)
+	reCommandPath = regexp.MustCompile(`(/(?:Users|home|workspace|private|Volumes|Library|opt|etc|tmp|var)/[a-zA-Z0-9_\-\./]+)`)
+)
+
+// sanitizeWorkspacePath strips OS path segments that create false-positive substring matches (e.g. OneDrive-Personal).
+func sanitizeWorkspacePath(p string) string {
+	return strings.ReplaceAll(p, "OneDrive-Personal", "OD-P")
+}
+
+// isGenericParentContainer checks if a workspace path is a broad parent container rather than an actual codebase.
+func isGenericParentContainer(path string) bool {
+	clean := filepath.Clean(strings.Trim(path, `"'`))
+	if clean == "" || clean == "/" || clean == "." || clean == "/Untitled" || strings.HasPrefix(clean, "/Untitled") {
+		return true
+	}
+	base := filepath.Base(clean)
+	lower := strings.ToLower(base)
+	return lower == "interviews" || lower == "knowledge" || lower == "users" || lower == "aparv" || lower == "home" || lower == "workspace"
+}
+
+// findGitRoot recursively inspects parent directories of a path to find the repository root (.git boundary).
+func findGitRoot(path string) string {
+	if path == "" {
+		return ""
+	}
+	clean := filepath.Clean(strings.Trim(path, `"'`))
+	if clean == "" || clean == "/" || clean == "." {
+		return ""
+	}
+
+	curr := clean
+	if fi, err := os.Stat(curr); err != nil || !fi.IsDir() {
+		curr = filepath.Dir(curr)
+	}
+
+	for {
+		if curr == "" || curr == "/" || curr == "." {
+			break
+		}
+		gitPath := filepath.Join(curr, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return curr
+		}
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break
+		}
+		curr = parent
+	}
+	return ""
+}
+
+// extractTrajectoryMetadata probes conversations/<id>.db to extract authoritative workspace and Git metadata.
+func extractTrajectoryMetadata(storageDir, sessionID string) *TrajectoryMeta {
+	candidatePaths := []string{
+		filepath.Join(filepath.Dir(storageDir), "conversations", sessionID+".db"),
+		filepath.Join(storageDir, "..", "conversations", sessionID+".db"),
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidatePaths = append(candidatePaths,
+			filepath.Join(home, ".gemini", "antigravity-cli", "conversations", sessionID+".db"),
+			filepath.Join(home, ".gemini", "antigravity-ide", "conversations", sessionID+".db"),
+		)
+	}
+
+	var dbPath string
+	for _, p := range candidatePaths {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			dbPath = p
+			break
+		}
+	}
+	if dbPath == "" {
+		return nil
+	}
+
+	meta := &TrajectoryMeta{}
+
+	// Strategy A: Use sqlite3 CLI if available for precise extraction from trajectory_metadata_blob
+	if sqliteBin, err := exec.LookPath("sqlite3"); err == nil && sqliteBin != "" {
+		cmd := exec.Command(sqliteBin, dbPath, "SELECT hex(data) FROM trajectory_metadata_blob WHERE id='main';")
+		if out, err := cmd.Output(); err == nil && len(out) > 0 {
+			if raw, err := hex.DecodeString(strings.TrimSpace(string(out))); err == nil && len(raw) > 0 {
+				parseTrajectoryBytes(raw, meta)
+				if meta.WorkspaceURI != "" || meta.GitRepo != "" {
+					return meta
+				}
+			}
+		}
+	}
+
+	// Strategy B: Pure Go binary scan fallback on the SQLite file
+	if f, err := os.Open(dbPath); err == nil {
+		defer f.Close()
+		buf := make([]byte, 128*1024)
+		n, _ := f.Read(buf)
+		if n > 0 {
+			parseTrajectoryBytes(buf[:n], meta)
+		}
+	}
+
+	if meta.WorkspaceURI != "" || meta.GitRepo != "" {
+		return meta
+	}
+	return nil
+}
+
+func parseTrajectoryBytes(raw []byte, meta *TrajectoryMeta) {
+	if meta.WorkspaceURI == "" {
+		matches := reFileURI.FindAllSubmatch(raw, -1)
+		for _, m := range matches {
+			if len(m) > 1 {
+				u := string(m[1])
+				u = strings.TrimRight(u, "`'\"jzJ \t\r\n")
+				if !strings.Contains(u, ".gemini") && !strings.Contains(u, "/output.txt") && !strings.Contains(u, "/task-") {
+					meta.WorkspaceURI = u
+					break
+				}
+			}
+		}
+	}
+
+	if meta.GitRepo == "" {
+		matches := reGitURL.FindAllSubmatch(raw, -1)
+		for _, m := range matches {
+			if len(m) > 2 {
+				owner := string(m[1])
+				repo := string(m[2])
+				if owner != "" && repo != "" && !strings.EqualFold(owner, "apps") && !strings.EqualFold(owner, "actions") {
+					meta.GitRepo = owner + "/" + repo
+					meta.GitURL = fmt.Sprintf("https://github.com/%s/%s", owner, repo)
+					break
+				}
+			}
+		}
+	}
+
+	if meta.GitBranch == "" {
+		if m := reGitBranch.FindSubmatch(raw); len(m) > 1 {
+			meta.GitBranch = string(m[1])
+		}
+	}
+}
+
 // extractWorkspace extracts the workspace/project path from ADDITIONAL_METADATA or CLI user_information.
 // Implements: R-005, R-036
 var activeDocRegex = regexp.MustCompile(`Active Document:\s*(/[^\s\n\r]+)`)
@@ -1215,6 +1499,10 @@ func isValidWorkspaceName(name string) bool {
 		"default": true, "workspace": true, "aparv": true, "runner": true,
 		"work": true, "bin": true, "cmd": true, "lib": true,
 		"library": true, "applications": true, "system": true, "volumes": true,
+		"div": true, "span": true, "pre": true, "code": true, "details": true,
+		"summary": true, "button": true, "em": true, "strong": true, "null": true,
+		"localhost": true, "site": true, "assets": true, "text": true, "math": true,
+		"search": true, "symbol": true, "references": true, "main": true,
 	}
 	if blocked[lower] {
 		return false
@@ -1383,23 +1671,29 @@ func (idx *SessionIndex) GetWorkspaceWIP(workspace, sessionID string, forceLates
 			continue
 		}
 
-		wsLower := strings.ToLower(wsTarget)
 		cleanLower := strings.ToLower(wsTargetClean)
 
 		matched := strings.EqualFold(s.ProjectName, wsTarget) ||
 			strings.EqualFold(s.ProjectName, wsTargetClean) ||
-			strings.Contains(strings.ToLower(s.Workspace), wsLower) ||
-			strings.Contains(strings.ToLower(s.ProjectName), wsLower) ||
 			(cleanLower != "default" && strings.EqualFold(s.ProjectName, cleanLower))
 
 		if !matched {
 			for _, pt := range s.ProjectsTouched {
 				if strings.EqualFold(pt, wsTarget) || strings.EqualFold(pt, wsTargetClean) ||
-					strings.Contains(strings.ToLower(pt), wsLower) {
+					strings.EqualFold(pt, cleanLower) {
 					matched = true
 					break
 				}
 			}
+		}
+
+		if !matched {
+			sanitizedWs := sanitizeWorkspacePath(s.Workspace)
+			sanitizedTarget := sanitizeWorkspacePath(wsTarget)
+			matched = strings.HasSuffix(sanitizedWs, "/"+sanitizedTarget) ||
+				strings.Contains(sanitizedWs, "/"+sanitizedTarget+"/") ||
+				strings.EqualFold(sanitizedWs, sanitizedTarget) ||
+				strings.Contains(strings.ToLower(sanitizedWs), "/"+strings.ToLower(sanitizedTarget))
 		}
 
 		if matched {

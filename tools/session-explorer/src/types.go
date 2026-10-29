@@ -49,6 +49,8 @@ type Session struct {
 	Workspace              string         `json:"workspace"`
 	ProjectName            string         `json:"project_name"`
 	ProjectsTouched        []string       `json:"projects_touched,omitempty"`
+	GitRepo                string         `json:"git_repo,omitempty"`
+	GitBranch              string         `json:"git_branch,omitempty"`
 	StepCount              int            `json:"step_count"`
 	UserMessageCount       int            `json:"user_message_count"`
 	AgentResponseCount     int            `json:"agent_response_count"`

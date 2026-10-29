@@ -6,6 +6,53 @@
 
 ---
 
+### 2026-10-29 — Architecture: Multi-Tier Intelligent Workspace & Codebase Clustering Engine (R-028, R-005)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Intelligent Workspace Transpiler & Clustering Robustness)
+**Duration**: ~45m
+
+#### What Was Done
+- **Problem Investigated**:
+  - Session `07bb93c8-8d8a-42b8-947a-f22f047a7c12`, operating inside the `DSA` codebase repository, was incorrectly clustered under the `"Personal"` project in Session Explorer.
+  - Root cause analysis revealed three overlapping factors:
+    1. **Lack of DB Probing**: Antigravity IDE and CLI persist rich, authoritative session trajectory metadata in SQLite at `<storage_dir>/../conversations/<id>.db` (`trajectory_metadata_blob` table, `id='main'`). Session Explorer previously only read JSONL transcripts and ignored the authoritative DB.
+    2. **Uninspected Tool Arguments**: `scanSession` searched tool call argument keys for `["Cwd", "DirectoryPath", "SearchPath", "TargetFile", "AbsolutePath", "TargetDirectory"]`, but completely ignored `Path` (used in `read_file`, `write_file`, `edit_file`) and `CommandLine` (used in `run_command`). Over 565 tool interactions in `DSA` were completely invisible to the keyword frequency counter.
+    3. **Filesystem Substring Collisions**: The path component `OneDrive-Personal` in the user's macOS path (`/Users/aparv/Library/CloudStorage/OneDrive-Personal/...`) falsely triggered matches for `Personal` across every single session, while casual conversational prompt mentions tipped the heuristic score in favor of `"Personal"`.
+- **Architectural Solution Implemented**:
+  1. **Tier 0 (Authoritative Trajectory Metadata Probing)**:
+     - Implemented `extractTrajectoryMetadata(storageDir, sessionID)` in `scanner.go` to probe `conversations/<id>.db` via `sqlite3` CLI or direct binary scan fallback.
+     - Extracts authoritative `WorkspaceURI`, `GitRepo` (e.g. `vadde/DSA`), `GitURL`, and `GitBranch` (`main`).
+  2. **Tier 1 (Weighted Empirical Tool Touch Matrix)**:
+     - Expanded argument inspection to include `Path`, `CommandLine`, and MCP `Arguments`.
+     - Added `extractCandidatePathsFromArgs` to parse command-line paths, cd arguments, and file edits.
+     - Implemented `findGitRoot(path)` to traverse upwards and locate true repository roots (`.git`).
+     - Applied weighted scoring prioritizing physical evidence over conversational mentions: Mutations (`write_file`, `edit_file`) = 50 pts, Execution (`run_command`) = 25 pts, Inspections (`read_file`) = 15 pts, System Metadata = 30 pts, Casual Prompt mentions = 10 pts.
+  3. **Tier 2-4 (Graceful Degradation Invariants)**:
+     - Verified and hardened fallback order: Authoritative Git/DB → Empirical Touches → System Prompt Metadata → Non-Git Directory/Folder Name → `"Default"`.
+     - Implemented `isGenericParentContainer` to prevent broad parent directories (like `Interviews`, `knowledge`, `/workspace`) from eclipsing the specific child codebase.
+     - Implemented `sanitizeWorkspacePath` to replace `OneDrive-Personal` with `OD-P`, permanently preventing false-positive keyword collisions on macOS OneDrive paths.
+  4. **Types & Models (`src/types.go`)**:
+     - Added `GitRepo string` and `GitBranch string` to `Session` struct.
+  5. **Verification & Tests (`src/scanner_test.go`)**:
+     - Added `TestIntelligentClustering_EmpiricalTouchDominance` verifying tool calls completely supersede prompt mentions.
+     - Added `TestIntelligentClustering_NonGitFolderFallback` verifying folder fallback for non-git directories.
+     - Added `TestWorkspaceFilter_NoOneDrivePersonalCollision` verifying isolation between `DSA` and `Personal` workspaces.
+     - All 34 Go unit tests pass cleanly (`go test ./...`).
+     - Verified live binary on `:9876`: Session `07bb93c8` correctly clusters under `📁 DSA` with `git_repo: "vadde/DSA"` and `git_branch: "main"`.
+
+#### Files Changed
+- `specs/catalog/session-explorer.md` — Updated R-028 and Section 3.3 Data Source Specification
+- `tools/session-explorer/STATUS.md` — Updated timestamp and verified requirements
+- `tools/session-explorer/CONTEXT.md` — Updated test count (34) and recorded Key Decision
+- `tools/session-explorer/CHANGELOG.md` — Added release notes for R-028 & R-005
+- `tools/session-explorer/src/types.go` — Added `GitRepo` and `GitBranch` fields
+- `tools/session-explorer/src/scanner.go` — Multi-tier clustering engine, DB probing, weighted scoring, path sanitization
+- `tools/session-explorer/src/scanner_test.go` — Added 3 new unit tests (34 total)
+- `tools/session-explorer/bin/session-explorer` — Rebuilt standalone binary
+
+---
+
 ### 2026-10-15 — Feature: Universal Multi-Runtime Discovery & Provider Architecture (R-036)
 
 **Agent/Author**: Antigravity (Google DeepMind)

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Multi-Tier Intelligent Workspace & Codebase Clustering Engine (R-028, R-005)**:
+  - Eliminated false-positive workspace clustering collisions where macOS OneDrive path segments (e.g. `OneDrive-Personal`) caused sessions to be erroneously classified under "Personal".
+  - Replaced naive keyword counting with a 5-tier resolution hierarchy:
+    1. **Tier 0 (Authoritative DB Metadata)**: Probes `<storage_dir>/../conversations/<id>.db` table `trajectory_metadata_blob` (`id='main'`) to extract authoritative `WorkspaceURI`, `GitRepo`, `GitURL`, and `GitBranch`.
+    2. **Tier 1 (Empirical Tool Touch Matrix)**: Parses active tool parameters (`Path`, `CommandLine`, `Arguments`, `TargetFile`, `AbsolutePath`) with weighted scoring (Mutations `write_file`/`edit_file` = 50 pts, Execution `run_command` = 25 pts, Inspections `read_file` = 15 pts) and Git repository boundary root-finding.
+    3. **Tier 2 (System Prompt Metadata)**: Extracts explicit workspace paths and working directories from system prompts (`Active Workspaces`, `Command Working Directory`).
+    4. **Tier 3 (Non-Git Folder Fallback)**: Gracefully falls back to the enclosing directory name for ad-hoc scripts or unversioned folders, skipping generic system path segments (`Users`, `home`, `workspace`, `src`).
+    5. **Tier 4 (Default Graceful Degradation)**: Falls back safely to `"Default"`.
+  - Added strict workspace path sanitization (`sanitizeWorkspacePath`) to prevent global filesystem substring collisions across all filtering and WIP recovery operations.
 - **Unified Markdown Document Hierarchy & Reading Lane**:
   - Replaced isolated timeline-only `.message-body` markdown CSS rules with a shared typography system covering `.markdown-body`, `.message-body`, and `.file-viewer-markdown`.
   - Implemented an editorial-grade typographic scale (`h1` at 1.85rem with glass divider, `h2` at 1.45rem, `h3` at 1.22rem in cyan, `h4` at 1.05rem, `h5/h6` uppercase tracked at 0.88rem) with proportional spacing.

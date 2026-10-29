@@ -1,7 +1,7 @@
 ---
 tool: session-explorer
 status: review
-last_session: 2026-10-20
+last_session: 2026-10-29
 last_agent: "Antigravity"
 blockers: []
 ---
@@ -28,7 +28,7 @@ blockers: []
 | Spec Requirements (R-XXX) | 38 | 38 | ✅ 100% Implemented (R-037, R-038 completed) |
 | Acceptance Criteria (AC-XXX) | 39 | 39 | 🧪 100% Verified (AC-036..AC-039 added & verified) |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 30 unit tests passing + headless Playwright verified |
+| Test Coverage | 100% | 100% | 🧪 34 unit tests passing + headless Playwright verified |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -103,6 +103,7 @@ blockers: []
 | 2026-10-19 | Single Unified Scrollbar Invariant | Eliminated nested double vertical scrollbars in File Viewer by constraining overflow-y to body container while disabling vertical overflow on pre code blocks |
 | 2026-10-19 | TreeWalker Non-Destructive In-File Find Engine | Implemented in-modal Cmd+F search using document.createTreeWalker over text nodes, preserving DOM syntax-highlight spans and KaTeX/Mermaid structures with match count (X of Y) and smooth scrolling |
 | 2026-10-19 | Dual-Affordance File Reference & Micro-Feedback | Split session trail file chips into open-preview pill and direct 1-click copy path button (📋 → ✓), and added glowing feedback states to all viewer actions |
+| 2026-10-29 | Multi-Tier Intelligent Workspace & Codebase Clustering Engine | Resolves session cross-contamination and false-positive parent directory matches (e.g. OneDrive-Personal matching 'Personal') via a 5-tier resolution hierarchy: Tier 0 SQLite metadata blob (GitRepo, GitBranch, WorkspaceURI), Tier 1 Empirical weighted tool touches (Mutations 50, Execution 25, Read 15), Tier 2 Prompt metadata, Tier 3 Non-git directory name fallback, and Tier 4 'Default' fallback |
 | 2026-10-19 | Pinned Floating Find Widget Invariant | Anchored Find widget to unscrollable .file-viewer-shell frame (position: absolute; top: 66px; right: 24px) rather than scrolling body, ensuring find bar remains 100% visible across multi-page file scrolls (deltaTop = 0px) |
 | 2026-10-20 | Unified Document Typography & 98% Fluid File Viewer Real Estate | Unified markdown hierarchy across session trail and file viewer (.markdown-body, .message-body, .file-viewer-markdown); expanded .file-viewer-shell to 97.5vw and .file-viewer-markdown to 100% fluid width |
 
