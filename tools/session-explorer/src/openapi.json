@@ -342,6 +342,85 @@
           }
         }
       }
+    },
+    "/api/agent/context/global": {
+      "get": {
+        "summary": "Retrieve Global Agent Context & Behavioral Matrix",
+        "description": "Scans and returns the machine-wide agent configuration including global rules, builtin and user skills, MCP servers, plugins, hooks, and GenAI token bloat telemetry.",
+        "responses": {
+          "200": {
+            "description": "Global agent context payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalAgentContext" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/context/workspace": {
+      "get": {
+        "summary": "Retrieve Workspace-Scoped Agent Context",
+        "description": "Returns merged behavioral rules, codebase-specific skills, master instructions (AGENTS.md, CLAUDE.md), hooks, and inherited global context for a specific workspace.",
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "description": "Workspace directory path or repository name (defaults to active workspace)",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace-scoped agent context payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WorkspaceAgentContext" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/context": {
+      "get": {
+        "summary": "Retrieve Session-Specific Agent Context & Skill Invocations",
+        "description": "Returns empirical behavioral context for a conversation session, cross-referencing active rules, actively invoked skills with execution counts, uninvoked on-demand skills, and token telemetry.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Unique session identifier (UUID)",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session agent context payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionAgentContext" }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Session not found" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -520,6 +599,132 @@
           "is_binary": { "type": "boolean", "description": "True if file is binary or encoded image" },
           "mime_type": { "type": "string", "description": "Detected MIME type" },
           "line_count": { "type": "integer", "description": "Total number of lines in file" }
+        }
+      },
+      "GlobalAgentContext": {
+        "type": "object",
+        "properties": {
+          "rules": { "type": "array", "items": { "$ref": "#/components/schemas/AgentRule" } },
+          "skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
+          "plugins": { "type": "array", "items": { "$ref": "#/components/schemas/AgentPlugin" } },
+          "mcp_servers": { "type": "array", "items": { "$ref": "#/components/schemas/MCPServerInfo" } },
+          "hooks": { "type": "array", "items": { "$ref": "#/components/schemas/AgentHook" } },
+          "total_rules": { "type": "integer" },
+          "total_skills": { "type": "integer" },
+          "preloaded_tokens_est": { "type": "integer", "description": "Always-on constitutional rules and master prompt tokens" },
+          "on_demand_tokens_est": { "type": "integer", "description": "Available on-demand skill tokens" },
+          "total_tokens_est": { "type": "integer" },
+          "total_words": { "type": "integer" }
+        }
+      },
+      "WorkspaceAgentContext": {
+        "type": "object",
+        "properties": {
+          "workspace": { "type": "string" },
+          "project_name": { "type": "string" },
+          "rules": { "type": "array", "items": { "$ref": "#/components/schemas/AgentRule" } },
+          "skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
+          "master_docs": { "type": "array", "items": { "type": "string" } },
+          "mcp_servers": { "type": "array", "items": { "$ref": "#/components/schemas/MCPServerInfo" } },
+          "hooks": { "type": "array", "items": { "$ref": "#/components/schemas/AgentHook" } },
+          "total_rules": { "type": "integer" },
+          "total_skills": { "type": "integer" },
+          "preloaded_tokens_est": { "type": "integer" },
+          "on_demand_tokens_est": { "type": "integer" },
+          "total_tokens_est": { "type": "integer" },
+          "total_words": { "type": "integer" }
+        }
+      },
+      "SessionAgentContext": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "format": "uuid" },
+          "workspace": { "type": "string" },
+          "project_name": { "type": "string" },
+          "active_rules": { "type": "array", "items": { "$ref": "#/components/schemas/AgentRule" } },
+          "active_skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
+          "available_skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
+          "mcp_servers": { "type": "array", "items": { "$ref": "#/components/schemas/MCPServerInfo" } },
+          "subagents": { "type": "array", "items": { "type": "string" } },
+          "slash_commands": { "type": "array", "items": { "type": "string" } },
+          "active_tokens_est": { "type": "integer", "description": "Tokens actually injected into the active session" },
+          "on_demand_tokens_est": { "type": "integer" },
+          "total_words_injected": { "type": "integer" }
+        }
+      },
+      "AgentRule": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "title": { "type": "string" },
+          "scope": { "type": "string", "enum": ["global", "workspace", "builtin", "session", "plugin"] },
+          "file_path": { "type": "string" },
+          "description": { "type": "string" },
+          "priority": { "type": "string", "example": "Critical" },
+          "trigger": { "type": "string", "example": "always_on" },
+          "line_count": { "type": "integer" },
+          "word_count": { "type": "integer" },
+          "char_count": { "type": "integer" },
+          "tokens_est": { "type": "integer" },
+          "size_bytes": { "type": "integer" },
+          "provider": { "type": "string", "example": "antigravity" },
+          "workspace": { "type": "string" }
+        }
+      },
+      "AgentSkill": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "scope": { "type": "string", "enum": ["global", "workspace", "builtin", "plugin"] },
+          "file_path": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "provider": { "type": "string", "example": "antigravity" },
+          "workspace": { "type": "string" },
+          "plugin_name": { "type": "string" },
+          "has_scripts": { "type": "boolean" },
+          "has_examples": { "type": "boolean" },
+          "has_references": { "type": "boolean" },
+          "line_count": { "type": "integer" },
+          "word_count": { "type": "integer" },
+          "char_count": { "type": "integer" },
+          "tokens_est": { "type": "integer" },
+          "size_bytes": { "type": "integer" },
+          "invoked_count": { "type": "integer", "description": "Count of times executed in active session" },
+          "first_step_idx": { "type": "integer", "description": "Step index where first executed" }
+        }
+      },
+      "AgentPlugin": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "description": { "type": "string" },
+          "path": { "type": "string" },
+          "skills": { "type": "array", "items": { "type": "string" } },
+          "policies": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "MCPServerInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "command": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "scope": { "type": "string", "enum": ["global", "workspace"] },
+          "tools": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "AgentHook": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "event": { "type": "string", "example": "PreToolUse" },
+          "matcher": { "type": "string" },
+          "type": { "type": "string", "example": "command" },
+          "command": { "type": "string" },
+          "scope": { "type": "string", "enum": ["global", "workspace"] },
+          "timeout": { "type": "integer" }
         }
       }
     }

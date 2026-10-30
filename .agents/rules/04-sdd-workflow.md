@@ -167,3 +167,5 @@ For every tool, maintain a mental (or documented) traceability matrix:
 | Spec abandoned after coding | Spec drift = confusion | Keep spec updated |
 | Tests without spec reference | Can't verify coverage | Reference R-XXX in test names |
 | Skipping spec-review | Unreviewed specs = wrong direction | Always review before coding |
+| Backend API without OpenAPI/Swagger spec | API drift & broken interactive client tooling | Update openapi.json & /docs in the EXACT SAME TURN |
+| Code change without public living docs parity | External users and reviewers get stale docs | Update docs/site/index.html & run test-docs.sh in same turn |

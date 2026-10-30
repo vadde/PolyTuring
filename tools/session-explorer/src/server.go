@@ -417,6 +417,74 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
       </div>
     </div>
 
+    <!-- GET /api/agent/context/global -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="ep-path">/api/agent/context/global</span>
+        <span class="ep-summary">Retrieve machine-wide agent brain state (rules, skills, MCP, telemetry)</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Scans global configuration paths (~/.gemini/config, ~/.claude, ~/.cursorrules), MCP servers, plugins, and estimates pre-loaded constitutional vs on-demand token bloat.</div>
+        <button class="try-btn" onclick="executeGetAgentGlobal()">Try It Out</button>
+        <div id="resp_agent_global" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- GET /api/agent/context/workspace -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="ep-path">/api/agent/context/workspace</span>
+        <span class="ep-summary">Retrieve workspace-scoped agent context & cascade</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Returns merged rules, codebase-specific skills, master docs (AGENTS.md), and inherited global context for a workspace.</div>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
+          <tr><td>workspace</td><td>query (string)</td><td><input type="text" id="p_agent_ws" class="input-field" placeholder="e.g. PolyTuring" value="PolyTuring"></td></tr>
+        </table>
+        <button class="try-btn" onclick="executeGetAgentWorkspace()">Try It Out</button>
+        <div id="resp_agent_workspace" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- GET /api/sessions/{id}/context -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="ep-path">/api/sessions/{id}/context</span>
+        <span class="ep-summary">Retrieve session-specific agent context & skill invocations</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Returns empirical session context cross-referencing active rules, executed skills with tool invocation counts, uninvoked on-demand skills, and active token bloat.</div>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
+          <tr><td>id</td><td>path (string, required)</td><td><input type="text" id="p_agent_sess_id" class="input-field" placeholder="Session UUID"></td></tr>
+        </table>
+        <button class="try-btn" onclick="executeGetAgentSession()">Try It Out</button>
+        <div id="resp_agent_sess" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- GET /api/file -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="ep-path">/api/file</span>
+        <span class="ep-summary">Inspect file content with syntax detection</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Inspects any repo or configuration file, returning content, MIME type, line count, and binary detection for the in-browser viewer.</div>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
+          <tr><td>path</td><td>query (string, required)</td><td><input type="text" id="p_file_path" class="input-field" placeholder="Absolute or relative file path"></td></tr>
+        </table>
+        <button class="try-btn" onclick="executeGetFile()">Try It Out</button>
+        <div id="resp_file" class="response-box"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -496,6 +564,30 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
 
     function executeRefresh() {
       runFetch('/api/refresh', { method: 'POST' }, 'resp_refresh');
+    }
+
+    function executeGetAgentGlobal() {
+      runFetch('/api/agent/context/global', { method: 'GET' }, 'resp_agent_global');
+    }
+
+    function executeGetAgentWorkspace() {
+      const ws = document.getElementById('p_agent_ws').value.trim();
+      const params = new URLSearchParams();
+      if (ws) params.set('workspace', ws);
+      runFetch('/api/agent/context/workspace?' + params.toString(), { method: 'GET' }, 'resp_agent_workspace');
+    }
+
+    function executeGetAgentSession() {
+      const id = document.getElementById('p_agent_sess_id').value.trim();
+      if (!id) { alert('Please enter a session UUID'); return; }
+      runFetch('/api/sessions/' + encodeURIComponent(id) + '/context', { method: 'GET' }, 'resp_agent_sess');
+    }
+
+    function executeGetFile() {
+      const path = document.getElementById('p_file_path').value.trim();
+      if (!path) { alert('Please enter a file path'); return; }
+      const params = new URLSearchParams({ path });
+      runFetch('/api/file?' + params.toString(), { method: 'GET' }, 'resp_file');
     }
   </script>
 </body>

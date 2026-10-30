@@ -88,6 +88,8 @@ blockers: []
 | 2026-10-14 | Keyed DOM Reconciliation | Map<step_index, HTMLElement> cache eliminates full DOM re-renders; achieves O(Δ) incremental updates without flickering or destroying diagram states |
 | 2026-10-14 | Hash Routing & Route Persistence | Native hash routing (#/session/:id, #/project/:name, #/) guarantees persistent state across Cmd+R reloads and browser Back/Forward |
 | 2026-10-14 | SSE Real-Time Live Tailing | Server-Sent Events at /api/sessions/:id/tail with byte-offset seeking emits newly appended steps with sub-second latency |
+| 2026-10-30 | Canonical Repository Aliasing | tool-scripts canonically unified under PolyTuring to preserve historical session continuity across repository renames |
+| 2026-10-30 | Date Filter Landing Default & Decoupling | Default landing preset switched to All Time (all); project card session counts always display true totals; drilldown navigation decouples from global date filter to provide full repository session stacks |
 | 2026-10-19 | Inline Highlight Mark Invariant | Preformatted `<mark.line-highlight>` must be `display: inline` inside `<pre>`; `display: block` creates double newlines with literal `\n` |
 | 2026-10-19 | Line Gutter Synchronization Invariant | Gutter and code elements must share identical font-family, font-size (0.84rem), and fixed pixel line-height (22px) |
 | 2026-10-19 | Flex Containment & Code Viewer Sizing | Scrollable code container must use `display: block; overflow: auto;` to allow multi-page files to scroll without viewport clipping |

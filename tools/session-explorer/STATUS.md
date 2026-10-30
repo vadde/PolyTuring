@@ -5,7 +5,7 @@ version: 0.3.0
 language: go
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-10-29
+last_updated: 2026-10-30
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---

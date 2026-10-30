@@ -246,8 +246,19 @@ func TestR028_ProjectClustering(t *testing.T) {
 	if toolsSess == nil {
 		t.Fatal("sess-tools not found")
 	}
-	if toolsSess.ProjectName != "tool-scripts" {
-		t.Errorf("expected ProjectName tool-scripts, got %q", toolsSess.ProjectName)
+	// tool-scripts is canonically aliased to PolyTuring
+	if toolsSess.ProjectName != "PolyTuring" {
+		t.Errorf("expected ProjectName PolyTuring for tool-scripts session, got %q", toolsSess.ProjectName)
+	}
+
+	// Verify filtering by tool-scripts or PolyTuring finds the session
+	polySessions := idx.GetSessions("PolyTuring", "date", "desc", time.Time{}, time.Time{})
+	if len(polySessions) != 1 {
+		t.Errorf("expected 1 session for PolyTuring, got %d", len(polySessions))
+	}
+	aliasSessions := idx.GetSessions("tool-scripts", "date", "desc", time.Time{}, time.Time{})
+	if len(aliasSessions) != 1 {
+		t.Errorf("expected 1 session for tool-scripts alias query, got %d", len(aliasSessions))
 	}
 
 	// Verify stats.Projects contains tutor-intelligence and tool-scripts

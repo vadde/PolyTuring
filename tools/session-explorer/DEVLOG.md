@@ -1058,7 +1058,92 @@
 
 ---
 
-### 2026-10-30 — Feature: Universal Agent Context & Behavioral Matrix (R-039)
+### 2026-10-30 — Forensic Audit & Architectural Remediation: Workspace Session Clustering & Date Filter Decoupling
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Forensic Investigation, Root-Cause Analysis, Canonical Repository Aliasing & Viewport Fidelity)  
+**Duration**: ~35m
+
+#### Forensic Motivation & User Report
+- **The Observation**: User reported an anomaly after repository clustering improvements:
+  > *"one thing I noticed when we revamped the codebase/repository/workspace sessions is, I NOW only see 1 session under any workspace which is for sure wrong. because remember for DSA, tutor-intelligence, PolyTuring I have started clean fresh new sessions multiple times. Can we forensically analyze and make sure this is the case and that we missed somewhere something in the process and overdid things. I want to be 99.9999% certain that we did the right thing..."*
+- **Forensic Verification Protocol**: In strict accordance with the Zero-Order Constitutional Invariant (Rule 101) and Epistemic Boundary Framework, we initiated a multi-layered forensic query across the running backend daemon, SQLite metadata stores, transcript JSONL files, and the live headless DOM via Playwright.
+
+#### Forensic Findings & Root Cause Analysis
+
+1. **Root Cause 1: The "7 Days" Default Landing Filter Trap**:
+   - In `tools/session-explorer/src/web/index.html` (line 118) and `src/web/src/app.js` (line 419), initialization executed `applyDatePreset('7d')`.
+   - On initial page load, this populated `state.dateFrom = now - 7d` and `state.dateTo = now`.
+   - When inspecting the database:
+     - `tutor-intelligence` has **14 sessions** total. 1 session was active in the last 7 days (`aa0ebc2a`); the other 13 sessions were 8 to 45 days ago.
+     - `DSA` has **4 sessions** total. 1 session was active in the last 7 days (`07bb93c8`); the other 3 sessions were 22 days to 3.5 months ago.
+     - `Personal` has **2 sessions** total. 1 was in the last 7 days; 1 was older.
+     - `PolyTuring` had **1 session** under that exact name (active today); older sessions were tagged before the repository rename.
+   - Because `filterActive` evaluated to `true`, the UI executed:
+     `display_session_count: filterActive ? countInFilter : p.session_count`
+     and rendered:
+     `<span class="metric-item">📂 ${p.display_session_count} session</span>`
+   - Every single active workspace card on the screen literally displayed `📂 1 session`!
+
+2. **Root Cause 2: Drilldown Query Constraint Leaking**:
+   - When clicking on any repository card (e.g. `#/project/DSA`), `router()` executed `loadSessions()`.
+   - `loadSessions()` appended the active global filter `from=2026-10-23&to=2026-10-30` to `/api/sessions?workspace=DSA`.
+   - The Go backend's `GetSessions()` pruned out any session outside that 7-day range, returning an array of length 1.
+   - Even though the in-project toolbar had date filter buttons (`All Time`, `7 Days`, etc.), the data payload in memory had already been stripped by the server call.
+
+3. **Root Cause 3: Repository Renaming Fragmentation (`tool-scripts` ⇄ `PolyTuring`)**:
+   - On 2026-10-19, the user renamed the repository from `vadde/tool-scripts` to `vadde/PolyTuring`. On disk, `tool-scripts` is a symlink to `PolyTuring`.
+   - The 8 sessions prior to Oct 19 had authoritative Git repo `vadde/tool-scripts`.
+   - In `src/scanner.go`, `extractProjectName()` had a regex check for `tool-scripts`, but line 648 extracted `slugName := parts[len(parts)-1]` without canonical normalization, storing `ProjectName: "tool-scripts"` for the 8 older sessions and `ProjectName: "PolyTuring"` for the latest session.
+   - As a result, the 9 sessions were split into two separate repository clusters.
+
+#### Architectural Remediation & Implementation
+
+1. **Default Landing Date Preset Switched to "All Time" (`all`)**:
+   - In `tools/session-explorer/src/web/index.html`, transferred the `active` class to `<button class="chip date-preset-chip active" data-preset="all">All Time</button>`.
+   - In `tools/session-explorer/src/web/src/app.js`, updated `applyDatePreset('all')` on bootstrap and set default `state.datePreset = 'all'`, `state.dateFrom = ''`, `state.dateTo = ''`.
+   - All sessions across all repositories are now immediately visible upon initial load.
+
+2. **Total Session Metrics Uncoupled from Date Filters**:
+   - Updated `renderProjectHub()`: The primary metric `📂 ${p.session_count} sessions` ALWAYS reflects the genuine total session count.
+   - When a date or workspace filter is applied, the card displays a dedicated pill badge:
+     - If matching sessions exist: `✨ ${countInFilter} of ${p.session_count} in filter`
+     - If no matching sessions: `0 in filter`
+   - Total session counts are never replaced or overwritten by filtered counts.
+
+3. **Decoupled Project Drilldown Navigation**:
+   - In `router()` in `app.js`, navigating to `#/project/:name` resets `state.dateFrom` and `state.dateTo` before invoking `loadSessions()`.
+   - This ensures the server supplies the full lifetime history for the selected repository, allowing the dedicated in-project toolbar to filter locally across all sessions instantly.
+   - Added back-navigation reset in `handleRoute()` so returning to dashboard cleans up project drilldown state.
+
+4. **Canonical Repository Aliasing Engine (`src/scanner.go`)**:
+   - Added `canonicalProjectName(name string) string` resolving historical aliases (`tool-scripts`, `tool_scripts`) into `"PolyTuring"`.
+   - Applied `canonicalProjectName()` across:
+     - `discoverKnownProjects()`: Normalizes symlinked names and prevents duplicate clusters.
+     - `scanSession()`: Normalizes authoritative Git slugs, tool-call path scores, and empirical touches.
+     - `session.ProjectName` and `session.ProjectsTouched`: Unified under `PolyTuring`.
+     - `GetSessions()`: Added alias matching so querying `workspace=tool-scripts` or `workspace=PolyTuring` returns the unified 9-session set.
+     - `computeStats()`: Aggregates historical metrics under `PolyTuring`.
+
+#### Verification & Quality Gates
+
+1. **Automated Unit Tests**:
+   - Updated `TestR028_ProjectClustering` in `src/scanner_test.go` to assert canonical aliasing and dual-query resolution.
+   - Ran `make test-tool T=session-explorer`: All 38 unit tests passed cleanly (0 failures, 0.775s).
+   - Ran repo-level `make test`: All test suites passed cleanly across tools (omni-graph, session-explorer).
+
+2. **Headless Playwright DOM Inspection (`http://127.0.0.1:9876`)**:
+   - Navigated to live server daemon:
+     - `📁 PolyTuring`: Displayed **📂 9 sessions** (1 latest + 8 historical unified).
+     - `📁 tutor-intelligence`: Displayed **📂 14 sessions**.
+     - `📁 DSA`: Displayed **📂 4 sessions**.
+     - `📁 Personal`: Displayed **📂 2 sessions**.
+     - `📁 GenAI`: Displayed **📂 2 sessions**.
+     - `📁 QuarkDock`, `k8s-eks`, `agy`: Displayed **📂 1 session** each.
+   - Clicked `DSA`: Drilled into `#/project/DSA` &rarr; Verified Hero Banner (`📂 4 Total Sessions`, `👤 114 Prompts`, `⚡ 4261 Tool Calls`) and 4 session cards rendered.
+   - Clicked `tutor-intelligence`: Drilled into `#/project/tutor-intelligence` &rarr; Verified Hero Banner (`📂 14 Total Sessions`, `👤 462 Prompts`, `⚡ 34907 Tool Calls`) and 14 session cards rendered.
+   - Clicked `PolyTuring`: Drilled into `#/project/PolyTuring` &rarr; Verified Hero Banner (`📂 9 Total Sessions`, `👤 269 Prompts`, `⚡ 10765 Tool Calls`) and 9 session cards rendered.
+   - Verified that clicking date presets within project views filters accurately without losing historical session access.
 
 **Agent/Author**: Antigravity  
 **SDLC Phase**: `review` (Specification, Discovery Scanner, Dual-Sourcing, Visual Context UX & File Viewer Re-use)  
@@ -1104,6 +1189,37 @@
    - Session context computes `ActiveTokensEst` and `TotalWordsInjected` for active rules + executed skills vs uninvoked on-demand capacity.
    - Web UI renders the `#agentMatrixTelemetryRibbon` with live badges (`📌 Pre-loaded: ~5,036 tokens`, `💤 On-Demand: ~34,198 tokens`, `📊 Total Bloat: 20,828 words (~39,234 tokens)`), individual card badges (`⚡ ~1,837 tok`, `🔤 851 words`), and session drawer token stat boxes (`Injected Tokens: ~13,384`).
    - Headless Playwright verification confirmed live telemetry across modal and session drawer.
+
+---
+
+### 2026-10-30 — Full-Spectrum Parity: OpenAPI 3.0 Specs, Interactive Swagger UI (/docs), Public Living Docs & Rule Invariants
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (OpenAPI 3.0 Contract Expansion, Interactive Swagger Testing Console, Public Living Documentation & Architectural Invariant Fortification)  
+**Duration**: ~20m
+
+#### What Was Done
+1. **OpenAPI 3.0 Contract Specification (`src/openapi.json`)**:
+   - Added path definitions, query/path parameters, and response schemas for all 3 Agent Context & Behavioral Matrix endpoints:
+     - `GET /api/agent/context/global`
+     - `GET /api/agent/context/workspace`
+     - `GET /api/sessions/{id}/context`
+   - Added reusable schema models: `GlobalAgentContext`, `WorkspaceAgentContext`, `SessionAgentContext`, `AgentRule`, `AgentSkill`, `AgentPlugin`, `MCPServerInfo`, `AgentHook`, including GenAI token bloat metrics (`preloaded_tokens_est`, `on_demand_tokens_est`, `total_bloat_words`).
+   - Re-validated OpenAPI JSON structure (`jq empty` — 100% valid OpenAPI 3.0.3).
+
+2. **Interactive Swagger Documentation Console (`src/server.go`, `/docs`)**:
+   - Embedded interactive testing cards for all newly added endpoints with live "Try It Out" execution harnesses.
+   - Tested live on daemon via headless Playwright: executed `GET /api/agent/context/global` with 114ms response latency and formatted JSON rendering.
+
+3. **Public Living Documentation Portal (`docs/site/index.html`)**:
+   - Added the comprehensive Session Explorer REST API Reference table documenting all 11 endpoints with HTTP methods, parameter types, and descriptions.
+   - Re-compiled static distribution bundle via `./scripts/build-docs.sh` (23 files, 3.1MB).
+   - Executed docs verification suite (`./.agents/skills/docs-portal/scripts/test-docs.sh`): all 9 portal quality gates passed with zero errors.
+
+4. **Internal Agent Rules Fortification (`.agents/rules/06-documentation.md`, `.agents/rules/04-sdd-workflow.md`)**:
+   - Enshrined **The Full-Spectrum Parity Mandate (Unbreakable Correlation Invariant)** into Rule 06 and Rule 04:
+     - Any turn that introduces or modifies backend APIs, schemas, or behaviors MUST update the OpenAPI specification (`src/openapi.json`), interactive `/docs`, and public living documentation portal (`docs/site/index.html`) in the **EXACT SAME TURN**.
+     - Marked an undocumented endpoint as an immediate structural defect and unacceptable anti-pattern.
 
 
 

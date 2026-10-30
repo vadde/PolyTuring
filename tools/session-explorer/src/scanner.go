@@ -157,11 +157,15 @@ func (idx *SessionIndex) discoverKnownProjects() {
 			if !e.IsDir() {
 				continue
 			}
-			name := e.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || skipDirs[name] || !isValidWorkspaceName(name) {
+			rawName := e.Name()
+			if strings.HasPrefix(rawName, ".") || strings.HasPrefix(rawName, "_") || skipDirs[rawName] || !isValidWorkspaceName(rawName) {
 				continue
 			}
-			fullPath := filepath.Join(dir, name)
+			name := canonicalProjectName(rawName)
+			fullPath := filepath.Join(dir, rawName)
+			if name == "PolyTuring" {
+				fullPath = filepath.Join(dir, "PolyTuring")
+			}
 			if _, exists := idx.knownProjects[name]; !exists {
 				idx.knownProjects[name] = fullPath
 			}
@@ -578,25 +582,35 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 								sub := rawPath[kIdx+len("/knowledge/"):]
 								parts := strings.Split(sub, "/")
 								if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
-									projectName = parts[0]
-									projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", parts[0])
+									projectName = canonicalProjectName(parts[0])
+									if projectName == "PolyTuring" {
+										projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", "PolyTuring")
+									} else {
+										projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", parts[0])
+									}
 								}
 							} else if iIdx := strings.Index(rawPath, "/Interviews/"); iIdx != -1 {
 								sub := rawPath[iIdx+len("/Interviews/"):]
 								parts := strings.Split(sub, "/")
 								if len(parts) > 0 && isValidWorkspaceName(parts[0]) {
-									projectName = parts[0]
-									projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews", parts[0])
+									projectName = canonicalProjectName(parts[0])
+									if projectName == "PolyTuring" {
+										projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", "PolyTuring")
+									} else {
+										projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews", parts[0])
+									}
 								}
 							}
 						}
 
 						// 4. Graceful Degradation: Not a Git repo and not known -> fall back to directory/folder name!
 						if projectName == "" {
-							derived := extractProjectName(rawPath)
+							derived := canonicalProjectName(extractProjectName(rawPath))
 							if isValidWorkspaceName(derived) {
 								projectName = derived
-								if pIdx := strings.Index(rawPath, "/"+derived); pIdx != -1 {
+								if projectName == "PolyTuring" {
+									projectWorkspace = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", "PolyTuring")
+								} else if pIdx := strings.Index(rawPath, "/"+derived); pIdx != -1 {
 									projectWorkspace = rawPath[:pIdx+len("/"+derived)]
 								} else {
 									projectWorkspace = rawPath
@@ -643,7 +657,7 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	if trajMeta != nil {
 		if trajMeta.GitRepo != "" {
 			parts := strings.Split(trajMeta.GitRepo, "/")
-			slugName := parts[len(parts)-1]
+			slugName := canonicalProjectName(parts[len(parts)-1])
 			if isValidWorkspaceName(slugName) {
 				authoritativeProject = slugName
 			}
@@ -651,7 +665,7 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 		if trajMeta.WorkspaceURI != "" {
 			authoritativeWorkspace = trajMeta.WorkspaceURI
 			if authoritativeProject == "" {
-				derived := extractProjectName(authoritativeWorkspace)
+				derived := canonicalProjectName(extractProjectName(authoritativeWorkspace))
 				if isValidWorkspaceName(derived) {
 					authoritativeProject = derived
 				}
@@ -665,8 +679,9 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	}
 	var scoredList []pScore
 	for name, score := range projectScores {
-		if score > 0 && isValidWorkspaceName(name) {
-			scoredList = append(scoredList, pScore{name: name, score: score})
+		cName := canonicalProjectName(name)
+		if score > 0 && isValidWorkspaceName(cName) {
+			scoredList = append(scoredList, pScore{name: cName, score: score})
 		}
 	}
 
@@ -690,12 +705,13 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 			session.Workspace = authoritativeWorkspace
 		}
 	} else if session.Workspace != "" {
-		derived := extractProjectName(session.Workspace)
+		derived := canonicalProjectName(extractProjectName(session.Workspace))
 		if isValidWorkspaceName(derived) {
 			bestProject = derived
 		}
 	}
 
+	bestProject = canonicalProjectName(bestProject)
 	if bestProject == "" || !isValidWorkspaceName(bestProject) {
 		bestProject = "Default"
 	}
@@ -711,11 +727,12 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	}
 
 	for _, ps := range scoredList {
-		if isValidWorkspaceName(ps.name) && !seenTouched[ps.name] {
+		cName := canonicalProjectName(ps.name)
+		if isValidWorkspaceName(cName) && !seenTouched[cName] {
 			// Only include secondary projects in ProjectsTouched if tools genuinely touched them
-			if empiricalTouches[ps.name] > 0 {
-				seenTouched[ps.name] = true
-				session.ProjectsTouched = append(session.ProjectsTouched, ps.name)
+			if empiricalTouches[ps.name] > 0 || empiricalTouches[cName] > 0 {
+				seenTouched[cName] = true
+				session.ProjectsTouched = append(session.ProjectsTouched, cName)
 			}
 		}
 	}
@@ -761,8 +778,12 @@ func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, 
 		// Filter by workspace
 		if workspace != "" {
 			wsClean := strings.TrimSpace(workspace)
+			wsCanon := canonicalProjectName(wsClean)
 			wsLower := strings.ToLower(wsClean)
-			matched := strings.EqualFold(s.ProjectName, wsClean) || strings.EqualFold(strings.ToLower(s.ProjectName), wsLower)
+			matched := strings.EqualFold(s.ProjectName, wsClean) ||
+				strings.EqualFold(s.ProjectName, wsCanon) ||
+				strings.EqualFold(canonicalProjectName(s.ProjectName), wsCanon) ||
+				strings.EqualFold(strings.ToLower(s.ProjectName), wsLower)
 			if !matched {
 				sanitizedWs := sanitizeWorkspacePath(s.Workspace)
 				sanitizedTarget := sanitizeWorkspacePath(wsClean)
@@ -770,6 +791,10 @@ func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, 
 					strings.Contains(sanitizedWs, "/"+sanitizedTarget+"/") ||
 					strings.EqualFold(sanitizedWs, sanitizedTarget) ||
 					strings.Contains(strings.ToLower(sanitizedWs), "/"+strings.ToLower(sanitizedTarget))
+			}
+			if !matched && (wsCanon == "PolyTuring" || strings.EqualFold(wsClean, "tool-scripts")) {
+				matched = strings.Contains(strings.ToLower(s.Workspace), "tool-scripts") ||
+					strings.EqualFold(s.ProjectName, "PolyTuring")
 			}
 			if !matched {
 				continue
@@ -1116,18 +1141,22 @@ func (idx *SessionIndex) computeStats() {
 		}
 		idx.stats.RuntimeBreakdown[rm]++
 
-		proj := s.ProjectName
+		proj := canonicalProjectName(s.ProjectName)
 		if isValidWorkspaceName(proj) {
 			workspaceSet[proj] = true
 
 			ps, exists := projectStatsMap[proj]
 			if !exists {
+				wsPath := s.Workspace
+				if proj == "PolyTuring" {
+					wsPath = filepath.Join("/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge", "PolyTuring")
+				}
 				ps = &ProjectSummary{
 					Name:          proj,
-					Path:          s.Workspace,
+					Path:          wsPath,
 					RecentPrompts: make([]string, 0),
 				}
-				if _, err := os.Stat(filepath.Join(s.Workspace, ".git")); err == nil {
+				if _, err := os.Stat(filepath.Join(wsPath, ".git")); err == nil {
 					ps.IsGit = true
 				}
 				projectStatsMap[proj] = ps
@@ -1161,8 +1190,9 @@ func (idx *SessionIndex) computeStats() {
 
 		// Record any touched projects in workspaceSet
 		for _, pt := range s.ProjectsTouched {
-			if isValidWorkspaceName(pt) {
-				workspaceSet[pt] = true
+			cPt := canonicalProjectName(pt)
+			if isValidWorkspaceName(cPt) {
+				workspaceSet[cPt] = true
 			}
 		}
 
@@ -1191,7 +1221,8 @@ func (idx *SessionIndex) computeStats() {
 	}
 
 	// Also add any known projects from knowledge directory even if 0 sessions
-	for name, path := range idx.knownProjects {
+	for rawName, path := range idx.knownProjects {
+		name := canonicalProjectName(rawName)
 		if isValidWorkspaceName(name) {
 			if _, exists := projectStatsMap[name]; !exists {
 				isGit := false
@@ -1508,6 +1539,16 @@ func isValidWorkspaceName(name string) bool {
 		return false
 	}
 	return len(name) >= 2
+}
+
+// canonicalProjectName resolves historical or alias repository names into their canonical project identity.
+// E.g., vadde/tool-scripts was renamed to vadde/PolyTuring on 2026-10-19.
+func canonicalProjectName(name string) string {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if lower == "tool-scripts" || lower == "tool_scripts" || lower == "tools-scripts" {
+		return "PolyTuring"
+	}
+	return strings.TrimSpace(name)
 }
 
 // extractProjectName derives a clean, human-readable project or repository name from a workspace or file path.

@@ -223,6 +223,36 @@ What becomes easier or harder as a result of this change?
 
 ---
 
+## 🏛️ The Full-Spectrum Parity Mandate (Unbreakable Correlation Invariant)
+
+> **Mandatory Agent Law**: Never implement or enhance functionality locally while leaving external documentation, API specifications, or living GitHub Pages in a stale state. Stale documentation is a critical structural defect.
+
+Every turn that implements, enhances, or modifies functionality (APIs, UI widgets, tools, or data schemas) MUST satisfy the **Quad-Parity Gate** in the **EXACT SAME TURN**:
+
+### 1. API Contract & OpenAPI/Swagger Parity
+- If an HTTP endpoint, parameter, or schema model is added/modified in the backend (`server.go`, `api.go`, etc.):
+  - The corresponding OpenAPI 3.0 specification (`src/openapi.json`) MUST be updated with full path definitions, parameter descriptions, request/response bodies, and schema models in the **SAME TURN**.
+  - The embedded interactive API console / Swagger UI (`/docs`) MUST be updated with interactive testing cards and handlers.
+  - An endpoint without OpenAPI/Swagger documentation is considered broken and non-compliant.
+
+### 2. Public Living Documentation Portal Parity (`docs/site/index.html`)
+- The user-facing documentation portal / static GitHub pages MUST be updated in the **SAME TURN** with the new API contracts, architectural explanations, visual diagrams, and feature breakdowns.
+- Run `./scripts/build-docs.sh` and `./.agents/skills/docs-portal/scripts/test-docs.sh` (`make docs`) to guarantee all 9 quality gates pass before concluding the turn.
+
+### 3. Internal SDLC Quad Synchronization
+- Every turn touching behavior MUST update:
+  - `STATUS.md` — Traceability matrix (R-XXX, AC-XXX) & lifecycle phase.
+  - `CONTEXT.md` — Single source of truth orientation & key decisions.
+  - `DEVLOG.md` — Append-only session entry with forensic root causes & files changed.
+  - `README.md` — Tool-level documentation, CLI flags, and API tables.
+
+### 4. Zero-Assumption Verification
+- Never claim completion or trust assertions without running deterministic tool queries (`curl`, headless Playwright, compiler runs) to verify that the documentation and APIs are reachable, syntactically valid, and returning expected status codes.
+
+---
+
+## Documentation Checklist
+
 - [ ] README has all required sections
 - [ ] All CLI flags/options documented
 - [ ] All public API functions documented

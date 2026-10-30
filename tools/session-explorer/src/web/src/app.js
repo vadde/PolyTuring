@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   initLiveWatch();
   initRouter();
-  applyDatePreset('7d');
+  applyDatePreset('all');
 });
 
 // Theme Management
@@ -1642,6 +1642,7 @@ function renderProjectHub() {
     return {
       ...p,
       display_session_count: filterActive ? countInFilter : p.session_count,
+      count_in_filter: countInFilter,
       has_active_sessions: countInFilter > 0,
       filtered_sessions: pSessions
     };
@@ -1711,9 +1712,14 @@ function renderProjectHub() {
       promptsHtml = `<div class="project-prompt-chip" style="opacity: 0.5;">No user prompts recorded</div>`;
     }
 
-    const sessionBadge = filterActive && p.has_active_sessions
-      ? `<span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem;">✨ ${p.display_session_count} in filter</span>`
-      : '';
+    let sessionBadge = '';
+    if (filterActive) {
+      if (p.has_active_sessions) {
+        sessionBadge = `<span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem;">✨ ${p.count_in_filter} of ${p.session_count} in filter</span>`;
+      } else {
+        sessionBadge = `<span class="badge" style="background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem;">0 in filter</span>`;
+      }
+    }
 
     html += `
       <div class="project-card ${p.has_active_sessions ? 'active-filter-card' : ''}" data-project="${escapeHtml(p.name)}">
@@ -1736,7 +1742,7 @@ function renderProjectHub() {
 
         <div>
           <div class="card-metrics" style="margin-bottom: 0.75rem;">
-            <span class="metric-item" title="Total conversation sessions in this repository">📂 ${p.display_session_count} session${p.display_session_count === 1 ? '' : 's'}</span>
+            <span class="metric-item" title="Total conversation sessions in this repository">📂 ${p.session_count} session${p.session_count === 1 ? '' : 's'}</span>
             <span class="metric-item" title="User prompts in this repository">👤 ${p.total_user_messages} prompts</span>
             <span class="metric-item" title="Tool calls invoked in this repository">⚡ ${p.total_tool_calls} tools</span>
             <span class="metric-item" title="Total steps executed">🪜 ${p.total_steps} steps</span>
@@ -2060,6 +2066,17 @@ function handleRoute() {
       state.drilledProject = projName;
       state.filterWorkspace = projName;
       if (el.workspaceSelect) el.workspaceSelect.value = projName;
+      // Reset global date filter so all sessions in repository are loaded for in-project exploration
+      state.dateFrom = '';
+      state.dateTo = '';
+      state.datePreset = 'all';
+      if (el.dateFromInput) el.dateFromInput.value = '';
+      if (el.dateToInput) el.dateToInput.value = '';
+      if (el.datePresets) {
+        el.datePresets.forEach(p => p.classList.remove('active'));
+        const allBtn = Array.from(el.datePresets).find(p => p.dataset.preset === 'all');
+        if (allBtn) allBtn.classList.add('active');
+      }
       loadSessions();
       return;
     }
@@ -2068,6 +2085,14 @@ function handleRoute() {
   // Dashboard route
   if (state.currentView === 'detail') {
     showDashboard(false);
+  }
+  if (!clean.startsWith('project/') && !clean.startsWith('session/')) {
+    if (state.drilledProject) {
+      state.drilledProject = null;
+      state.filterWorkspace = '';
+      if (el.workspaceSelect) el.workspaceSelect.value = '';
+      loadSessions();
+    }
   }
 }
 
