@@ -3819,6 +3819,20 @@ function renderAgentMatrix() {
   if (el.agentMatrixPluginsCount) el.agentMatrixPluginsCount.textContent = (plugins.length + mcpServers.length);
   if (el.agentMatrixHooksCount) el.agentMatrixHooksCount.textContent = hooks.length;
 
+  // Update GenAI context bloat metrics
+  const preloadedToks = (scope === 'workspace' && workspaceContext) ? (workspaceContext.preloaded_tokens_est || 0) : (globalContext.preloaded_tokens_est || 0);
+  const ondemandToks = (scope === 'workspace' && workspaceContext) ? (workspaceContext.on_demand_tokens_est || 0) : (globalContext.on_demand_tokens_est || 0);
+  const totalWords = (scope === 'workspace' && workspaceContext) ? (workspaceContext.total_words || 0) : (globalContext.total_words || 0);
+  const totalTokens = preloadedToks + ondemandToks;
+
+  const preloadedEl = document.getElementById('agentMatrixPreloadedVal');
+  const ondemandEl = document.getElementById('agentMatrixOndemandVal');
+  const totalWordsEl = document.getElementById('agentMatrixTotalWordsVal');
+
+  if (preloadedEl) preloadedEl.textContent = `~${preloadedToks.toLocaleString()} tokens`;
+  if (ondemandEl) ondemandEl.textContent = `~${ondemandToks.toLocaleString()} tokens`;
+  if (totalWordsEl) totalWordsEl.textContent = `${totalWords.toLocaleString()} words (~${totalTokens.toLocaleString()} tokens)`;
+
   // Filter items by type
   let items = [];
   if (type === 'ALL' || type === 'RULES') {
@@ -3886,6 +3900,8 @@ function renderAgentMatrix() {
           </div>
           <p class="agent-card-desc">${escapeHtml(r.description || 'No summary description available.')}</p>
           <div class="agent-card-meta">
+            <span class="agent-token-badge">⚡ ~${(r.tokens_est || 0).toLocaleString()} tok</span>
+            <span class="agent-word-badge">🔤 ${(r.word_count || 0).toLocaleString()} words</span>
             <span>📏 ${r.line_count} lines</span>
             <span>💾 ${Math.max(1, Math.round(r.size_bytes / 1024))} KB</span>
             ${r.workspace ? `<span>📁 ${escapeHtml(r.workspace)}</span>` : ''}
@@ -3916,6 +3932,9 @@ function renderAgentMatrix() {
           </div>
           <p class="agent-card-desc">${escapeHtml(s.description || 'On-demand procedural runbook for agentic execution.')}</p>
           <div class="agent-card-meta">
+            <span class="agent-token-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08);">⚡ ~${(s.tokens_est || 0).toLocaleString()} tok</span>
+            <span class="agent-word-badge">🔤 ${(s.word_count || 0).toLocaleString()} words</span>
+            <span>📏 ${s.line_count} lines</span>
             ${s.has_scripts ? '<span>🛠️ Scripts</span>' : ''}
             ${s.has_examples ? '<span>💡 Examples</span>' : ''}
             ${s.has_references ? '<span>📚 References</span>' : ''}
@@ -4043,6 +4062,10 @@ function renderSessionContext(ctx) {
   const subagents = ctx.subagents || [];
   const slashCommands = ctx.slash_commands || [];
 
+  const activeTokens = ctx.active_tokens_est || 0;
+  const ondemandTokens = ctx.on_demand_tokens_est || 0;
+  const totalWordsInj = ctx.total_words_injected || 0;
+
   let html = `
     <div class="session-context-summary-bar">
       <div class="session-context-stat-box">
@@ -4053,13 +4076,17 @@ function renderSessionContext(ctx) {
         <div class="session-context-stat-num" style="color: #34d399;">${activeSkills.length}</div>
         <div class="session-context-stat-lbl">Skills Invoked</div>
       </div>
-      <div class="session-context-stat-box">
-        <div class="session-context-stat-num">${availableSkills.length}</div>
-        <div class="session-context-stat-lbl">On-Demand Skills</div>
+      <div class="session-context-stat-box" style="border-color: rgba(56, 189, 248, 0.4);">
+        <div class="session-context-stat-num" style="color: #38bdf8;">~${activeTokens.toLocaleString()}</div>
+        <div class="session-context-stat-lbl">Injected Tokens</div>
       </div>
       <div class="session-context-stat-box">
-        <div class="session-context-stat-num">${mcpServers.length + subagents.length}</div>
-        <div class="session-context-stat-lbl">Tools &amp; Subagents</div>
+        <div class="session-context-stat-num">${totalWordsInj.toLocaleString()}</div>
+        <div class="session-context-stat-lbl">Injected Words</div>
+      </div>
+      <div class="session-context-stat-box">
+        <div class="session-context-stat-num">~${ondemandTokens.toLocaleString()}</div>
+        <div class="session-context-stat-lbl">On-Demand Capacity</div>
       </div>
     </div>
   `;
@@ -4085,6 +4112,11 @@ function renderSessionContext(ctx) {
             <span class="agent-card-scope-badge ${s.scope}">${s.scope}</span>
           </div>
           <p class="agent-card-desc">${escapeHtml(s.description || 'Procedural skill runbook.')}</p>
+          <div class="agent-card-meta">
+            <span class="agent-token-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3);">⚡ ~${(s.tokens_est || 0).toLocaleString()} tok</span>
+            <span class="agent-word-badge">🔤 ${(s.word_count || 0).toLocaleString()} words</span>
+            <span>📏 ${s.line_count || 0} lines</span>
+          </div>
           <div class="agent-card-actions">
             <span class="agent-card-path" title="${escapeHtml(s.file_path)}">${escapeHtml(s.file_path)}</span>
             <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(s.file_path)}" title="Open skill in File Viewer">📖 Inspect</button>
@@ -4118,6 +4150,11 @@ function renderSessionContext(ctx) {
             </div>
           </div>
           <p class="agent-card-desc">${escapeHtml(r.description || 'Governing guideline for agent actions.')}</p>
+          <div class="agent-card-meta">
+            <span class="agent-token-badge">⚡ ~${(r.tokens_est || 0).toLocaleString()} tok</span>
+            <span class="agent-word-badge">🔤 ${(r.word_count || 0).toLocaleString()} words</span>
+            <span>📏 ${r.line_count || 0} lines</span>
+          </div>
           <div class="agent-card-actions">
             <span class="agent-card-path" title="${escapeHtml(r.file_path)}">${escapeHtml(r.file_path)}</span>
             <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(r.file_path)}" title="Open rule in File Viewer">📖 Inspect</button>
@@ -4140,8 +4177,9 @@ function renderSessionContext(ctx) {
     `;
     availableSkills.forEach(s => {
       html += `
-        <div class="tool-file-pill inspect-agent-file-btn" style="cursor: pointer;" data-path="${escapeHtml(s.file_path)}" title="${escapeHtml(s.description)}">
+        <div class="tool-file-pill inspect-agent-file-btn" style="cursor: pointer;" data-path="${escapeHtml(s.file_path)}" title="${escapeHtml(s.description)} (${(s.word_count || 0).toLocaleString()} words, ~${(s.tokens_est || 0).toLocaleString()} tokens)">
           <span>⚡ ${escapeHtml(s.name)}</span>
+          <span style="font-size: 0.7rem; color: #34d399; margin-left: 4px;">~${(s.tokens_est || 0).toLocaleString()} tok</span>
         </div>
       `;
     });

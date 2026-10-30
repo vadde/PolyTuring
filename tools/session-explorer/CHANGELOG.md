@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added in-session behavioral context analysis at `GET /api/sessions/:id/context` distinguishing between **⚡ Actively Invoked Skills** (with invocation counts and step markers) and **💤 On-Demand Skills** (progressive disclosure).
   - Built liquid-glass **Agent Brain & Context Matrix Modal** (`#agentMatrixModal`) accessible via top header action `🧠 Agent Brain` and Project Hub (`#projectAgentContextBtn`).
   - Built **In-Session Agent Context Drawer** (`#sessionContextModal`) launched via sticky detail header pill `🧠 Agent Context (<count>)`.
+  - Added **GenAI Token & Word Bloat Telemetry (AC-045)**: computes line counts, word counts, character counts, and estimated tokens ($T \approx \max(\lceil C/4 \rceil, \lceil W \times 1.33 \rceil)$) for every rule and skill; renders dynamic bloat telemetry ribbons distinguishing pre-loaded context from on-demand footprint.
   - Seamlessly reuses embedded Native File Viewer (R-038) for 1-click high-fidelity Markdown and code inspection with syntax highlighting and line numbers.
 
 ### Fixed

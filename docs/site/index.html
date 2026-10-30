@@ -198,6 +198,7 @@
           <a href="#sec-session-arch" class="nav-tree-link">Go + Bun Standalone Binary</a>
           <a href="#sec-session-wip" class="nav-tree-link">Agent WIP Recovery &amp; Disambiguation</a>
           <a href="#sec-session-viewer" class="nav-tree-link">Code Viewer &amp; In-Page Find</a>
+          <a href="#sec-agent-context" class="nav-tree-link">Agent Context &amp; Behavioral Matrix</a>
           <a href="#sec-session-swagger" class="nav-tree-link">OpenAPI 3.0 &amp; Swagger UI</a>
           <a href="#sec-session-usage" class="nav-tree-link">Telemetry &amp; CLI Quickstart</a>
         </div>
@@ -1061,6 +1062,10 @@ flowchart LR
               <h4>📁 Native In-Browser File &amp; Artifact Viewer</h4>
               <p>Instant file inspection with syntax highlighting, line numbers gutter, line anchor highlighting (<code>#L10-L20</code>), pinned floating Find widget (<code>Cmd+F</code>), and 1-click quick-copy chips (<code>📋</code> &rarr; <code>✓</code>).</p>
             </div>
+            <div class="glass-card">
+              <h4>🧠 Agent Context &amp; Behavioral Matrix</h4>
+              <p>Full-spectrum transparency into rules, skills, plugins, and MCP servers across Global, Workspace, and Session tiers. Traces invoked vs on-demand skills with live GenAI token bloat telemetry.</p>
+            </div>
           </div>
 
           <!-- Visual Interface Showcase: Main Cockpit -->
@@ -1206,6 +1211,86 @@ flowchart TD
             </div>
           </div>
 
+          <!-- Section: Universal Agent Context & Behavioral Matrix (R-039) -->
+          <h3 class="section-h2" id="sec-agent-context">Universal Agent Context &amp; Behavioral Matrix</h3>
+          <p>
+            Autonomous coding assistants operate under a complex hierarchy of behavioral rules, system instructions, composable skills, plugins, and MCP tools. Session Explorer introduces the <strong>Universal Agent Context &amp; Behavioral Matrix</strong> (<code>R-039</code>), providing complete visibility into the cognitive boundaries, active capabilities, and token footprints governing every agent turn.
+          </p>
+
+          <!-- Context Dual-Sourcing Callout -->
+          <div class="callout callout-theory" style="margin-bottom: 24px;">
+            <div class="callout-header">⚖️ The Context Dual-Sourcing Invariant</div>
+            <div class="callout-body">
+              <strong>Why can't session transcripts alone provide agent context?</strong>
+              <br><br>
+              In production, transcripts frequently omit initial system prompt injections and full skill runbooks to conserve context window tokens. Relying solely on transcripts yields false negatives, while relying solely on static filesystem configuration cannot determine whether an agent ever executed a skill.
+              <br><br>
+              <strong>The Architecture:</strong> Session Explorer combines <strong>Static Filesystem Discovery</strong> (scanning <code>~/.gemini/config/</code>, <code>~/.claude/rules/</code>, <code>.cursorrules</code>, and repo-local <code>.agents/</code>) with <strong>Dynamic Transcript Tool-Call Analysis</strong> (tracking <code>read_file</code>, <code>view_file</code>, <code>invoke_subagent</code>, and MCP calls) to establish empirical execution milestones.
+            </div>
+          </div>
+
+          <!-- Interactive Zoomable Canvas: Context Discovery & Scope Cascade -->
+          <div class="canvas-container">
+            <div class="canvas-header-bar">
+              <span class="canvas-type-tag">Agent Context Blueprint · Dual-Sourcing &amp; Scope Hierarchy</span>
+              <div class="canvas-controls-group">
+                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                <span class="zoom-level-badge">100%</span>
+                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                  <span>Theater</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-viewport">
+              <div class="canvas-content-surface">
+                <pre class="mermaid">
+flowchart TD
+    subgraph S1["Static Filesystem Discovery"]
+        Global["Global Rules &amp; Skills (~/.gemini/config/)"]
+        Assistants["Multi-Assistant Rules (~/.claude, .cursorrules)"]
+        Workspace[".agents/ (Repo Rules, Skills &amp; Hooks)"]
+        MasterDocs["Master Docs (AGENTS.md, CLAUDE.md)"]
+    end
+    subgraph S2["Dynamic Transcript Extraction"]
+        Logs["Session Transcripts (JSONL)"]
+        ToolParser["Tool Call Scanner (read_file, invoke_subagent, MCP)"]
+    end
+    Global &amp; Assistants &amp; Workspace &amp; MasterDocs --&gt; Engine["Universal Context Engine"]
+    Logs --&gt; ToolParser --&gt; Engine
+    Engine --&gt; Cascade["5-Tier Scope Precedence Cascade"]
+    Cascade --&gt; Modal["Global Agent Brain Modal (#agentBrainBtn)"]
+    Cascade --&gt; Drawer["Session Context Drawer (#sessionContextModal)"]
+    Drawer --&gt; Invoked["Actively Invoked Skills (Count &amp; Step Markers)"]
+    Drawer --&gt; OnDemand["Available On-Demand Skills (Progressive Disclosure)"]
+    Modal &amp; Drawer --&gt; Viewer["1-Click Native File Viewer (KaTeX, Mermaid, Line Gutters)"]
+                </pre>
+              </div>
+            </div>
+            <div class="canvas-caption">Figure 2.6: Universal Agent Context &amp; Behavioral Dual-Sourcing Engine (R-039)</div>
+          </div>
+
+          <div class="card-grid">
+            <div class="glass-card">
+              <h4>🏛️ 5-Tier Precedence Cascade</h4>
+              <p>Computes clean governance hierarchy: <code>workspace</code> &gt; <code>declared</code> &gt; <code>global</code> &gt; <code>plugin</code> &gt; <code>builtin</code>, ensuring repo-specific contracts take precedence over machine-wide defaults.</p>
+            </div>
+            <div class="glass-card">
+              <h4>⚡ Actively Invoked vs On-Demand</h4>
+              <p>Session drawer displays invoked skills with invocation counters (e.g. <code>40x</code>) and direct step jump links, alongside uninvoked on-demand skills ready for progressive disclosure.</p>
+            </div>
+            <div class="glass-card">
+              <h4>📊 GenAI Token &amp; Word Bloat Telemetry</h4>
+              <p>Estimates linguistic payload via $T \approx \max(\lceil C/4 \rceil, \lceil W \times 1.33 \rceil)$, cleanly distinguishing pre-loaded context bloat (~5k tokens) from on-demand footprint (~34k tokens).</p>
+            </div>
+            <div class="glass-card">
+              <h4>📖 Native File Viewer Re-use</h4>
+              <p>Deep synergy with R-038: Every rule and skill features 1-click inspection via <code>openFileViewer(path)</code>, rendering full KaTeX math, Mermaid diagrams, and line anchors without redundant UI modals.</p>
+            </div>
+          </div>
+
           <h3 class="section-h2" id="sec-session-swagger">Embedded OpenAPI 3.0 & Swagger UI</h3>
           <p>
             Session Explorer embeds an interactive, 100% offline OpenAPI 3.0 specification and Swagger-compatible documentation explorer directly inside the compiled binary:
@@ -1338,6 +1423,13 @@ make demo-tool T=session-explorer</code></pre>
                         <td><span style="color: #94a3b8;">🔄 Telemetry Importer</span></td>
                         <td><span style="color: #94a3b8;">🔄 CLI Session Reader</span></td>
                         <td><span style="color: #94a3b8;">🔄 Trace Importer</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Agent Context &amp; Behavioral Matrix</strong></td>
+                        <td><span style="color: #34d399; font-weight: 700;">✅ Dual-Source Engine (:9876)</span></td>
+                        <td><span style="color: #94a3b8;">🔄 copilot-instructions Parser</span></td>
+                        <td><span style="color: #94a3b8;">🔄 Claude Rules &amp; Skills Parser</span></td>
+                        <td><span style="color: #94a3b8;">🔄 .cursorrules Importer</span></td>
                       </tr>
                     </tbody>
                   </table>
@@ -1628,6 +1720,7 @@ graph TD
         <li class="toc-item"><a href="#sec-session-arch" class="toc-link">Go + Bun Architecture</a></li>
         <li class="toc-item"><a href="#sec-session-wip" class="toc-link">Agent WIP Recovery</a></li>
         <li class="toc-item"><a href="#sec-session-viewer" class="toc-link">Code Viewer &amp; In-Page Find</a></li>
+        <li class="toc-item"><a href="#sec-agent-context" class="toc-link">Agent Context Matrix (R-039)</a></li>
         <li class="toc-item"><a href="#sec-session-swagger" class="toc-link">OpenAPI 3.0 &amp; Swagger</a></li>
         <li class="toc-item"><a href="#sec-session-usage" class="toc-link">Session CLI Usage</a></li>
         <li class="toc-item"><a href="#ch3-assistant-matrix" class="toc-link">Assistant Ecosystem Matrix</a></li>

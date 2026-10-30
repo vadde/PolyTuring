@@ -484,6 +484,20 @@
         <button class="chip" data-type="PLUGINS">🔌 Plugins &amp; MCP (<span id="agentMatrixPluginsCount">0</span>)</button>
         <button class="chip" data-type="HOOKS">🪝 Lifecycle Hooks (<span id="agentMatrixHooksCount">0</span>)</button>
       </div>
+      <div class="agent-matrix-telemetry-ribbon" id="agentMatrixTelemetryRibbon">
+        <div class="telemetry-pill preloaded" id="agentMatrixPreloadedPill" title="Estimated tokens injected into turns by default (Always-on rules &amp; constitutions)">
+          <span class="telemetry-lbl">📌 Pre-loaded Context:</span>
+          <span class="telemetry-val" id="agentMatrixPreloadedVal">~0 tokens</span>
+        </div>
+        <div class="telemetry-pill ondemand" id="agentMatrixOndemandPill" title="Estimated total tokens across available on-demand skills (if loaded into context)">
+          <span class="telemetry-lbl">💤 On-Demand Footprint:</span>
+          <span class="telemetry-val" id="agentMatrixOndemandVal">~0 tokens</span>
+        </div>
+        <div class="telemetry-pill total" id="agentMatrixTotalWordsPill" title="Aggregate words and estimated tokens across discovered rules and skills">
+          <span class="telemetry-lbl">📊 Total Bloat:</span>
+          <span class="telemetry-val" id="agentMatrixTotalWordsVal">0 words (~0 tokens)</span>
+        </div>
+      </div>
       <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
         <div id="agentMatrixContent">
           <!-- Injected dynamically by app.js -->

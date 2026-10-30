@@ -43,7 +43,7 @@ spec: ../../specs/catalog/session-explorer.md
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
 | Requirements (R-XXX) | 39 | 39 | 100% |
-| Acceptance Criteria (AC-XXX) | 44 | 44 | 100% |
+| Acceptance Criteria (AC-XXX) | 45 | 45 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---

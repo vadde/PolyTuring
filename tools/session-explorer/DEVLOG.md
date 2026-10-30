@@ -1098,6 +1098,13 @@
 - Playwright headless verification confirmed modal opening, 24 global context items, rule inspection in File Viewer, session drawer invocation breakdown (e.g. `dsa-docs-portal` 40x at step 154), and skill file inspection.
 - Living documentation updated across `specs/catalog/session-explorer.md`, `STATUS.md`, `CONTEXT.md`, and `CHANGELOG.md`.
 
+5. **GenAI Token & Word Bloat Telemetry (AC-045)**:
+   - Added text metric analysis in `calculateTextMetrics` computing line count, word count, character count, and estimated tokens ($T \approx \max(\lceil C/4 \rceil, \lceil W \times 1.33 \rceil)$) for all rules and skills.
+   - Global and Workspace contexts aggregate `PreloadedTokensEst` (always-on rules) vs `OnDemandTokensEst` (on-demand skills) and total word bloat.
+   - Session context computes `ActiveTokensEst` and `TotalWordsInjected` for active rules + executed skills vs uninvoked on-demand capacity.
+   - Web UI renders the `#agentMatrixTelemetryRibbon` with live badges (`📌 Pre-loaded: ~5,036 tokens`, `💤 On-Demand: ~34,198 tokens`, `📊 Total Bloat: 20,828 words (~39,234 tokens)`), individual card badges (`⚡ ~1,837 tok`, `🔤 851 words`), and session drawer token stat boxes (`Injected Tokens: ~13,384`).
+   - Headless Playwright verification confirmed live telemetry across modal and session drawer.
+
 
 
 

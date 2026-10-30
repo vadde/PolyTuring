@@ -26,7 +26,7 @@ blockers: []
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
 | Spec Requirements (R-XXX) | 39 | 39 | ✅ 100% Implemented (R-037, R-038, R-039 completed) |
-| Acceptance Criteria (AC-XXX) | 44 | 44 | 🧪 100% Verified (AC-040..AC-044 added & verified) |
+| Acceptance Criteria (AC-XXX) | 45 | 45 | 🧪 100% Verified (AC-040..AC-045 added & verified) |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
 | Test Coverage | 100% | 100% | 🧪 38 unit tests passing + headless Playwright verified |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |

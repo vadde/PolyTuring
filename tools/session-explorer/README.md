@@ -22,6 +22,7 @@
 - 💬 **Granular Filtering & Dialogue Mode**: 1-click `💬 Dialogue` mode isolates pure human-to-AI conversation, filtering out hundreds of autonomous tool execution cards.
 - 📊 **Bounded Diagrams & Fullscreen Theater**: Inline Mermaid diagrams bounded to 440px to eliminate vertical scroll trapping; double-click or Theater button opens pan/drag 2D theater with 20%–500% zoom, Fit to View, and SVG/Source copy.
 - 📁 **Native In-Browser File & Artifact Viewer**: Instant file inspection with Highlight.js syntax highlighting, line numbers gutter, anchor line highlighting (`#L10-L20`), full-width Markdown preview, pinned floating Find widget (`Cmd+F`), and dual-affordance 1-click copy path chips (`📋` → `✓`).
+- 🧠 **Universal Agent Context & Behavioral Matrix**: Complete multi-tier visibility into the constitutional rules, skills, plugins, MCP servers, and lifecycle hooks governing agent behavior across Global, Workspace, and Session tiers. Automatically tracks empirical tool executions with step jump markers and deep 1-click File Viewer inspection.
 - 🛑 **Agent WIP Recovery & Disambiguation**: Sub-millisecond state restore (`/api/wip`, `make session-wip`) with mandatory agent halting when multiple parallel sessions exist in a workspace.
 - 📖 **Embedded Offline OpenAPI 3.0 & Swagger UI**: Zero-CDN interactive API explorer at `http://localhost:9876/docs`.
 
@@ -109,7 +110,45 @@ Every lifecycle action is managed through standard `make` targets:
 | **Date Range Filter** | Filter sessions by date range with quick presets (`Today`, `7d`, `30d`) | Toolbar date picker |
 | **Dialogue Mode** | Filter out tool executions to read clean user-agent dialogue | Detail toolbar `💬 Dialogue` chip |
 | **Theater Mode** | Expand Mermaid diagram into full-screen pan/zoom canvas (20%–500%) | Double-click canvas or `Theater` button |
+| **Agent Brain Matrix** | Explore all global, workspace, plugin, and builtin rules & skills | Header button `🧠 Agent Brain` |
+| **Session Context Drawer** | Inspect active rules, invoked skills (with call counts & step jump links) | Session header `🧠 Agent Context` |
+| **Rule / Skill Inspection** | 1-click view of any markdown rule or skill in Native File Viewer | Card button `📖 Inspect` |
 | **Export Session** | Download session as clean Markdown (`.md`) or structured JSON (`.json`) | Detail header buttons |
+
+---
+
+## Universal Agent Context & Behavioral Matrix (R-039)
+
+Session Explorer provides full-spectrum transparency into the autonomous agent's cognitive boundaries, constitutional guardrails, skills, plugins, and MCP servers across multiple scopes:
+
+### Multi-Scope Cascade Hierarchy
+Rules and skills are discovered and prioritized according to strict constitutional precedence:
+1. **Workspace / Codebase Scope** (`.agents/rules/`, `.agents/skills/`, `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `copilot-instructions.md`): Repository-specific guidelines override global defaults.
+2. **Global System Scope** (`~/.gemini/config/rules/`, `~/.gemini/config/skills/`, `~/.claude/rules/`, `~/.cursorrules`): Machine-wide guardrails and constitutional invariants (e.g., Rule 101).
+3. **Plugins Scope** (`~/.gemini/config/plugins/`): Composable community and engineering extension bundles.
+4. **Built-in Scope** (`builtin/skills/`): Core agent runtime runbooks and fallback skills.
+
+### Context Dual-Sourcing Architecture
+1. **Static Filesystem Discovery**: Directly interrogates active filesystem locations to index the ground truth of all configured rules, skills, plugins, and MCP servers, even when transcripts omit initial system prompts to conserve context tokens.
+2. **Dynamic Transcript Tool-Call Analysis**: Analyzes JSONL transcripts for tool executions (`read_file`, `view_file`, `invoke_subagent`, MCP calls) to compute empirical utilization metrics:
+   - **⚡ Actively Invoked Skills**: Skills actually triggered during the session, complete with execution counts and first step index jump links.
+   - **💤 Available On-Demand Skills**: Available skills that remained dormant in memory, ready for progressive disclosure.
+
+### Deep Native File Viewer Integration (R-038 Re-use)
+Every rule, constitution, and skill card features a 1-click `📖 Inspect` button that directly invokes the **Native In-Browser File Viewer** (`openFileViewer`), providing:
+- Full-width fluid reading view (97.5vw $\times$ 96vh).
+- Live **KaTeX math** formula typesetting and interactive **Mermaid diagrams**.
+- Highlight.js syntax highlighting and unified line numbers gutter.
+- Pinned floating in-page find HUD (`Cmd+F` / `Ctrl+F`).
+
+### GenAI Token & Word Bloat Telemetry (AC-045)
+To safeguard context windows from bloat and token exhaustion, Session Explorer analyzes the exact linguistic payload of every rule, guideline, prompt, and skill:
+- **Linguistic Metrics**: Every rule and skill card displays exact line count (`lines`), word count (`words`), and byte size (`KB`).
+- **Standard Token Estimation**: Estimates tokens using $T \approx \max(\lceil C / 4 \rceil, \lceil W \times 1.33 \rceil)$, providing a realistic token estimate across Gemini, Claude, and GPT tokenizers.
+- **Pre-Loaded vs. On-Demand Analysis**:
+  - **📌 Pre-Loaded Context Bloat**: Measures tokens permanently injected into turns by default via always-on constitutional rules and workspace guidelines (e.g., `~5,036 tokens`).
+  - **💤 On-Demand Footprint**: Measures potential token capacity across available procedural skills and runbooks if loaded into context (e.g., `~34,198 tokens`).
+  - **⚡ Active Session Ingestion**: Real-time measurement of tokens and words actually consumed by active rules and invoked skills in a given conversation (e.g., `~13,384 tokens` across 6,936 injected words).
 
 ---
 
@@ -122,6 +161,9 @@ The embedded HTTP server exposes a JSON REST API for integration:
 | `/api/sessions` | `GET` | `workspace`, `runtime`, `sort_by`, `sort_order`, `from`, `to` | List all discovered sessions with summary stats |
 | `/api/sessions/{id}` | `GET` | — | Retrieve full conversation messages and tool calls for a session |
 | `/api/sessions/{id}/tail` | `GET` | `last_step` | Real-time Server-Sent Events (SSE) live tail stream |
+| `/api/sessions/{id}/context` | `GET` | — | Session-specific active rules, actively invoked skills (with call counts & step index), and on-demand skills |
+| `/api/agent/context/global` | `GET` | — | Discovered global rules, skills, plugins, MCP servers, and hooks across assistants |
+| `/api/agent/context/workspace` | `GET` | `workspace` | Discovered codebase rules/skills + scope cascade (Workspace → Declared → Global → Built-in) |
 | `/api/file` | `GET` | `path` | Secure local file retrieval with language detection & line anchors |
 | `/api/search` | `GET` | `q`, `workspace`, `type`, `from`, `to` | Full-text search across transcripts |
 | `/api/stats` | `GET` | — | Global statistics, workspace list, runtime breakdown, and top tools |

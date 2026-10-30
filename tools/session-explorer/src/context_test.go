@@ -125,6 +125,21 @@ Run the tests with care.`
 	if !foundWorkspaceSkill {
 		t.Errorf("expected test-skill to be discovered in workspace skills")
 	}
+
+	// Verify Token & Word metrics calculation (R-039 GenAI Bloat Telemetry)
+	if wctx.PreloadedTokensEst <= 0 {
+		t.Errorf("expected PreloadedTokensEst > 0, got %d", wctx.PreloadedTokensEst)
+	}
+	if wctx.OnDemandTokensEst <= 0 {
+		t.Errorf("expected OnDemandTokensEst > 0, got %d", wctx.OnDemandTokensEst)
+	}
+	if wctx.TotalWords <= 0 {
+		t.Errorf("expected TotalWords > 0, got %d", wctx.TotalWords)
+	}
+	if wctx.TotalTokensEst != wctx.PreloadedTokensEst+wctx.OnDemandTokensEst {
+		t.Errorf("expected TotalTokensEst == Preloaded + OnDemand, got %d vs %d+%d",
+			wctx.TotalTokensEst, wctx.PreloadedTokensEst, wctx.OnDemandTokensEst)
+	}
 }
 
 // TestR039_ExtractSessionAgentContext_SkillInvocations tests that tool calls and reads
@@ -187,6 +202,14 @@ func TestR039_ExtractSessionAgentContext_SkillInvocations(t *testing.T) {
 	}
 	if !foundPlan {
 		t.Errorf("expected /plan in SlashCommands, got %v", sctx.SlashCommands)
+	}
+
+	// Verify Session-level Token & Word Metrics
+	if sctx.ActiveTokensEst <= 0 {
+		t.Errorf("expected ActiveTokensEst > 0, got %d", sctx.ActiveTokensEst)
+	}
+	if sctx.TotalWordsInjected <= 0 {
+		t.Errorf("expected TotalWordsInjected > 0, got %d", sctx.TotalWordsInjected)
 	}
 }
 

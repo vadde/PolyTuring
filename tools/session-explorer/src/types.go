@@ -300,6 +300,9 @@ type AgentRule struct {
 	Priority    string            `json:"priority,omitempty"`    // "Critical", "Important", "Constitutional", "Standard"
 	Trigger     string            `json:"trigger,omitempty"`     // "always_on", "model_decision", "user_invoked"
 	LineCount   int               `json:"line_count"`
+	WordCount   int               `json:"word_count"`
+	CharCount   int               `json:"char_count"`
+	TokensEst   int               `json:"tokens_est"`
 	SizeBytes   int64             `json:"size_bytes"`
 	Provider    string            `json:"provider"`              // "antigravity", "claude", "copilot", "cursor"
 	Workspace   string            `json:"workspace,omitempty"`
@@ -319,6 +322,11 @@ type AgentSkill struct {
 	HasScripts    bool              `json:"has_scripts"`
 	HasExamples   bool              `json:"has_examples"`
 	HasReferences bool              `json:"has_references"`
+	LineCount     int               `json:"line_count"`
+	WordCount     int               `json:"word_count"`
+	CharCount     int               `json:"char_count"`
+	TokensEst     int               `json:"tokens_est"`
+	SizeBytes     int64             `json:"size_bytes"`
 	InvokedCount  int               `json:"invoked_count,omitempty"`  // Count of tool calls or reads in session
 	FirstStepIdx  int               `json:"first_step_idx,omitempty"` // Step index where first triggered
 }
@@ -359,41 +367,52 @@ type AgentHook struct {
 // GlobalAgentContext represents the machine-wide agent brain state.
 // Implements: R-039
 type GlobalAgentContext struct {
-	Rules       []AgentRule     `json:"rules"`
-	Skills      []AgentSkill    `json:"skills"`
-	Plugins     []AgentPlugin   `json:"plugins"`
-	MCPServers  []MCPServerInfo `json:"mcp_servers"`
-	Hooks       []AgentHook     `json:"hooks"`
-	TotalRules  int             `json:"total_rules"`
-	TotalSkills int             `json:"total_skills"`
+	Rules              []AgentRule     `json:"rules"`
+	Skills             []AgentSkill    `json:"skills"`
+	Plugins            []AgentPlugin   `json:"plugins"`
+	MCPServers         []MCPServerInfo `json:"mcp_servers"`
+	Hooks              []AgentHook     `json:"hooks"`
+	TotalRules         int             `json:"total_rules"`
+	TotalSkills        int             `json:"total_skills"`
+	PreloadedTokensEst int             `json:"preloaded_tokens_est"` // Always-on / constitutional rules & master instructions
+	OnDemandTokensEst  int             `json:"on_demand_tokens_est"` // Available skills & on-demand runbooks
+	TotalTokensEst     int             `json:"total_tokens_est"`
+	TotalWords         int             `json:"total_words"`
 }
 
 // WorkspaceAgentContext represents the merged contextual view for a specific repository.
 // Implements: R-039
 type WorkspaceAgentContext struct {
-	Workspace   string          `json:"workspace"`
-	ProjectName string          `json:"project_name"`
-	Rules       []AgentRule     `json:"rules"`       // Workspace rules + inherited global rules with scope tagging
-	Skills      []AgentSkill    `json:"skills"`      // Workspace skills + inherited global/builtin skills
-	MasterDocs  []string        `json:"master_docs"` // AGENTS.md, CLAUDE.md, .cursorrules
-	MCPServers  []MCPServerInfo `json:"mcp_servers"`
-	Hooks       []AgentHook     `json:"hooks"`
-	TotalRules  int             `json:"total_rules"`
-	TotalSkills int             `json:"total_skills"`
+	Workspace          string          `json:"workspace"`
+	ProjectName        string          `json:"project_name"`
+	Rules              []AgentRule     `json:"rules"`       // Workspace rules + inherited global rules with scope tagging
+	Skills             []AgentSkill    `json:"skills"`      // Workspace skills + inherited global/builtin skills
+	MasterDocs         []string        `json:"master_docs"` // AGENTS.md, CLAUDE.md, .cursorrules
+	MCPServers         []MCPServerInfo `json:"mcp_servers"`
+	Hooks              []AgentHook     `json:"hooks"`
+	TotalRules         int             `json:"total_rules"`
+	TotalSkills        int             `json:"total_skills"`
+	PreloadedTokensEst int             `json:"preloaded_tokens_est"`
+	OnDemandTokensEst  int             `json:"on_demand_tokens_est"`
+	TotalTokensEst     int             `json:"total_tokens_est"`
+	TotalWords         int             `json:"total_words"`
 }
 
 // SessionAgentContext represents active rules, skills, and tools in a conversation session.
 // Implements: R-039
 type SessionAgentContext struct {
-	SessionID       string          `json:"session_id"`
-	Workspace       string          `json:"workspace"`
-	ProjectName     string          `json:"project_name"`
-	ActiveRules     []AgentRule     `json:"active_rules"`
-	ActiveSkills    []AgentSkill    `json:"active_skills"`    // Skills actually invoked during the session
-	AvailableSkills []AgentSkill    `json:"available_skills"` // Skills available via progressive disclosure
-	MCPServers      []MCPServerInfo `json:"mcp_servers"`
-	Subagents       []string        `json:"subagents,omitempty"`
-	SlashCommands   []string        `json:"slash_commands,omitempty"`
+	SessionID          string          `json:"session_id"`
+	Workspace          string          `json:"workspace"`
+	ProjectName        string          `json:"project_name"`
+	ActiveRules        []AgentRule     `json:"active_rules"`
+	ActiveSkills       []AgentSkill    `json:"active_skills"`    // Skills actually invoked during the session
+	AvailableSkills    []AgentSkill    `json:"available_skills"` // Skills available via progressive disclosure
+	MCPServers         []MCPServerInfo `json:"mcp_servers"`
+	Subagents          []string        `json:"subagents,omitempty"`
+	SlashCommands      []string        `json:"slash_commands,omitempty"`
+	ActiveTokensEst    int             `json:"active_tokens_est"`    // Tokens injected into session (rules + invoked skills)
+	OnDemandTokensEst  int             `json:"on_demand_tokens_est"`  // Tokens available if all on-demand skills were called
+	TotalWordsInjected int             `json:"total_words_injected"`
 }
 
 

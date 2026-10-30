@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 var (
@@ -28,21 +29,47 @@ var (
 	reSkillPromptTag  = regexp.MustCompile(`- ([a-zA-Z0-9_-]+) \((/[^)]+SKILL\.md)\)`)
 )
 
-// parseMarkdownHeader extracts title, priority, trigger, line count, and description from a Markdown file.
-func parseMarkdownHeader(filePath string) (title string, description string, priority string, trigger string, lineCount int, sizeBytes int64) {
+// calculateTextMetrics computes line count, word count, character count, and estimated tokens for a string.
+// Standard GenAI token estimation rule:
+// - English words average ~1.33 tokens each.
+// - Characters average ~4 characters per token for English text and code.
+// - Formula: tokensEst = max(ceil(charCount / 4), ceil(wordCount * 1.33))
+func calculateTextMetrics(content string) (lineCount int, wordCount int, charCount int, tokensEst int) {
+	if len(content) == 0 {
+		return 0, 0, 0, 0
+	}
+	lines := strings.Split(content, "\n")
+	lineCount = len(lines)
+	words := strings.Fields(content)
+	wordCount = len(words)
+	charCount = utf8.RuneCountInString(content)
+
+	estByChar := (charCount + 3) / 4
+	estByWord := int(float64(wordCount) * 1.33)
+	tokensEst = estByChar
+	if estByWord > tokensEst {
+		tokensEst = estByWord
+	}
+	if tokensEst < 1 && charCount > 0 {
+		tokensEst = 1
+	}
+	return lineCount, wordCount, charCount, tokensEst
+}
+
+// parseMarkdownHeader extracts title, priority, trigger, line count, word count, char count, estimated tokens, and description from a Markdown file.
+func parseMarkdownHeader(filePath string) (title string, description string, priority string, trigger string, lineCount int, wordCount int, charCount int, tokensEst int, sizeBytes int64) {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return filepath.Base(filePath), "", "Standard", "always_on", 0, 0
+		return filepath.Base(filePath), "", "Standard", "always_on", 0, 0, 0, 0, 0
 	}
 	sizeBytes = info.Size()
 
 	contentBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return filepath.Base(filePath), "", "Standard", "always_on", 0, sizeBytes
+		return filepath.Base(filePath), "", "Standard", "always_on", 0, 0, 0, 0, sizeBytes
 	}
 	content := string(contentBytes)
-	lines := strings.Split(content, "\n")
-	lineCount = len(lines)
+	lineCount, wordCount, charCount, tokensEst = calculateTextMetrics(content)
 
 	// Extract Title
 	if m := reH1Title.FindStringSubmatch(content); len(m) > 1 {
@@ -110,8 +137,8 @@ func cleanBadgeText(raw string) string {
 	return raw
 }
 
-// parseSkillYAML extracts skill metadata from SKILL.md YAML frontmatter.
-func parseSkillYAML(filePath string) (name string, description string, category string, hasScripts bool, hasExamples bool, hasRefs bool) {
+// parseSkillYAML extracts skill metadata from SKILL.md YAML frontmatter and computes text metrics.
+func parseSkillYAML(filePath string) (name string, description string, category string, hasScripts bool, hasExamples bool, hasRefs bool, lineCount int, wordCount int, charCount int, tokensEst int, sizeBytes int64) {
 	dir := filepath.Dir(filePath)
 	name = filepath.Base(dir)
 
@@ -125,11 +152,17 @@ func parseSkillYAML(filePath string) (name string, description string, category 
 		hasRefs = true
 	}
 
+	info, err := os.Stat(filePath)
+	if err == nil {
+		sizeBytes = info.Size()
+	}
+
 	contentBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return name, "", "", hasScripts, hasExamples, hasRefs
+		return name, "", "", hasScripts, hasExamples, hasRefs, 0, 0, 0, 0, sizeBytes
 	}
 	content := string(contentBytes)
+	lineCount, wordCount, charCount, tokensEst = calculateTextMetrics(content)
 
 	if fm := reYAMLFrontmatter.FindStringSubmatch(content); len(fm) > 1 {
 		yamlBody := fm[1]
@@ -164,7 +197,7 @@ func parseSkillYAML(filePath string) (name string, description string, category 
 		description = strings.Join(p, " ")
 	}
 
-	return name, description, category, hasScripts, hasExamples, hasRefs
+	return name, description, category, hasScripts, hasExamples, hasRefs, lineCount, wordCount, charCount, tokensEst, sizeBytes
 }
 
 // parseMCPConfig parses an mcp_config.json file into MCPServerInfo structs.
@@ -294,7 +327,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 					continue
 				}
 				seenRules[fullPath] = true
-				title, desc, priority, trigger, lines, size := parseMarkdownHeader(fullPath)
+				title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(fullPath)
 				ctx.Rules = append(ctx.Rules, AgentRule{
 					Name:        e.Name(),
 					Title:       title,
@@ -304,6 +337,9 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 					Priority:    priority,
 					Trigger:     trigger,
 					LineCount:   lines,
+					WordCount:   words,
+					CharCount:   chars,
+					TokensEst:   tokens,
 					SizeBytes:   size,
 					Provider:    "antigravity",
 				})
@@ -321,7 +357,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 					continue
 				}
 				seenRules[fullPath] = true
-				title, desc, priority, trigger, lines, size := parseMarkdownHeader(fullPath)
+				title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(fullPath)
 				ctx.Rules = append(ctx.Rules, AgentRule{
 					Name:        e.Name(),
 					Title:       title,
@@ -331,6 +367,9 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 					Priority:    priority,
 					Trigger:     trigger,
 					LineCount:   lines,
+					WordCount:   words,
+					CharCount:   chars,
+					TokensEst:   tokens,
 					SizeBytes:   size,
 					Provider:    "claude",
 				})
@@ -342,7 +381,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 	cursorGlobal := filepath.Join(homeDir, ".cursorrules")
 	if _, err := os.Stat(cursorGlobal); err == nil && !seenRules[cursorGlobal] {
 		seenRules[cursorGlobal] = true
-		title, desc, priority, trigger, lines, size := parseMarkdownHeader(cursorGlobal)
+		title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(cursorGlobal)
 		ctx.Rules = append(ctx.Rules, AgentRule{
 			Name:        ".cursorrules",
 			Title:       title,
@@ -352,6 +391,9 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 			Priority:    priority,
 			Trigger:     trigger,
 			LineCount:   lines,
+			WordCount:   words,
+			CharCount:   chars,
+			TokensEst:   tokens,
 			SizeBytes:   size,
 			Provider:    "cursor",
 		})
@@ -365,7 +407,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 				skillPath := filepath.Join(globalSkillsDir, e.Name(), "SKILL.md")
 				if _, err := os.Stat(skillPath); err == nil && !seenSkills[skillPath] {
 					seenSkills[skillPath] = true
-					name, desc, cat, hasScr, hasEx, hasRef := parseSkillYAML(skillPath)
+					name, desc, cat, hasScr, hasEx, hasRef, lines, words, chars, tokens, size := parseSkillYAML(skillPath)
 					ctx.Skills = append(ctx.Skills, AgentSkill{
 						Name:          name,
 						Scope:         ScopeGlobal,
@@ -376,6 +418,11 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 						HasScripts:    hasScr,
 						HasExamples:   hasEx,
 						HasReferences: hasRef,
+						LineCount:     lines,
+						WordCount:     words,
+						CharCount:     chars,
+						TokensEst:     tokens,
+						SizeBytes:     size,
 					})
 				}
 			}
@@ -394,7 +441,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 					skillPath := filepath.Join(bDir, e.Name(), "SKILL.md")
 					if _, err := os.Stat(skillPath); err == nil && !seenSkills[skillPath] {
 						seenSkills[skillPath] = true
-						name, desc, cat, hasScr, hasEx, hasRef := parseSkillYAML(skillPath)
+						name, desc, cat, hasScr, hasEx, hasRef, lines, words, chars, tokens, size := parseSkillYAML(skillPath)
 						ctx.Skills = append(ctx.Skills, AgentSkill{
 							Name:          name,
 							Scope:         ScopeBuiltin,
@@ -405,6 +452,11 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 							HasScripts:    hasScr,
 							HasExamples:   hasEx,
 							HasReferences: hasRef,
+							LineCount:     lines,
+							WordCount:     words,
+							CharCount:     chars,
+							TokensEst:     tokens,
+							SizeBytes:     size,
 						})
 					}
 				}
@@ -447,7 +499,7 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 							if _, err := os.Stat(skillPath); err == nil && !seenSkills[skillPath] {
 								seenSkills[skillPath] = true
 								p.Skills = append(p.Skills, se.Name())
-								name, desc, cat, hasScr, hasEx, hasRef := parseSkillYAML(skillPath)
+								name, desc, cat, hasScr, hasEx, hasRef, lines, words, chars, tokens, size := parseSkillYAML(skillPath)
 								ctx.Skills = append(ctx.Skills, AgentSkill{
 									Name:          name,
 									Scope:         ScopePlugin,
@@ -459,6 +511,11 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 									HasScripts:    hasScr,
 									HasExamples:   hasEx,
 									HasReferences: hasRef,
+									LineCount:     lines,
+									WordCount:     words,
+									CharCount:     chars,
+									TokensEst:     tokens,
+									SizeBytes:     size,
 								})
 							}
 						}
@@ -487,6 +544,16 @@ func (idx *SessionIndex) DiscoverGlobalAgentContext() GlobalAgentContext {
 
 	ctx.TotalRules = len(ctx.Rules)
 	ctx.TotalSkills = len(ctx.Skills)
+
+	for _, r := range ctx.Rules {
+		ctx.PreloadedTokensEst += r.TokensEst
+		ctx.TotalWords += r.WordCount
+	}
+	for _, s := range ctx.Skills {
+		ctx.OnDemandTokensEst += s.TokensEst
+		ctx.TotalWords += s.WordCount
+	}
+	ctx.TotalTokensEst = ctx.PreloadedTokensEst + ctx.OnDemandTokensEst
 
 	return ctx
 }
@@ -561,7 +628,7 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 						continue
 					}
 					seenRules[fullPath] = true
-					title, desc, priority, trigger, lines, size := parseMarkdownHeader(fullPath)
+					title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(fullPath)
 					wctx.Rules = append(wctx.Rules, AgentRule{
 						Name:        e.Name(),
 						Title:       title,
@@ -571,6 +638,9 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 						Priority:    priority,
 						Trigger:     trigger,
 						LineCount:   lines,
+						WordCount:   words,
+						CharCount:   chars,
+						TokensEst:   tokens,
 						SizeBytes:   size,
 						Provider:    "antigravity",
 						Workspace:   projName,
@@ -587,7 +657,7 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 					skillPath := filepath.Join(skillsDir, e.Name(), "SKILL.md")
 					if _, err := os.Stat(skillPath); err == nil && !seenSkills[skillPath] {
 						seenSkills[skillPath] = true
-						name, desc, cat, hasScr, hasEx, hasRef := parseSkillYAML(skillPath)
+						name, desc, cat, hasScr, hasEx, hasRef, lines, words, chars, tokens, size := parseSkillYAML(skillPath)
 						wctx.Skills = append(wctx.Skills, AgentSkill{
 							Name:          name,
 							Scope:         ScopeWorkspace,
@@ -599,6 +669,11 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 							HasScripts:    hasScr,
 							HasExamples:   hasEx,
 							HasReferences: hasRef,
+							LineCount:     lines,
+							WordCount:     words,
+							CharCount:     chars,
+							TokensEst:     tokens,
+							SizeBytes:     size,
 						})
 					}
 				}
@@ -633,7 +708,7 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 		if _, err := os.Stat(cand.path); err == nil && !seenRules[cand.path] {
 			seenRules[cand.path] = true
 			wctx.MasterDocs = append(wctx.MasterDocs, cand.name)
-			title, desc, priority, trigger, lines, size := parseMarkdownHeader(cand.path)
+			title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(cand.path)
 			wctx.Rules = append([]AgentRule{{
 				Name:        cand.name,
 				Title:       title,
@@ -643,6 +718,9 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 				Priority:    priority,
 				Trigger:     trigger,
 				LineCount:   lines,
+				WordCount:   words,
+				CharCount:   chars,
+				TokensEst:   tokens,
 				SizeBytes:   size,
 				Provider:    cand.provider,
 				Workspace:   projName,
@@ -660,7 +738,7 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 					continue
 				}
 				seenRules[fullPath] = true
-				title, desc, priority, trigger, lines, size := parseMarkdownHeader(fullPath)
+				title, desc, priority, trigger, lines, words, chars, tokens, size := parseMarkdownHeader(fullPath)
 				wctx.Rules = append(wctx.Rules, AgentRule{
 					Name:        e.Name(),
 					Title:       title,
@@ -670,6 +748,9 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 					Priority:    priority,
 					Trigger:     trigger,
 					LineCount:   lines,
+					WordCount:   words,
+					CharCount:   chars,
+					TokensEst:   tokens,
 					SizeBytes:   size,
 					Provider:    "cursor",
 					Workspace:   projName,
@@ -705,6 +786,16 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 
 	wctx.TotalRules = len(wctx.Rules)
 	wctx.TotalSkills = len(wctx.Skills)
+
+	for _, r := range wctx.Rules {
+		wctx.PreloadedTokensEst += r.TokensEst
+		wctx.TotalWords += r.WordCount
+	}
+	for _, s := range wctx.Skills {
+		wctx.OnDemandTokensEst += s.TokensEst
+		wctx.TotalWords += s.WordCount
+	}
+	wctx.TotalTokensEst = wctx.PreloadedTokensEst + wctx.OnDemandTokensEst
 
 	return wctx
 }
@@ -771,12 +862,25 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 					skillName := match[1]
 					skillPath := match[2]
 					if _, exists := availableSkillIndex[skillName]; !exists {
+						_, desc, cat, hasScr, hasEx, hasRef, lines, words, chars, tokens, size := parseSkillYAML(skillPath)
+						if desc == "" {
+							desc = "Mounted in system prompt"
+						}
 						availableSkillIndex[skillName] = AgentSkill{
-							Name:        skillName,
-							Scope:       ScopeBuiltin,
-							FilePath:    skillPath,
-							Provider:    "antigravity",
-							Description: "Mounted in system prompt",
+							Name:          skillName,
+							Scope:         ScopeBuiltin,
+							FilePath:      skillPath,
+							Provider:      "antigravity",
+							Description:   desc,
+							Category:      cat,
+							HasScripts:    hasScr,
+							HasExamples:   hasEx,
+							HasReferences: hasRef,
+							LineCount:     lines,
+							WordCount:     words,
+							CharCount:     chars,
+							TokensEst:     tokens,
+							SizeBytes:     size,
 						}
 					}
 				}
@@ -859,6 +963,19 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 	})
 
 	sctx.MCPServers = wsCtx.MCPServers
+
+	// Compute session-level token bloat and word metrics
+	for _, r := range sctx.ActiveRules {
+		sctx.ActiveTokensEst += r.TokensEst
+		sctx.TotalWordsInjected += r.WordCount
+	}
+	for _, s := range sctx.ActiveSkills {
+		sctx.ActiveTokensEst += s.TokensEst
+		sctx.TotalWordsInjected += s.WordCount
+	}
+	for _, s := range sctx.AvailableSkills {
+		sctx.OnDemandTokensEst += s.TokensEst
+	}
 
 	return sctx, nil
 }

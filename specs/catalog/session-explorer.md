@@ -485,6 +485,7 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-042 | Given a session detail view, the sticky header renders an Agent Context button (`🧠 Agent Context (<count>)`); clicking opens a drawer showing active rules, invoked skills (with step counts), and on-demand skills | R-039 |
 | AC-043 | Given any rule or skill item, clicking `Inspect` opens its full content directly in the embedded Native File Viewer (R-038) with syntax highlighting, Markdown preview, and line numbers | R-039 |
 | AC-044 | Given multiple assistant ecosystems, the backend provider architecture abstracts rule and skill discovery across Antigravity, Claude Code, GitHub Copilot, and Cursor | R-039 |
+| AC-045 | Given rules and skills in the Agent Brain modal or session context drawer, the system computes and renders GenAI bloat telemetry including line count, word count, character count, and estimated tokens ($T \approx \max(\lceil C/4 \rceil, \lceil W \times 1.33 \rceil)$), distinguishing pre-loaded context bloat from on-demand footprint | R-039 |
 
 ---
 
