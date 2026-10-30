@@ -38,8 +38,8 @@ if [ -n "${UNESCAPED_LT}" ]; then
 fi
 echo "   ✅ Mermaid node labels are cleanly escaped."
 
-# 3. Verify CSS SVG sizing rules (Prevent SVG 0px x 0px collapse)
-echo "→ 3. Auditing SVG sizing invariants in style.css..."
+# 3. Verify CSS SVG sizing rules & Mermaid Dual-Scope Styling Invariants
+echo "→ 3. Auditing SVG sizing & Mermaid dual-scope theme invariants in style.css..."
 if grep -E '\.mermaid svg.*width:\s*auto\s*!important' "${SITE_DIR}/style.css" > /dev/null; then
   echo "❌ Fatal CSS anti-pattern: 'width: auto !important' found on .mermaid svg."
   echo "   This collapses SVG elements to 0px x 0px inside flex containers."
@@ -49,7 +49,19 @@ if grep -E '\.mermaid svg.*height:\s*auto\s*!important.*max-height' "${SITE_DIR}
   echo "❌ Fatal CSS anti-pattern: conflicting max-height and height: auto !important on same line."
   exit 1
 fi
-echo "   ✅ CSS SVG sizing rules conform to responsive viewBox standards."
+if ! grep -q '\.theater-surface \.node rect' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing .theater-surface .node rect selector in style.css! Both in-card and theater mode must share identical Mermaid rules to prevent disparity."
+  exit 1
+fi
+if ! grep -q '\[data-theme="mica"\] \.mermaid svg foreignObject div' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing Mica foreignObject div text override in style.css! White-on-white text bug will occur on HTML labels."
+  exit 1
+fi
+if ! grep -q '\[data-theme="mica"\] \.theater-surface svg foreignObject div' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing Mica theater foreignObject div text override in style.css!"
+  exit 1
+fi
+echo "   ✅ CSS SVG sizing & Mermaid dual-scope theme rules verified (Zero In-Card vs Theater disparity)."
 
 # 4. Verify KaTeX configuration
 echo "→ 4. Checking KaTeX resources and delimiters..."

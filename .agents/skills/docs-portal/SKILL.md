@@ -294,8 +294,26 @@ flowchart TB
      margin: 0 auto;
    }
    ```
-6. **Node Label Escaping Rule**:
+9. **Node Label Escaping Rule**:
    - Escape `<` and `>` in labels as `≤` or `&lt;` / `&gt;` to avoid crashing Mermaid's HTML parser.
+10. **Dual-Scope In-Card & Theater Mode Styling (Zero Disparity Invariant)**:
+   - When an SVG is cloned into `#theater-surface` during Fullscreen Theater Mode, it is NO LONGER nested inside `.mermaid`.
+   - Every CSS rule modifying node shapes, text, edges, markers, or labels MUST explicitly target both `.mermaid` and `.theater-surface` to guarantee zero visual disparity between in-card and theater workbench modes.
+11. **The Dual Fill/Color SVG & HTML ForeignObject Contrast Invariant**:
+   - Mermaid flowcharts with HTML labels render text inside `<foreignObject><div xmlns="..."><span class="nodeLabel">...</span></div></foreignObject>`.
+   - SVG `fill: ...` only affects pure SVG `<text>` elements and is completely ignored by HTML `<div>` / `<span>` elements (which default to Mermaid's internal generated `color: #f1f5f9`).
+   - To guarantee crystal-clear contrast and eliminate white-on-white bugs in light themes (Mica), CSS MUST enforce both `fill` and `color` simultaneously across SVG and foreignObject tags:
+     ```css
+     [data-theme="mica"] .mermaid svg text,
+     [data-theme="mica"] .mermaid svg foreignObject div,
+     [data-theme="mica"] .mermaid svg foreignObject span,
+     [data-theme="mica"] .theater-surface svg text,
+     [data-theme="mica"] .theater-surface svg foreignObject div,
+     [data-theme="mica"] .theater-surface svg foreignObject span {
+       fill: #0f172a !important;
+       color: #0f172a !important;
+     }
+     ```
 
 ---
 

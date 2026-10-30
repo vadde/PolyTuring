@@ -1929,11 +1929,9 @@ dialog#theater-modal::backdrop {
   cursor: text;
 }
 
-/* Mermaid SVG Readability & Natural Scale Overrides */
-.mermaid {
-  display: inline-block !important;
-  margin: 0 auto !important;
-  text-align: center !important;
+/* Mermaid SVG Readability & Natural Scale Overrides (Dual Scope: In-Card & Theater) */
+.mermaid,
+.theater-surface {
   overflow: visible !important;
 }
 
@@ -1947,41 +1945,181 @@ dialog#theater-modal::backdrop {
   margin: 0 auto;
 }
 
-.mermaid svg text, .mermaid svg .label {
+/* Universal Text & Label Color Enforcement (SVG <text> + HTML <foreignObject> elements) */
+.mermaid svg text,
+.mermaid svg tspan,
+.mermaid svg .label,
+.mermaid svg .nodeLabel,
+.mermaid svg .cluster-label text,
+.mermaid svg foreignObject div,
+.mermaid svg foreignObject span,
+.mermaid svg foreignObject p,
+.theater-surface svg text,
+.theater-surface svg tspan,
+.theater-surface svg .label,
+.theater-surface svg .nodeLabel,
+.theater-surface svg .cluster-label text,
+.theater-surface svg foreignObject div,
+.theater-surface svg foreignObject span,
+.theater-surface svg foreignObject p {
   font-family: var(--font-mono) !important;
   font-size: 13.5px !important;
   font-weight: 600 !important;
   fill: var(--text-main) !important;
+  color: var(--text-main) !important;
 }
 
+/* Node Container Shapes (Rect, Circle, Polygon, Ellipse) */
 .mermaid .node rect, 
 .mermaid .node circle, 
-.mermaid .node polygon {
+.mermaid .node ellipse,
+.mermaid .node polygon,
+.theater-surface .node rect,
+.theater-surface .node circle,
+.theater-surface .node ellipse,
+.theater-surface .node polygon {
   stroke-width: 2px !important;
   stroke: var(--accent-cyan) !important;
   fill: var(--bg-card) !important;
 }
 
-[data-theme="mica"] .mermaid .node rect,
-[data-theme="mica"] .mermaid .node circle,
-[data-theme="mica"] .mermaid .node polygon {
-  stroke: var(--accent-blue) !important;
-  fill: #ffffff !important;
+/* Subgraph / Cluster Containers */
+.mermaid .cluster rect,
+.theater-surface .cluster rect {
+  fill: var(--bg-subtle) !important;
+  stroke: var(--bg-card-border-glow) !important;
+  stroke-width: 1.5px !important;
+  rx: 8px !important;
+  ry: 8px !important;
 }
 
-.mermaid .edgePath path {
+.mermaid .cluster-label text,
+.mermaid .cluster-label span,
+.mermaid .cluster-label p,
+.theater-surface .cluster-label text,
+.theater-surface .cluster-label span,
+.theater-surface .cluster-label p {
+  fill: var(--accent-cyan) !important;
+  color: var(--accent-cyan) !important;
+  font-weight: 700 !important;
+}
+
+/* Connecting Edge Paths & Arrow Markers */
+.mermaid .edgePath path,
+.theater-surface .edgePath path {
   stroke: var(--accent-violet) !important;
   stroke-width: 2px !important;
 }
 
-.mermaid .edgeLabel {
-  background: var(--bg-subtle) !important;
-  color: var(--accent-cyan) !important;
-  font-size: 12px !important;
+.mermaid marker path,
+.theater-surface marker path {
+  fill: var(--accent-violet) !important;
+  stroke: var(--accent-violet) !important;
 }
 
-[data-theme="mica"] .mermaid .edgeLabel {
+/* Edge Labels */
+.mermaid .edgeLabel,
+.theater-surface .edgeLabel {
+  background: var(--bg-subtle) !important;
+  color: var(--accent-cyan) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+}
+
+.mermaid .edgeLabel rect,
+.theater-surface .edgeLabel rect {
+  fill: var(--bg-subtle) !important;
+  opacity: 0.9 !important;
+}
+
+.mermaid .edgeLabel span,
+.mermaid .edgeLabel p,
+.theater-surface .edgeLabel span,
+.theater-surface .edgeLabel p {
+  color: var(--accent-cyan) !important;
+  fill: var(--accent-cyan) !important;
+}
+
+/* ─── Fluent Aero Mica Theme Overrides (Crisp High-Contrast Paper) ─── */
+[data-theme="mica"] .mermaid .node rect,
+[data-theme="mica"] .mermaid .node circle,
+[data-theme="mica"] .mermaid .node ellipse,
+[data-theme="mica"] .mermaid .node polygon,
+[data-theme="mica"] .theater-surface .node rect,
+[data-theme="mica"] .theater-surface .node circle,
+[data-theme="mica"] .theater-surface .node ellipse,
+[data-theme="mica"] .theater-surface .node polygon {
+  stroke: var(--accent-blue) !important;
+  fill: #ffffff !important;
+}
+
+[data-theme="mica"] .mermaid svg text,
+[data-theme="mica"] .mermaid svg tspan,
+[data-theme="mica"] .mermaid svg .label,
+[data-theme="mica"] .mermaid svg .nodeLabel,
+[data-theme="mica"] .mermaid svg foreignObject div,
+[data-theme="mica"] .mermaid svg foreignObject span,
+[data-theme="mica"] .mermaid svg foreignObject p,
+[data-theme="mica"] .theater-surface svg text,
+[data-theme="mica"] .theater-surface svg tspan,
+[data-theme="mica"] .theater-surface svg .label,
+[data-theme="mica"] .theater-surface svg .nodeLabel,
+[data-theme="mica"] .theater-surface svg foreignObject div,
+[data-theme="mica"] .theater-surface svg foreignObject span,
+[data-theme="mica"] .theater-surface svg foreignObject p {
+  fill: #0f172a !important;
+  color: #0f172a !important;
+}
+
+[data-theme="mica"] .mermaid .cluster rect,
+[data-theme="mica"] .theater-surface .cluster rect {
+  fill: rgba(234, 230, 219, 0.5) !important;
+  stroke: rgba(2, 132, 199, 0.4) !important;
+}
+
+[data-theme="mica"] .mermaid .cluster-label text,
+[data-theme="mica"] .mermaid .cluster-label span,
+[data-theme="mica"] .mermaid .cluster-label p,
+[data-theme="mica"] .theater-surface .cluster-label text,
+[data-theme="mica"] .theater-surface .cluster-label span,
+[data-theme="mica"] .theater-surface .cluster-label p {
+  fill: var(--accent-blue) !important;
   color: var(--accent-blue) !important;
+}
+
+[data-theme="mica"] .mermaid .edgePath path,
+[data-theme="mica"] .theater-surface .edgePath path {
+  stroke: var(--accent-blue) !important;
+}
+
+[data-theme="mica"] .mermaid marker path,
+[data-theme="mica"] .theater-surface marker path {
+  fill: var(--accent-blue) !important;
+  stroke: var(--accent-blue) !important;
+}
+
+[data-theme="mica"] .mermaid .edgeLabel,
+[data-theme="mica"] .theater-surface .edgeLabel {
+  background: #ffffff !important;
+  color: var(--accent-blue) !important;
+  border: 1px solid rgba(30, 41, 59, 0.15) !important;
+}
+
+[data-theme="mica"] .mermaid .edgeLabel rect,
+[data-theme="mica"] .theater-surface .edgeLabel rect {
+  fill: #ffffff !important;
+  stroke: rgba(30, 41, 59, 0.15) !important;
+}
+
+[data-theme="mica"] .mermaid .edgeLabel span,
+[data-theme="mica"] .mermaid .edgeLabel p,
+[data-theme="mica"] .theater-surface .edgeLabel span,
+[data-theme="mica"] .theater-surface .edgeLabel p {
+  color: var(--accent-blue) !important;
+  fill: var(--accent-blue) !important;
 }
 
 /* Visual Flash Focus Animation for Bi-Directional Nav */
