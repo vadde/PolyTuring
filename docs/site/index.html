@@ -29,6 +29,12 @@
           <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
+      <button class="sidebar-dock-toggle" id="sidebar-dock-toggle" aria-label="Toggle Navigation Sidebar" title="Toggle Sidebar (⌘B / [)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+      </button>
       <a href="#ch0-manifesto" class="brand-section">
         <div class="brand-logo">PT</div>
         <div class="brand-text-wrap">
@@ -39,13 +45,24 @@
       </a>
     </div>
 
-    <div class="search-trigger" id="search-trigger">
+    <div class="search-trigger" id="search-trigger" title="Search documentation (⌘K)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <span class="search-trigger-text">Quick search documentation...</span>
       <span class="shortcut-kbd">⌘K</span>
     </div>
 
     <div class="header-actions">
+      <!-- 4-Theme Engine Picker -->
+      <div class="theme-picker-group">
+        <button class="theme-pill-btn active" data-theme-set="liquid" title="Deep Space Liquid Glass">Liquid</button>
+        <button class="theme-pill-btn" data-theme-set="mica" title="Fluent Aero Mica">Mica</button>
+        <button class="theme-pill-btn" data-theme-set="holo" title="Holo Cyberpunk Neon">Holo</button>
+        <button class="theme-pill-btn" data-theme-set="matrix" title="Matrix Obsidian">Matrix</button>
+      </div>
+
+      <!-- Haptic Web Audio Feedback -->
+      <button class="hud-tool-btn" id="audio-toggle-btn" title="Toggle Haptic Audio Feedback">🔊</button>
+
       <a href="#token-simulator" class="action-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
         <span>Token Simulator</span>
@@ -54,7 +71,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
         <span>API Playground</span>
       </a>
-      <a href="https://github.com/vadde/PolyTuring" target="_blank" rel="noopener noreferrer" class="action-btn btn-primary">
+      <a href="https://github.com/vadde/PolyTuring" target="_blank" rel="noopener noreferrer" class="action-btn btn-primary" title="View Source on GitHub">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
         <span>GitHub</span>
       </a>
@@ -73,31 +90,44 @@
     </div>
   </div>
 
-  <!-- Fullscreen Visual Theater Modal -->
-  <div id="theater-modal">
+  <!-- Fullscreen Visual Theater Modal (HTML5 Dialog Workbench) -->
+  <dialog id="theater-modal" class="theater-modal">
     <div class="theater-topbar">
       <div class="theater-title" id="theater-title">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-        <span>Visual Architecture Theater</span>
+        <span class="theater-icon">📐</span>
+        <span class="theater-title-text">Visual Architecture Theater</span>
       </div>
       <div class="canvas-controls-group">
         <button class="canvas-tool-btn" id="theater-zoom-out" title="Zoom Out">−</button>
-        <span class="zoom-level-badge" id="theater-zoom-badge">125%</span>
+        <span class="zoom-level-badge" id="theater-zoom-badge">100%</span>
         <button class="canvas-tool-btn" id="theater-zoom-in" title="Zoom In">+</button>
-        <button class="canvas-tool-btn" id="theater-zoom-reset" title="Reset Zoom">⟲</button>
+        <button class="canvas-tool-btn" id="theater-zoom-reset" title="1:1 Native Scale">100%</button>
+        <button class="canvas-tool-btn" id="theater-zoom-fit" title="Fit to Viewport">Fit</button>
+        <button class="canvas-tool-btn" id="theater-fullscreen" title="Toggle Fullscreen">⛶</button>
         <button class="canvas-tool-btn" id="close-theater-btn" title="Close Theater (Esc)" style="color: var(--accent-rose); font-weight: bold; margin-left: 10px;">✕</button>
       </div>
     </div>
     <div class="theater-body-viewport" id="theater-viewport">
       <div class="theater-surface" id="theater-surface"></div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Master Layout -->
   <div class="layout-container">
     
     <!-- Mobile Drawer Backdrop Overlay -->
     <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" aria-hidden="true"></div>
+
+    <!-- Floating Re-Open Sidebar Tab (Distraction-Free Mode) -->
+    <button class="floating-sidebar-toggle" id="floating-sidebar-toggle" aria-label="Open Navigation Sidebar" title="Open Sidebar (⌘B / [)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="9" y1="3" x2="9" y2="21"></line>
+        <path d="m13 15 3-3-3-3"></path>
+      </svg>
+      <span>Navigation</span>
+      <span class="kbd-hint">⌘B</span>
+    </button>
     
     <!-- Left Navigation Sidebar (Calibrated Hierarchical Tree / Slide-out Mobile Drawer) -->
     <aside class="sidebar" id="main-sidebar" aria-label="Documentation Navigation">
@@ -130,14 +160,27 @@
         </a>
       </div>
 
-      <div class="sidebar-controls-bar">
-        <button class="sidebar-rail-btn" id="sidebar-rail-toggle" title="Toggle Compact Rail">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          <span class="sidebar-header-actions">Compact Rail</span>
+      <!-- Sidebar Search & Filter Row -->
+      <div class="sidebar-search-row">
+        <div class="sidebar-search-box">
+          <span class="sidebar-search-icon">🔍</span>
+          <input type="text" class="sidebar-search-input" id="sidebar-filter-input" placeholder="Filter architecture &amp; chapters..." autocomplete="off">
+          <button class="sidebar-filter-clear" id="sidebar-filter-clear" title="Clear filter (Esc)">✕</button>
+        </div>
+        <button class="sidebar-collapse-pill sidebar-close-btn" id="sidebar-close-btn" aria-label="Collapse navigation sidebar" title="Collapse sidebar (⌘B / [)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+            <path d="m14 9-3 3 3 3"></path>
+          </svg>
         </button>
-        <div class="sidebar-quick-actions sidebar-header-actions">
-          <button class="sidebar-quick-btn" id="expand-all-trees" title="Expand All Groups">Expand</button>
-          <button class="sidebar-quick-btn" id="collapse-all-trees" title="Collapse All Groups">Collapse</button>
+      </div>
+
+      <!-- Tree Expand/Collapse Controls -->
+      <div class="sidebar-controls-bar">
+        <div class="sidebar-quick-actions">
+          <button class="sidebar-quick-btn" id="expand-all-trees" title="Expand All Groups">⊞ Expand All</button>
+          <button class="sidebar-quick-btn" id="collapse-all-trees" title="Collapse All Groups">⊟ Collapse All</button>
         </div>
       </div>
 
@@ -232,7 +275,8 @@
           <span class="nav-pill pill-core">Governance</span>
         </div>
         <div class="nav-tree-children">
-          <a href="#sec-appendix-rigor" class="nav-tree-link">Spec-Driven Governance (SDD)</a>
+          <a href="#sec-appendix-rigor" class="nav-tree-link">Engineering Rigor Overview</a>
+          <a href="#sec-sdd-governance" class="nav-tree-link">Spec-Driven Governance (SDD)</a>
           <a href="#sec-agent-shield" class="nav-tree-link">Agentic Defense Shield</a>
           <a href="#sec-ci-gates" class="nav-tree-link">Continuous Integration Matrix</a>
           <a href="#sec-docs-drift" class="nav-tree-link">Documentation Sync Gate</a>
@@ -444,26 +488,26 @@
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TB
-    subgraph UI["Tier 4: WebGL Visualizer (:3000)"]
-        Cosmo["Cosmograph 3D Force Graph"]
-        Analytics["Dual-Source Agent Analytics"]
+    subgraph UI["🎨 Tier 4: WebGL Visualizer (:3000)"]
+        Cosmo["✨ Cosmograph 3D Force Graph"]
+        Analytics["📊 Dual-Source Agent Analytics"]
     end
 
-    subgraph Rust["Tier 3: Rust Axum Orchestrator (:8080)"]
-        Parser["Tree-Sitter Polyglot Parser"]
-        Condenser["Context Condenser (≤ 1500 Tokens)"]
-        RagEngine["GraphRagEngine (Hybrid Synthesizer)"]
-        Watcher["Notify Background Watcher Daemon"]
+    subgraph Rust["⚡ Tier 3: Rust Axum Orchestrator (:8080)"]
+        Parser["🌲 Tree-Sitter Polyglot Parser"]
+        Condenser["⚡ Context Condenser (≤ 1500 Tokens)"]
+        RagEngine["🧠 GraphRagEngine (Hybrid Synthesizer)"]
+        Watcher["👁️ Notify Background Watcher Daemon"]
     end
 
-    subgraph DB["Tier 1: SurrealDB v2 (:8000)"]
-        NodeTbl["node (SCHEMAFULL, HNSW 384-dim)"]
-        EdgeTbl["linked_to (TYPE RELATION, idx_edge_*)"]
-        GalaxyTbl["galaxy (Pre-Computed LPA Clusters)"]
+    subgraph DB["🗄️ Tier 1: SurrealDB v2 (:8000)"]
+        NodeTbl["📄 node (SCHEMAFULL, HNSW 384-dim)"]
+        EdgeTbl["🔗 linked_to (TYPE RELATION, idx_edge_*)"]
+        GalaxyTbl["🌌 galaxy (Pre-Computed LPA Clusters)"]
     end
 
-    subgraph TEI["Tier 2: HuggingFace TEI (:8081)"]
-        Model["BAAI/bge-small-en-v1.5 (ARM64 SIMD)"]
+    subgraph TEI["🚀 Tier 2: HuggingFace TEI (:8081)"]
+        Model["📐 BAAI/bge-small-en-v1.5 (ARM64 SIMD)"]
     end
 
     UI --> Rust
@@ -755,28 +799,28 @@ flowchart TB
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TB
-    Trunk["Trunk Workspace (Parent)<br/>e.g. ecommerce-platform"]
+    Trunk["🌳 Trunk Workspace (Parent)<br/>e.g. ecommerce-platform"]
 
-    subgraph GitWorktrees["Git Worktree Directory (.git/worktrees/*)"]
-        WT1[".git/worktrees/feat-stripe-v2"]
-        WT2[".git/worktrees/refactor-auth-jwt"]
-        WT3[".git/worktrees/hotfix-cart-lock"]
-        WT4[".git/worktrees/exp-graphql-mesh"]
+    subgraph GitWorktrees["📁 Git Worktree Directory (.git/worktrees/*)"]
+        WT1["🌿 .git/worktrees/feat-stripe-v2"]
+        WT2["🌿 .git/worktrees/refactor-auth-jwt"]
+        WT3["🌿 .git/worktrees/hotfix-cart-lock"]
+        WT4["🌿 .git/worktrees/exp-graphql-mesh"]
     end
 
-    subgraph EBFEngine["Omni-Graph EBF Core (Rust Axum Engine)"]
-        Peeker["O(1) Worktree Peeker<br/>Resolves gitdir and lineage"]
-        Cascade["Top-Down Auto-Cascade<br/>Asynchronous Background Ingestion"]
-        LPAInherit["Seed-Preserving LPA<br/>Inherits parent community IDs"]
-        WatcherPool["Notify Watcher Pool<br/>Multi-Path Concurrent Daemon"]
+    subgraph EBFEngine["⚙️ Omni-Graph EBF Core (Rust Axum Engine)"]
+        Peeker["⚡ O(1) Worktree Peeker<br/>Resolves gitdir and lineage"]
+        Cascade["🌊 Top-Down Auto-Cascade<br/>Asynchronous Background Ingestion"]
+        LPAInherit["🧬 Seed-Preserving LPA<br/>Inherits parent community IDs"]
+        WatcherPool["👁️ Notify Watcher Pool<br/>Multi-Path Concurrent Daemon"]
     end
 
-    subgraph Storage["SurrealDB v2 Isolation"]
-        DB_Trunk["workspace: ecommerce-platform"]
-        DB_WT1["workspace: feat-stripe-v2"]
-        DB_WT2["workspace: refactor-auth-jwt"]
-        DB_WT3["workspace: hotfix-cart-lock"]
-        DB_WT4["workspace: exp-graphql-mesh"]
+    subgraph Storage["🗄️ SurrealDB v2 Isolation"]
+        DB_Trunk["📦 workspace: ecommerce-platform"]
+        DB_WT1["📦 workspace: feat-stripe-v2"]
+        DB_WT2["📦 workspace: refactor-auth-jwt"]
+        DB_WT3["📦 workspace: hotfix-cart-lock"]
+        DB_WT4["📦 workspace: exp-graphql-mesh"]
     end
 
     Trunk --> Peeker
@@ -847,8 +891,14 @@ flowchart TB
 
           <div class="code-container">
             <div class="code-header">
-              <span>SurrealQL · src/db/schema.surql</span>
-              <button class="copy-btn" data-target="surql-indexes">Copy</button>
+              <div class="code-header-left">
+                <span class="code-lang-tag">SURREALQL</span>
+                <span class="code-file-path">src/db/schema.surql</span>
+              </div>
+              <button class="copy-btn" data-target="surql-indexes" title="Copy code snippet">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+              </button>
             </div>
             <pre><code id="surql-indexes">-- Sub-millisecond graph edge traversals & caller lookups
 DEFINE INDEX idx_edge_workspace ON TABLE linked_to FIELDS workspace;
@@ -971,8 +1021,14 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
 
           <div class="code-container">
             <div class="code-header">
-              <span>Generated Command</span>
-              <button class="copy-btn" data-target="api-curl-output">Copy Curl</button>
+              <div class="code-header-left">
+                <span class="code-lang-tag">CURL</span>
+                <span class="code-file-path">REST API Query Sandbox</span>
+              </div>
+              <button class="copy-btn" data-target="api-curl-output" title="Copy curl command">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy Curl</span>
+              </button>
             </div>
             <pre><code id="api-curl-output">curl -s -X POST http://localhost:8080/api/query \
   -H "Content-Type: application/json" \
@@ -1023,13 +1079,13 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart LR
-    CLI["~/.gemini/antigravity-cli/brain/ (CLI)"] --> Scanner["Go Concurrent Scanner (Worker Pool + Delta Cache)"]
-    IDE["~/.gemini/antigravity-ide/brain/ (IDE)"] --> Scanner
-    Scanner --> MemIndex["In-Memory Index &amp; Search Engine"]
-    MemIndex --> Api["Go HTTP REST API &amp; SSE Live Tail (/tail)"]
-    Assets["Bun Web Frontend (Liquid Glass UI)"] --> Embed["go:embed Static Assets"]
-    Embed --> Binary["Standalone 'session-explorer' Binary (0 Deps)"]
-    Binary --> Browser["Local Browser (:9876)"]
+    CLI["💻 ~/.gemini/antigravity-cli/brain/ (CLI)"] --> Scanner["⚡ Go Concurrent Scanner<br/>(Worker Pool + Delta Cache)"]
+    IDE["🖥️ ~/.gemini/antigravity-ide/brain/ (IDE)"] --> Scanner
+    Scanner --> MemIndex["🧠 In-Memory Index &amp; Search Engine"]
+    MemIndex --> Api["🌐 Go HTTP REST API &amp; SSE Live Tail (/tail)"]
+    Assets["🎨 Bun Web Frontend (Liquid Glass UI)"] --> Embed["📦 go:embed Static Assets"]
+    Embed --> Binary["🚀 Standalone 'session-explorer' Binary (0 Deps)"]
+    Binary --> Browser["📱 Local Browser (:9876)"]
     Api -.->|SSE Stream| Browser
                 </pre>
               </div>
@@ -1176,14 +1232,14 @@ flowchart LR
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TD
-    Trigger["Coding Assistant Runs /most-recent-wip (or wip.sh)"] --> QueryAPI["Query Session Explorer Engine (GET /api/wip)"]
-    QueryAPI --> ScanIndex["Scan Brain Transcripts &amp; Correlate Workspace"]
-    ScanIndex --> Decision{"Multiple Active Sessions Found?"}
-    Decision -- "Yes (&gt;1 Candidates)" --> HaltAgent["🛑 MANDATORY AGENT HALT: Present Candidates &amp; Ask User"]
-    Decision -- "No (1 Match or Forced)" --> LoadDigest["🚀 Auto-Resume: Extract Recent Prompts, Diffed Files &amp; Commands"]
-    HaltAgent --> UserPicks["User Selects Target Session UUID"]
+    Trigger["🤖 Coding Assistant Runs /most-recent-wip (or wip.sh)"] --> QueryAPI["📡 Query Session Explorer Engine (GET /api/wip)"]
+    QueryAPI --> ScanIndex["🔎 Scan Brain Transcripts &amp; Correlate Workspace"]
+    ScanIndex --> Decision{"⚖️ Multiple Active Sessions Found?"}
+    Decision -- "Yes (&gt;1 Candidates)" --> HaltAgent["🛑 MANDATORY AGENT HALT:<br/>Present Candidates &amp; Ask User"]
+    Decision -- "No (1 Match or Forced)" --> LoadDigest["🚀 Auto-Resume:<br/>Extract Recent Prompts, Diffed Files &amp; Commands"]
+    HaltAgent --> UserPicks["👤 User Selects Target Session UUID"]
     UserPicks --> LoadDigest
-    LoadDigest --> ContinueWork["Assistant Resumes Task Seamlessly Without Context Loss"]
+    LoadDigest --> ContinueWork["✅ Assistant Resumes Task Seamlessly Without Context Loss"]
                 </pre>
               </div>
             </div>
@@ -1248,24 +1304,24 @@ flowchart TD
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TD
-    subgraph S1["Static Filesystem Discovery"]
-        Global["Global Rules &amp; Skills (~/.gemini/config/)"]
-        Assistants["Multi-Assistant Rules (~/.claude, .cursorrules)"]
-        Workspace[".agents/ (Repo Rules, Skills &amp; Hooks)"]
-        MasterDocs["Master Docs (AGENTS.md, CLAUDE.md)"]
+    subgraph S1["📁 Static Filesystem Discovery"]
+        Global["🌐 Global Rules &amp; Skills (~/.gemini/config/)"]
+        Assistants["🤖 Multi-Assistant Rules (~/.claude, .cursorrules)"]
+        Workspace["💼 .agents/ (Repo Rules, Skills &amp; Hooks)"]
+        MasterDocs["📜 Master Docs (AGENTS.md, CLAUDE.md)"]
     end
-    subgraph S2["Dynamic Transcript Extraction"]
-        Logs["Session Transcripts (JSONL)"]
-        ToolParser["Tool Call Scanner (read_file, invoke_subagent, MCP)"]
+    subgraph S2["⚡ Dynamic Transcript Extraction"]
+        Logs["📝 Session Transcripts (JSONL)"]
+        ToolParser["🔍 Tool Call Scanner (read_file, invoke_subagent, MCP)"]
     end
-    Global &amp; Assistants &amp; Workspace &amp; MasterDocs --&gt; Engine["Universal Context Engine"]
+    Global &amp; Assistants &amp; Workspace &amp; MasterDocs --&gt; Engine["⚙️ Universal Context Engine"]
     Logs --&gt; ToolParser --&gt; Engine
-    Engine --&gt; Cascade["5-Tier Scope Precedence Cascade"]
-    Cascade --&gt; Modal["Global Agent Brain Modal (#agentBrainBtn)"]
-    Cascade --&gt; Drawer["Session Context Drawer (#sessionContextModal)"]
-    Drawer --&gt; Invoked["Actively Invoked Skills (Count &amp; Step Markers)"]
-    Drawer --&gt; OnDemand["Available On-Demand Skills (Progressive Disclosure)"]
-    Modal &amp; Drawer --&gt; Viewer["1-Click Native File Viewer (KaTeX, Mermaid, Line Gutters)"]
+    Engine --&gt; Cascade["🏛️ 5-Tier Scope Precedence Cascade"]
+    Cascade --&gt; Modal["🧠 Global Agent Brain Modal (#agentBrainBtn)"]
+    Cascade --&gt; Drawer["📑 Session Context Drawer (#sessionContextModal)"]
+    Drawer --&gt; Invoked["🎯 Actively Invoked Skills (Count &amp; Step Markers)"]
+    Drawer --&gt; OnDemand["📦 Available On-Demand Skills (Progressive Disclosure)"]
+    Modal &amp; Drawer --&gt; Viewer["👁️ 1-Click Native File Viewer (KaTeX, Mermaid, Line Gutters)"]
                 </pre>
               </div>
             </div>
@@ -1382,8 +1438,14 @@ flowchart TD
           <h3 class="section-h2" id="sec-session-usage">CLI Commands & Quickstart</h3>
           <div class="code-container">
             <div class="code-header">
-              <span>Terminal · Makefile Targets</span>
-              <button class="copy-btn" data-target="session-cmds">Copy</button>
+              <div class="code-header-left">
+                <span class="code-lang-tag">BASH</span>
+                <span class="code-file-path">Terminal · Makefile Targets</span>
+              </div>
+              <button class="copy-btn" data-target="session-cmds" title="Copy CLI commands">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy Commands</span>
+              </button>
             </div>
             <pre><code id="session-cmds"># Launch Session Explorer (auto-opens browser at http://localhost:9876)
 make session-explorer
@@ -1550,23 +1612,23 @@ make demo-tool T=session-explorer</code></pre>
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 flowchart TB
-    subgraph Assistants["Supported Coding Assistants"]
-        AG["Google Antigravity<br/>(Native CLI / IDE / Brain)"]
-        CC["Claude Code<br/>(Anthropic CLI)"]
-        GH["GitHub Copilot<br/>(VS Code / IntelliJ)"]
-        CR["Cursor<br/>(IDE / Composer)"]
+    subgraph Assistants["🤖 Supported Coding Assistants"]
+        AG["✨ Google Antigravity<br/>(Native CLI / IDE / Brain)"]
+        CC["🧠 Claude Code<br/>(Anthropic CLI)"]
+        GH["🐙 GitHub Copilot<br/>(VS Code / IntelliJ)"]
+        CR["⚡ Cursor<br/>(IDE / Composer)"]
     end
 
-    subgraph AdapterLayer["PolyTuring Universal Adapter Layer"]
-        Hooks["Native Hooks<br/>hook_pre_tool.sh"]
-        MCPServer["PolyTuring MCP Server<br/>(JSON-RPC over stdio / HTTP)"]
-        LSPBridge["LSP Proxy Sidecar<br/>(Diagnostics &amp; Hover)"]
+    subgraph AdapterLayer["🔌 PolyTuring Universal Adapter Layer"]
+        Hooks["🪝 Native Hooks<br/>hook_pre_tool.sh"]
+        MCPServer["🌐 PolyTuring MCP Server<br/>(JSON-RPC over stdio / HTTP)"]
+        LSPBridge["🌉 LSP Proxy Sidecar<br/>(Diagnostics &amp; Hover)"]
     end
 
-    subgraph CoreEngines["PolyTuring Deterministic Engines"]
-        OG["Omni-Graph Core (:8080)<br/>AST Knowledge &amp; Galaxies"]
-        SE["Session Explorer (:9876)<br/>Trajectory Intelligence &amp; WIP"]
-        DB["SurrealDB v2 Graph Store"]
+    subgraph CoreEngines["⚙️ PolyTuring Deterministic Engines"]
+        OG["🌌 Omni-Graph Core (:8080)<br/>AST Knowledge &amp; Galaxies"]
+        SE["🔎 Session Explorer (:9876)<br/>Trajectory Intelligence &amp; WIP"]
+        DB["🗄️ SurrealDB v2 Graph Store"]
     end
 
     AG --> Hooks
@@ -1659,13 +1721,13 @@ flowchart TB
               <div class="canvas-content-surface">
                 <pre class="mermaid">
 graph TD
-    User["Agent Trigger / PreInvocation Hook"] --> ReconCheck{"Recon Marker Present? /tmp/omni_recon"}
-    ReconCheck -- No --> GateEnforce["150-Line Source Gate ACTIVE"]
-    GateEnforce --> Tier1["Tier 1: Global Graph-RAG (make query Q=...)"]
-    Tier1 --> Tier2["Tier 2: Galaxy Cluster Boundaries (make galaxies)"]
-    Tier2 --> Tier3["Tier 3: AST Call Graph Condenser (make condense SYM=...)"]
-    Tier3 --> TouchMarker["Touch Recon Marker"]
-    TouchMarker --> GatePass["150-Line Gate UNLOCKED for Precision Reads"]
+    User["🤖 Agent Trigger / PreInvocation Hook"] --> ReconCheck{"🛡️ Recon Marker Present?<br/>/tmp/omni_recon"}
+    ReconCheck -- No --> GateEnforce["🚫 150-Line Source Gate ACTIVE"]
+    GateEnforce --> Tier1["🌌 Tier 1: Global Graph-RAG<br/>(make query Q=...)"]
+    Tier1 --> Tier2["🪐 Tier 2: Galaxy Cluster Boundaries<br/>(make galaxies)"]
+    Tier2 --> Tier3["⚡ Tier 3: AST Call Graph Condenser<br/>(make condense SYM=...)"]
+    Tier3 --> TouchMarker["✨ Touch Recon Marker"]
+    TouchMarker --> GatePass["🔓 150-Line Gate UNLOCKED<br/>for Precision Reads"]
     ReconCheck -- Yes --> GatePass
                 </pre>
               </div>
@@ -1767,39 +1829,88 @@ graph TD
 
     </main>
 
-    <!-- Table of Contents (Right Sticky) -->
-    <aside class="toc-sidebar">
-      <div class="toc-title">On This Page</div>
-      <ul class="toc-list">
-        <li class="toc-item"><a href="#ch0-manifesto" class="toc-link active">Platform Manifesto</a></li>
-        <li class="toc-item"><a href="#sec-context-crisis" class="toc-link">Context Window Crisis</a></li>
-        <li class="toc-item"><a href="#sec-polyturing-triad" class="toc-link">The PolyTuring Triad</a></li>
-        <li class="toc-item"><a href="#sec-antigravity-native" class="toc-link">Antigravity-Native &amp; Beyond</a></li>
-        <li class="toc-item"><a href="#ch1-omni-graph" class="toc-link">Omni-Graph Overview</a></li>
-        <li class="toc-item"><a href="#sec-omni-arch" class="toc-link">4-Tier Container Topology</a></li>
-        <li class="toc-item"><a href="#sec-omni-galaxies" class="toc-link">Galaxy Subsystems &amp; Louvain</a></li>
-        <li class="toc-item"><a href="#sec-omni-coupling" class="toc-link">Coupling Metrics &amp; Blast Radius</a></li>
-        <li class="toc-item"><a href="#sec-omni-ebf" class="toc-link">Ephemeral Branch Fabric (EBF)</a></li>
-        <li class="toc-item"><a href="#sec-omni-ast" class="toc-link">Polyglot AST &amp; Fields</a></li>
-        <li class="toc-item"><a href="#sec-omni-budget" class="toc-link">Token Budget Math</a></li>
-        <li class="toc-item"><a href="#sec-omni-relational" class="toc-link">Relational Indexing</a></li>
-        <li class="toc-item"><a href="#token-simulator" class="toc-link">Token Simulator</a></li>
-        <li class="toc-item"><a href="#api-playground" class="toc-link">API Playground</a></li>
-        <li class="toc-item"><a href="#ch2-session-explorer" class="toc-link">Session Explorer</a></li>
-        <li class="toc-item"><a href="#sec-session-arch" class="toc-link">Go + Bun Architecture</a></li>
-        <li class="toc-item"><a href="#sec-session-wip" class="toc-link">Agent WIP Recovery</a></li>
-        <li class="toc-item"><a href="#sec-session-viewer" class="toc-link">Code Viewer &amp; In-Page Find</a></li>
-        <li class="toc-item"><a href="#sec-agent-context" class="toc-link">Agent Context Matrix (R-039)</a></li>
-        <li class="toc-item"><a href="#sec-session-swagger" class="toc-link">OpenAPI 3.0 &amp; Swagger</a></li>
-        <li class="toc-item"><a href="#sec-session-usage" class="toc-link">Session CLI Usage</a></li>
-        <li class="toc-item"><a href="#ch3-assistant-matrix" class="toc-link">Assistant Ecosystem Matrix</a></li>
-        <li class="toc-item"><a href="#sec-assistant-roadmap" class="toc-link">Multi-Assistant Roadmap</a></li>
-        <li class="toc-item"><a href="#sec-assistant-mcp" class="toc-link">Universal MCP Blueprint</a></li>
-        <li class="toc-item"><a href="#sec-appendix-rigor" class="toc-link">Engineering Rigor &amp; SDD</a></li>
-        <li class="toc-item"><a href="#sec-agent-shield" class="toc-link">Agentic Defense Shield</a></li>
-        <li class="toc-item"><a href="#sec-ci-gates" class="toc-link">CI/CD Quality Gates</a></li>
-        <li class="toc-item"><a href="#sec-docs-drift" class="toc-link">Docs Sync Gate</a></li>
-      </ul>
+    <!-- Table of Contents (Right Sticky Futuristic Outline HUD) -->
+    <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of Contents">
+      <div class="toc-header-hud">
+        <div class="toc-header-title-wrap">
+          <span class="toc-header-icon">📑</span>
+          <span class="toc-title">On This Page</span>
+        </div>
+        <div class="toc-header-actions">
+          <span class="toc-reading-progress" id="toc-reading-progress">0%</span>
+          <button class="toc-jump-top-btn" id="toc-jump-top" title="Back to Top (Home)">⌃</button>
+        </div>
+      </div>
+
+      <div class="toc-progress-track">
+        <div class="toc-progress-indicator" id="toc-progress-indicator"></div>
+      </div>
+
+      <nav class="toc-nav" id="toc-nav">
+        <!-- Chapter 00 -->
+        <div class="toc-chapter-group" data-chapter="ch0">
+          <div class="toc-chapter-heading">00 · Manifesto</div>
+          <ul class="toc-list">
+            <li class="toc-item"><a href="#ch0-manifesto" class="toc-link active"><span class="toc-bullet"></span>Platform Manifesto</a></li>
+            <li class="toc-item"><a href="#sec-context-crisis" class="toc-link"><span class="toc-bullet"></span>Context Window Crisis &amp; Raw Grep</a></li>
+            <li class="toc-item"><a href="#sec-polyturing-triad" class="toc-link"><span class="toc-bullet"></span>The PolyTuring Triad</a></li>
+            <li class="toc-item"><a href="#sec-antigravity-native" class="toc-link"><span class="toc-bullet"></span>Antigravity-First Native Architecture</a></li>
+          </ul>
+        </div>
+
+        <!-- Chapter 01 -->
+        <div class="toc-chapter-group" data-chapter="ch1">
+          <div class="toc-chapter-heading">01 · Omni-Graph</div>
+          <ul class="toc-list">
+            <li class="toc-item"><a href="#ch1-omni-graph" class="toc-link"><span class="toc-bullet"></span>Omni-Graph Overview</a></li>
+            <li class="toc-item"><a href="#sec-omni-arch" class="toc-link"><span class="toc-bullet"></span>4-Tier Container Architecture</a></li>
+            <li class="toc-item"><a href="#sec-omni-galaxies" class="toc-link"><span class="toc-bullet"></span>Galaxy Subsystems &amp; Louvain / Leiden</a></li>
+            <li class="toc-item"><a href="#sec-omni-coupling" class="toc-link"><span class="toc-bullet"></span>Coupling Metrics &amp; Blast Radius</a></li>
+            <li class="toc-item"><a href="#sec-omni-ebf" class="toc-link"><span class="toc-bullet"></span>Ephemeral Branch Fabric (EBF)</a></li>
+            <li class="toc-item"><a href="#sec-omni-ast" class="toc-link"><span class="toc-bullet"></span>Polyglot AST Grammar &amp; Struct Fields</a></li>
+            <li class="toc-item"><a href="#sec-omni-budget" class="toc-link"><span class="toc-bullet"></span>Token Budget Math &amp; Condenser</a></li>
+            <li class="toc-item"><a href="#sec-omni-relational" class="toc-link"><span class="toc-bullet"></span>SurrealDB Relational Indexing</a></li>
+            <li class="toc-item"><a href="#token-simulator" class="toc-link"><span class="toc-bullet"></span>Token Budget Simulator (Interactive)</a></li>
+            <li class="toc-item"><a href="#api-playground" class="toc-link"><span class="toc-bullet"></span>REST API &amp; Curl Sandbox (Interactive)</a></li>
+          </ul>
+        </div>
+
+        <!-- Chapter 02 -->
+        <div class="toc-chapter-group" data-chapter="ch2">
+          <div class="toc-chapter-heading">02 · Session Explorer</div>
+          <ul class="toc-list">
+            <li class="toc-item"><a href="#ch2-session-explorer" class="toc-link"><span class="toc-bullet"></span>Session Explorer Overview</a></li>
+            <li class="toc-item"><a href="#sec-session-arch" class="toc-link"><span class="toc-bullet"></span>Go + Bun Standalone Binary Architecture</a></li>
+            <li class="toc-item"><a href="#sec-session-wip" class="toc-link"><span class="toc-bullet"></span>Agent WIP Recovery &amp; Disambiguation</a></li>
+            <li class="toc-item"><a href="#sec-session-viewer" class="toc-link"><span class="toc-bullet"></span>Liquid Glass UI &amp; In-Page Find</a></li>
+            <li class="toc-item"><a href="#sec-agent-context" class="toc-link"><span class="toc-bullet"></span>Universal Agent Context Matrix</a></li>
+            <li class="toc-item"><a href="#sec-session-swagger" class="toc-link"><span class="toc-bullet"></span>Embedded OpenAPI 3.0 &amp; Swagger UI</a></li>
+            <li class="toc-item"><a href="#sec-session-usage" class="toc-link"><span class="toc-bullet"></span>CLI Commands &amp; Quickstart</a></li>
+          </ul>
+        </div>
+
+        <!-- Chapter 03 -->
+        <div class="toc-chapter-group" data-chapter="ch3">
+          <div class="toc-chapter-heading">03 · Universal Matrix</div>
+          <ul class="toc-list">
+            <li class="toc-item"><a href="#ch3-assistant-matrix" class="toc-link"><span class="toc-bullet"></span>Assistant Matrix Overview</a></li>
+            <li class="toc-item"><a href="#sec-assistant-roadmap" class="toc-link"><span class="toc-bullet"></span>Multi-Assistant Phasing (Copilot, Claude)</a></li>
+            <li class="toc-item"><a href="#sec-assistant-mcp" class="toc-link"><span class="toc-bullet"></span>Universal MCP Extensibility Blueprint</a></li>
+          </ul>
+        </div>
+
+        <!-- Chapter 04 -->
+        <div class="toc-chapter-group" data-chapter="ch4">
+          <div class="toc-chapter-heading">04 · Engineering Rigor</div>
+          <ul class="toc-list">
+            <li class="toc-item"><a href="#sec-appendix-rigor" class="toc-link"><span class="toc-bullet"></span>Engineering Rigor Overview</a></li>
+            <li class="toc-item"><a href="#sec-sdd-governance" class="toc-link"><span class="toc-bullet"></span>Spec-Driven Governance (SDD)</a></li>
+            <li class="toc-item"><a href="#sec-agent-shield" class="toc-link"><span class="toc-bullet"></span>Agentic Defense Shield &amp; Reconnaissance</a></li>
+            <li class="toc-item"><a href="#sec-ci-gates" class="toc-link"><span class="toc-bullet"></span>Continuous Integration Matrix</a></li>
+            <li class="toc-item"><a href="#sec-docs-drift" class="toc-link"><span class="toc-bullet"></span>Documentation Sync Gate</a></li>
+          </ul>
+        </div>
+      </nav>
     </aside>
 
   </div>

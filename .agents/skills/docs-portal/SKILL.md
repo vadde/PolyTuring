@@ -1,12 +1,12 @@
 ---
 name: docs-portal
 description: >-
-  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers cosmic liquid-glass design system, dynamic draggable sidebar resizer, Year 2500 mobile navigation drawer, strict touch-overflow containment, 1:1 bi-directional navigation sync, Mermaid diagram canvas invariants, KaTeX mathematical typesetting, interactive simulators, and headless verification.
+  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers Year 2500 cosmic liquid-glass design system, 4-theme engine (Liquid Glass, Fluent Aero Mica, Holo Cyberpunk, Matrix Obsidian), Haptic Web Audio feedback micro-transients, interactive draggable sidebar resizer and collapsible rail (⌘B / [), live sidebar search filter, commute gadget mobile drawer, zero-truncation titles, touch-overflow containment, 1:1 ScrollSpy and right-side TOC reading progress HUD, Mermaid SVG layout rules, fullscreen visual theater workbench with dynamic viewport fit and SVG text selection, KaTeX math typesetting, interactive simulators, and the 14-gate automated headless audit suite.
 ---
 
 # 📚 Living Documentation Portal Engineering Skill
 
-This skill is the **single source of truth** for maintaining, styling, extending, and verifying the `vadde/PolyTuring` Living Documentation Portal ([https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/)).
+This skill is the **authoritative engineering protocol and single source of truth** for maintaining, styling, extending, and verifying the `vadde/PolyTuring` Living Documentation Portal ([https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/)).
 
 Follow this guide whenever adding chapters, modifying CSS styles, rendering architecture diagrams, typesetting mathematical equations, building interactive simulator widgets, or supporting small commute gadgets.
 
@@ -14,31 +14,32 @@ Follow this guide whenever adding chapters, modifying CSS styles, rendering arch
 
 ## 🏛️ Portal Architecture & File Map
 
-The documentation portal is built with **zero build toolchain dependencies** (pure vanilla HTML5, CSS3, ES2022 JavaScript, and CDN-loaded libraries):
+The documentation portal is built with **zero build toolchain dependencies** (pure vanilla HTML5, CSS3, ES2022 JavaScript, and standard CDN libraries):
 
 ```
 PolyTuring/
+├── Makefile                               # Canonical DevEx commands (docs-test, docs-serve, docs-build)
 ├── docs/site/
-│   ├── index.html        → Semantic HTML5 layout, chapter disclosure trees, widgets, mobile drawer
-│   ├── style.css         → Liquid-glass design tokens, draggable resizer, responsive queries, canvas layout
-│   └── app.js            → 1:1 ScrollSpy, sidebar resizer, mobile drawer, zoomable canvas pan/zoom, simulator engines
+│   ├── index.html                         # Semantic HTML5 layout, chapter disclosure trees, widgets, mobile drawer
+│   ├── style.css                          # Liquid glass tokens, 4-theme engine, resizer, collapsible rail, TOC HUD
+│   └── app.js                             # Haptic audio, ScrollSpy, sidebar filter, collapsible rail, theater mode
 ├── scripts/
-│   └── build-docs.sh     → Static bundle packaging script (outputs to _site/)
+│   └── build-docs.sh                      # Static bundle packaging script (outputs to _site/)
 ├── .agents/skills/docs-portal/
-│   ├── SKILL.md          → YOU ARE HERE — Authoritative design & engineering protocol
+│   ├── SKILL.md                           # YOU ARE HERE — Authoritative design & engineering protocol
 │   └── scripts/
-│       └── test-docs.sh  → Automated 9-gate verification suite
+│       └── test-docs.sh                   # 14-Gate automated headless verification suite
 └── .github/workflows/
-    └── docs-publish.yml  → CI/CD workflow deploying main pushes to GitHub Pages
+    └── docs-publish.yml                   # CI/CD workflow deploying main pushes to GitHub Pages
 ```
 
 ---
 
-## 🎨 Design System & Color Tokens
+## 🎨 Design System & Multi-Theme Engine
 
-The portal uses a **deep cosmic liquid-glass design system**. Always use CSS variables rather than hardcoding ad-hoc color values:
+The portal uses a **deep cosmic liquid-glass design system** supporting 4 distinct themes:
 
-### Color Palette
+### Color Palette Tokens
 
 | Token | CSS Variable | Hex / RGBA Value | Purpose |
 |---|---|---|---|
@@ -55,80 +56,81 @@ The portal uses a **deep cosmic liquid-glass design system**. Always use CSS var
 | **Muted Text** | `--text-muted` | `#94a3b8` | Subtitles, parameter descriptions |
 | **Dim Text** | `--text-dim` | `#64748b` | Captions, footnotes, table metadata |
 
-### Glassmorphism Recipe
-```css
-/* Canonical frosted glass surface */
-background: rgba(15, 23, 42, 0.65);
-backdrop-filter: blur(24px) saturate(190%);
--webkit-backdrop-filter: blur(24px) saturate(190%);
-border: 1px solid var(--bg-card-border);
-border-radius: var(--radius-md);
-```
-
-### Typography Hierarchy
-- **Display Headings (`h1`, `h2`, `.chapter-title`)**: `'Outfit', sans-serif`, font-weight 700–800. Fluid sizing via `clamp()`.
-- **Body & Controls**: `'Inter', sans-serif`, font-weight 400–600.
-- **Code, Metrics & Data**: `'JetBrains Mono', monospace`, font-weight 500–700.
+### Theme Invariants:
+1. **Liquid Glass (`[data-theme="liquid"]`)**: Default deep cosmic glass with vibrant cyan/violet edge glows.
+2. **Fluent Aero Mica (`[data-theme="mica"]`)**:
+   - **High-Contrast Code Blocks**: Code blocks MUST use dark text on bright frosted surface (`background: #ffffff; color: #0f172a !important;`). Never leave white-on-white text!
+   - **Crisp Paper Surfaces**: Frosted glass with subtle slate borders and deep navy accents (`--accent-cyan: #0284c7;`).
+3. **Holo Cyberpunk Neon (`[data-theme="holo"]`)**: High-saturation hot-pink (`#ff007f`) and electric cyan (`#00f0ff`) contrast grid.
+4. **Matrix Obsidian (`[data-theme="matrix"]`)**: Matte pure-black stealth palette with emerald accents (`#10b981`).
 
 ---
 
-## ↔️ Interactive Draggable Sidebar Resizer Standard
+## 🔊 Curated Web Audio Haptic System (`HapticAudio`)
 
-Fixed-width sidebars degrade user experience by clipping titles on ultra-wide screens or consuming excessive reading space on medium displays.
+A tactile acoustic feedback engine built directly on the Web Audio API without external audio file dependencies. Synthesizes directional micro-transients for every user action:
 
-### 1. Splitter DOM & Styling Invariants
-The draggable splitter `.sidebar-resizer` must sit directly between `<aside class="sidebar">` and `<main class="content-area">`:
+| Action / Interaction | Synthesis Curve | Frequency / Duration | Aesthetic Sensation |
+|---|---|---|---|
+| **Expand (`expand`)** | Ascending exponential sine ramp | `540Hz → 880Hz` (`38ms`) | Mechanical switch unfolding / opening |
+| **Collapse (`collapse`)** | Descending exponential sine ramp | `780Hz → 420Hz` (`38ms`) | Snappy mechanical tuck / folding shut |
+| **Sidebar Open (`sidebarOpen`)** | Resonant ascending triangle glide | `440Hz → 760Hz` (`55ms`) | Smooth sliding panel reveal |
+| **Sidebar Close (`sidebarClose`)** | Solid mechanical sine latch | `680Hz → 320Hz` (`45ms`) | Secure latch click |
+| **Tactile Tap (`tap`)** | High-transient triangle pop | `920Hz → 560Hz` (`22ms`) | iOS-style segmented chip toggle |
+| **Copy Code (`copySuccess`)** | Dual-tone arpeggiated chime | `C6 (1046Hz) + E6 (1318Hz)` (`90ms`) | Celebratory clipboard success chime |
+| **Search Trigger (`searchOpen`)** | Holographic digital ping | `1180Hz → 1480Hz` (`40ms`) | Futuristic HUD activation |
+| **Theme Change (`themeChange`)** | Cosmic frequency sweep | `600Hz → 1200Hz` (`60ms`) | Dimension / palette shift |
+| **Theater Launch (`theaterOpen`)** | Low-frequency harmonic sine | `440Hz → 880Hz` (`70ms`) | Cinematic workbench focus |
+
+### Acoustic Invariants:
+1. **Directional Consistency**: Main content chapters, problem cards, nested accordions, and sidebar tree headers share the exact same `HapticAudio.expand()` and `HapticAudio.collapse()` curves.
+2. **Batch Expansion Guard**: During "Expand All" and "Collapse All", `STATE.isBatchExpanding` strictly mutes individual accordion blips to eliminate audio distortion and DOM thread starvation.
+3. **Audio Persistence**: State saved to `localStorage.getItem('polyturing_audio_enabled')`, defaulting to ON for tactile mobile-like delight. Toggled via HUD `🔊 / 🔇`.
+
+---
+
+## ↔️ Interactive Draggable Sidebar Resizer & Collapsible Rail Standard
+
+Fixed-width sidebars degrade user experience by clipping titles on ultra-wide screens or consuming excessive reading space on medium displays. PolyTuring implements both continuous draggable resizing and full collapsible rail distraction-free mode:
 
 ```html
-<aside class="sidebar" id="main-sidebar">...</aside>
-<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize navigation sidebar" title="Drag to adjust sidebar width (Double-click to reset)"></div>
-<main class="content-area">...</main>
+<header class="header-glass">
+  <button class="sidebar-dock-toggle" id="sidebar-dock-toggle" aria-label="Toggle Navigation Sidebar" title="Toggle Sidebar (⌘B / [)">...</button>
+</header>
+<div class="layout-container">
+  <button class="floating-sidebar-toggle" id="floating-sidebar-toggle" aria-label="Open Navigation Sidebar" title="Open Sidebar (⌘B / [)">...</button>
+  <aside class="sidebar" id="main-sidebar">
+    <div class="sidebar-search-row">
+      <div class="sidebar-search-box">
+        <span class="sidebar-search-icon">🔍</span>
+        <input type="text" class="sidebar-search-input" id="sidebar-filter-input" placeholder="Filter architecture & chapters..." autocomplete="off">
+        <button class="sidebar-filter-clear" id="sidebar-filter-clear" title="Clear filter (Esc)">✕</button>
+      </div>
+      <button class="sidebar-collapse-pill sidebar-close-btn" id="sidebar-close-btn" aria-label="Collapse navigation sidebar" title="Collapse sidebar (⌘B / [)">...</button>
+    </div>
+    ...
+  </aside>
+  <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize navigation sidebar" title="Drag to adjust sidebar width (Double-click to reset)"></div>
+  <main class="content-area">...</main>
+</div>
 ```
 
-```css
-.sidebar-resizer {
-  width: 10px;
-  margin-left: -5px;
-  margin-right: -5px;
-  cursor: col-resize;
-  position: sticky;
-  top: var(--topbar-height);
-  height: calc(100vh - var(--topbar-height));
-  z-index: 35;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-}
-
-.sidebar-resizer::after {
-  content: '';
-  width: 2px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.2);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.sidebar-resizer:hover::after,
-.sidebar-resizer.is-resizing::after {
-  height: 84px;
-  width: 3px;
-  background: var(--accent-cyan);
-  box-shadow: 0 0 14px var(--accent-cyan);
-}
-```
-
-### 2. Operational Invariants for Sidebar Resizing
-1. **Bounds Clamping**: Resizing must be strictly clamped between `MIN_WIDTH = 240px` and `MAX_WIDTH = 560px`.
-2. **Dragging Performance**: During drag, `body.resizing-sidebar` must set `cursor: col-resize !important; user-select: none !important;`, and `.sidebar` must set `transition: none !important;` to eliminate pointer lag.
-3. **Persistence**: The chosen width must be persisted to `localStorage.setItem('polyturing_sidebar_width', width)` on pointer up, and restored on `DOMContentLoaded`.
-4. **Double-Click Reset**: Double-clicking the splitter resets `--sidebar-width` to the default optimal width (`320px`).
-5. **The Zero-Truncation Invariant**: Never clip titles with single-line ellipses (`white-space: nowrap; text-overflow: ellipsis;`). All navigation titles must use:
+### Operational Invariants for Sidebar:
+1. **Collapsible Distraction-Free Reading Mode**:
+   - Closed via `#sidebar-close-btn` inside sidebar or `#sidebar-dock-toggle` in header.
+   - When collapsed, `body.sidebar-collapsed` shifts `.sidebar` by `margin-left: calc(-1 * var(--sidebar-width)); opacity: 0; visibility: hidden;` and hides `.sidebar-resizer`.
+   - Floating reopen tab `#floating-sidebar-toggle` appears on the left edge (`top: calc(var(--topbar-height) + 14px); left: 14px;`).
+   - Global keyboard shortcuts: `⌘B`, `Ctrl+B`, or `[` (when not focused in inputs) toggle the rail instantly.
+   - State persisted in `localStorage.setItem('polyturing_sidebar_collapsed', 'true' / 'false')`.
+2. **Real-Time Sidebar Filtering**:
+   - Filter input `#sidebar-filter-input` filters all navigation groups and links instantly as the user types.
+   - Automatically expands matching groups (`.expanded`) and hides non-matching items.
+   - Pressing `Escape` or clicking `✕` clears the filter and restores previous tree state.
+3. **Bounds Clamping**: Resizing strictly clamped between `MIN_WIDTH = 240px` and `MAX_WIDTH = 560px`.
+4. **Dragging Performance**: During drag, `body.resizing-sidebar` sets `cursor: col-resize !important; user-select: none !important;`.
+5. **Persistence**: The chosen width is persisted to `localStorage.setItem('polyturing_sidebar_width', width)` on pointer up.
+6. **Double-Click Reset**: Double-clicking resets `--sidebar-width` to the default optimal width (`320px`).
+7. **The Zero-Truncation Invariant**: Never clip titles with single-line ellipses (`white-space: nowrap; text-overflow: ellipsis;`). All navigation titles wrap cleanly:
    ```css
    .tree-title-text {
      white-space: normal;
@@ -137,173 +139,90 @@ The draggable splitter `.sidebar-resizer` must sit directly between `<aside clas
      font-size: 0.85rem;
    }
    ```
-   This ensures chapter names like `01. Omni-Graph Nervous System` wrap cleanly without ugly ellipsis truncation dots.
+
+---
+
+## 📑 Right-Side "On This Page" TOC HUD & 1:1 Synchrony Invariant
+
+The right-side Table of Contents provides an interactive, live-updating outline that strictly mirrors the main content:
+
+```html
+<aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of Contents">
+  <div class="toc-header-hud">
+    <div class="toc-header-title-wrap">
+      <span class="toc-header-icon">📑</span>
+      <span class="toc-title">On This Page</span>
+    </div>
+    <div class="toc-header-actions">
+      <span class="toc-reading-progress" id="toc-reading-progress">0%</span>
+      <button class="toc-jump-top-btn" id="toc-jump-top" title="Back to Top (Home)">⌃</button>
+    </div>
+  </div>
+  <div class="toc-progress-track">
+    <div class="toc-progress-indicator" id="toc-progress-indicator"></div>
+  </div>
+  <nav class="toc-nav" id="toc-nav">
+    <div class="toc-chapter-group" data-chapter="ch0">
+      <div class="toc-chapter-heading">00 · Manifesto</div>
+      <ul class="toc-list">
+        <li class="toc-item"><a href="#ch0-manifesto" class="toc-link active"><span class="toc-bullet"></span>Platform Manifesto</a></li>
+        ...
+      </ul>
+    </div>
+    ...
+  </nav>
+</aside>
+```
+
+### Operational Invariants for TOC:
+1. **1:1 Exact Heading Alignment**: Every TOC label must 100% align with the corresponding section header in `<main>` (e.g. `sec-sdd-governance` must never be omitted or mislabeled).
+2. **Dynamic Reading Progress**: HUD `#toc-reading-progress` and `#toc-progress-indicator` track document scroll depth in real time (`0%` to `100%`).
+3. **Bi-Directional Synchrony**:
+   - ScrollSpy tracks **ALL** unique target anchors referenced across Left Nav and Right TOC.
+   - Highlights the active section with `.active` and lights up the parent chapter with `.active-chapter`.
+   - Never mutates open/collapsed state during passive scrolling.
+4. **Smooth Anchor Interception**:
+   - Clicking any TOC or Left Nav link intercepts native jump, automatically uncollapses parent chapter in `<main>`, scrolls with an 80px cushion below the sticky header, applies a 1.8s `.flash-focus` neon glow, and triggers `HapticAudio.tap()`.
+5. **Back to Top Action**: `#toc-jump-top` smoothly scrolls to top and triggers `HapticAudio.collapse()`.
 
 ---
 
 ## 📱 Year 2500 Visionary Mobile Architecture (Commute Gadget Standard)
 
-Modern software engineers and architects scout tools on mobile devices during commutes (smartphones, foldable devices, compact tablets) before testing on workstations. The portal must deliver a flawless, high-density, touch-optimized experience.
-
-### 1. The Mobile Navigation Drawer Pattern
 On viewports $\le 1024\text{px}$, the sidebar transforms into an off-canvas slide-out drawer:
 
 ```html
 <header class="header-glass">
-  <div class="header-left-cluster">
-    <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Open Navigation">
-      <svg width="20" height="20" ...></svg>
-    </button>
-    ...
-  </div>
+  <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Open Navigation">...</button>
 </header>
-
 <div class="layout-container">
-  <!-- Backdrop MUST be inside layout container to share stacking context with sidebar -->
   <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" aria-hidden="true"></div>
-  
   <aside class="sidebar" id="main-sidebar">
     <div class="mobile-drawer-header">
       <div class="brand-section">...</div>
       <button class="mobile-drawer-close" id="mobile-drawer-close">✕</button>
     </div>
-    <div class="mobile-drawer-tools">
-      <!-- Token Simulator, API Playground, GitHub Repo links -->
-    </div>
     ...
   </aside>
-  ...
 </div>
 ```
 
-```css
-@media (max-width: 1024px) {
-  .mobile-nav-toggle { display: flex; }
-  .sidebar-resizer { display: none !important; }
-
-  .mobile-drawer-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(4, 6, 12, 0.75);
-    backdrop-filter: blur(12px);
-    z-index: 1100;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .mobile-drawer-backdrop.show {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .sidebar {
-    position: fixed;
-    top: 0; left: 0; bottom: 0;
-    width: min(86vw, 360px);
-    height: 100dvh;
-    z-index: 1200;
-    background: #090e1a;
-    backdrop-filter: blur(32px) saturate(200%);
-    box-shadow: 16px 0 60px rgba(0, 0, 0, 0.95);
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-}
-```
-
-### 2. The Stacking Context Invariant (CRITICAL)
-> [!CAUTION]
-> If `.layout-container` defines a CSS `z-index` and `position: relative`, placing `#mobile-drawer-backdrop` outside `.layout-container` traps the sidebar's stacking context below the backdrop.
-> **Invariant**: Always place `#mobile-drawer-backdrop` inside `.layout-container` right before `<aside class="sidebar">`. This guarantees `.sidebar` (`z-index: 1200`) cleanly layers above the backdrop (`z-index: 1100`), which in turn dims `.content-area` (`z-index: 1`).
-
-### 3. Strict Anti-Clobbering & Sticky-Safe Containment
-1. **The Sticky Overflow Invariant**:
-   - **NEVER use `overflow-x: hidden` on `html` or `body`** when sticky headers or sticky sidebars exist. In WebKit/Blink, `overflow-x: hidden` forces an implicit scroll container that destroys `position: sticky`.
-   - **Always use `overflow-x: clip;`** on `html, body, .layout-container`. `clip` prevents horizontal scroll blowouts without creating a scroll container!
-2. **The Table Containment Invariant**:
-   - Every `<table>` must be wrapped in `<div class="table-wrapper">`.
-   - CSS must enforce:
-     ```css
-     .table-wrapper {
-       width: 100%;
-       max-width: 100%;
-       overflow-x: auto;
-       -webkit-overflow-scrolling: touch;
-     }
-     table {
-       min-width: 520px; /* Prevents columns from crushing into illegible slivers */
-     }
-     ```
-3. **KaTeX & Code Blocks Containment**:
-   - `.katex-display` must define `overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; max-width: 100%;`.
-   - `.code-container pre` must define `overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;`.
-4. **Fluid Typography (`clamp`)**:
-   - Hero Headings: `font-size: clamp(1.6rem, 5.5vw, 2.2rem);`
-   - Chapter Titles: `font-size: clamp(1.25rem, 4.2vw, 1.75rem);`
-   - Section H2: `font-size: clamp(1.1rem, 3vw, 1.4rem);`
-   - Mode Buttons: `flex: 1; min-width: 80px; justify-content: center;`
+### Mobile Invariants:
+1. **Stacking Context Hierarchy**: Always place `#mobile-drawer-backdrop` inside `.layout-container` right before `<aside class="sidebar">` to avoid trapped z-index bugs.
+2. **Sticky Overflow Invariant**:
+   - **NEVER use `overflow-x: hidden` on `html` or `body`** when sticky headers or sticky sidebars exist. In WebKit/Blink, `overflow-x: hidden` creates an implicit scroll container that breaks `position: sticky`.
+   - **Always use `overflow-x: clip;`** on `html, body, .layout-container`.
+3. **Table & Formula Containment**:
+   - Every `<table>` must be wrapped in `<div class="table-wrapper">` with `min-width: 520px` and `-webkit-overflow-scrolling: touch`.
+   - KaTeX displays (`.katex-display`) must use `overflow-x: auto; max-width: 100%;`.
 
 ---
 
-## 🧭 Navigation & The 1:1 Synchrony Invariant
-
-### 1. The Structure of Navigation
-The left sidebar is composed of `.nav-tree-group` sections containing:
-1. `.nav-tree-header`: Chapter group bar with disclosure chevron and language pill.
-2. `.nav-tree-children`: List of `.nav-tree-link` anchors (`href="#sec-id"`).
-
-### 2. The Bi-Directional Synchrony Contract
-* **Header Click**: Clicking `.nav-tree-header` toggles `.expanded` on the sidebar group **AND** simultaneously toggles `.chapter-expanded` on the corresponding `<section class="chapter-section">` in the content pane.
-* **Child Link Click**: Clicking a `.nav-tree-link`:
-  1. Ensures containing parent chapter is expanded.
-  2. Applies Focus Mode rules (collapses sibling chapters if Focus Mode is active).
-  3. Smooth-scrolls to the target element with sticky-header offset (`160px`).
-  4. Applies temporary `.flash-focus` neon glow (1.8s) to the target element.
-  5. Sets `isNavClicking = true` for `850ms` to prevent smooth-scroll events from overriding the active highlight.
-  6. On mobile ($\le 1024\text{px}$), automatically dismisses the mobile navigation drawer.
-* **ScrollSpy Tracking (CRITICAL)**:
-  - ScrollSpy tracks **EVERY TARGET ELEMENT LINKED IN THE NAVIGATION** individually, NOT just `.chapter-section`!
-  - Targets include: `#sec-omni-arch`, `#sec-omni-galaxies`, `#sec-omni-coupling`, `#sec-omni-ebf`, `#sec-omni-ast`, etc.
-  - **INVARIANT**: ScrollSpy must **NEVER** mutate tree open/close state (`classList.add('expanded')`) while scrolling! It ONLY updates `.active` on the link and `.active-branch` on the group header.
-  - **INVARIANT**: When "Collapse All" is clicked, scrolling must **NEVER** forcefully pop open closed chapters.
-
----
-
-## 🔬 Theoretical & Mathematical Foundations Standard
-
-When documenting tools in PolyTuring, avoid superficial descriptions of CLI flags. Present the **rigorous computer science and graph theory foundations** that empower the architecture:
-
-### 1. Omni-Graph: Galaxy Subsystems & Louvain/Leiden Modularity Clustering
-Document how the polyglot AST call graph is partitioned into architectural galaxy subsystems using Louvain / Leiden modularity optimization ($Q$):
-$$Q = \frac{1}{2m} \sum_{ij} \left( A_{ij} - \gamma \frac{k_i k_j}{2m} \right) \delta(c_i, c_j)$$
-
-### 2. Robert C. Martin Coupling Metrics & Dynamic Blast Radius Contracts
-Document how cross-boundary dependency vectors are quantified before writing refactored code:
-- **Afferent Coupling ($C_a$)**: Incoming external symbols depending on this subsystem.
-- **Efferent Coupling ($C_e$)**: Outgoing dependencies this subsystem calls.
-- **Instability Metric ($I$)**:
-  $$I = \frac{C_e}{C_a + C_e}, \quad I \in [0, 1]$$
-- **Architectural SLA Thresholds**:
-  - **Core Foundation**: $I \le 0.25$ (High stability, maximum caution).
-  - **Domain Service**: $0.25 < I \le 0.65$ (Balanced volatility).
-  - **Orchestrator / Leaf**: $I > 0.65$ (High volatility, safe to patch).
-
-### 3. Session Explorer: Trajectory Observability & Memory Recovery
-Document how standalone Go + Bun binaries index JSONL agent trajectory logs into SQLite3 WAL, enabling instant WIP memory recovery for agent context crashes.
-
-### 4. Universal Assistant Matrix
-Position every tool as natively integrated with Google Antigravity today, while providing an architectural blueprint for Model Context Protocol (MCP) server integration with GitHub Copilot, Claude Code, and Cursor.
-
----
-
-## 📊 Mermaid Architecture Diagrams & Zoomable Canvas
+## 📊 Mermaid Architecture Diagrams & Fullscreen Visual Theater Workbench
 
 ### 1. Canvas DOM Anatomy
-Every architecture diagram and complex table must be wrapped in a zoomable canvas:
+Every architecture diagram and complex table is wrapped in a zoomable canvas:
+
 ```html
 <div class="canvas-container">
   <div class="canvas-header-bar">
@@ -331,76 +250,59 @@ flowchart TB
 </div>
 ```
 
-### 2. The Critical SVG Layout Invariant (DO NOT VIOLATE)
-> [!CAUTION]
-> **NEVER apply `width: auto !important` or `height: auto !important` to `.mermaid svg` inside nested flex containers!**
-> Overriding SVG width/height with `auto` inside flex containers collapses the SVG's flex basis to **0px by 0px**, rendering diagrams invisible.
-
-**The Golden Layout Rules for Mermaid:**
-```css
-.canvas-viewport {
-  overflow: auto;
-  padding: 28px 24px;
-  display: block;
-  text-align: center;
-  min-height: 220px;
-  max-height: 600px;
-  cursor: grab;
-  user-select: none;
-}
-
-.canvas-content-surface {
-  transform-origin: center top;
-  transition: transform 0.12s ease-out;
-  display: inline-block;
-  margin: 0 auto;
-  text-align: center;
-  max-width: 100%;
-}
-
-.mermaid {
-  display: inline-block !important;
-  margin: 0 auto !important;
-  text-align: center !important;
-  overflow: visible !important;
-}
-
-.mermaid svg {
-  display: inline-block !important;
-  max-width: 100% !important;
-  height: auto !important;
-}
-```
-
-### 3. Mermaid Node Label Escaping Rule
-> [!WARNING]
-> Unescaped `<` or `>` characters inside Mermaid node labels (e.g. `[Condenser (<1500 Tokens)]`) parse as HTML tags and **crash the Mermaid parser**!
-> **Always write:** `≤ 1,500 Tokens` or `&lt;1500 Tokens`.
+### 2. Fullscreen Theater Workbench (`<dialog id="theater-modal">`):
+1. **Top-Layer `<dialog>` Isolation**: Uses HTML5 dialog `showModal()` to guarantee the visual workbench layers over all content with an authentic backdrop blur.
+2. **Sub-Millisecond Zoom/Pan SLA**:
+   - `.theater-surface` MUST specify `transition: none !important;` to eliminate pointer lag.
+   - Panning uses `translate(${panX}px, ${panY}px) scale(${zoom})` for 1:1 pixel accuracy.
+3. **Clear UX Distinction: `100%` vs `Fit`**:
+   - `100%` (`#theater-zoom-reset`): Resets scale to **`1.0`** (true 1:1 native design scale).
+   - `Fit` (`#theater-zoom-fit`): Dynamically calculates exact scale based on live viewport boundaries and SVG `viewBox` (`calculateFitScale`).
+4. **SVG Text Selection**:
+   - `.theater-surface svg text, foreignObject, span` have `user-select: text !important; cursor: text;` so engineers can highlight and copy symbol names directly.
+5. **Safari WebKit Flex-SVG Sizing Invariant**:
+   ```css
+   .mermaid svg {
+     display: block !important;
+     width: 100% !important;
+     max-width: 100% !important;
+     height: auto !important;
+     max-height: 580px;
+     object-fit: contain;
+     margin: 0 auto;
+   }
+   ```
+6. **Node Label Escaping Rule**:
+   - Escape `<` and `>` in labels as `≤` or `&lt;` / `&gt;` to avoid crashing Mermaid's HTML parser.
 
 ---
 
-## 🎛️ Interactive Simulators & Playgrounds
+## 💻 Code Display Enhancements Standard
 
-Interactive modules (such as the **Context Condenser Token Simulator** and **API Playground**) are first-class citizens of the portal:
+Interactive code containers feature frosted glass headers, semantic language pills, copy chimes, and theme adaptation:
 
-### 1. Parameter Control Card Anatomy (The 2-Line Rule)
-Never squeeze parameter titles and values into a single row with `justify-content: space-between`. On narrow cards or multi-word titles, this forces ugly multi-line wrapping.
-
-**Always use the 2-Line Stack inside isolated frosted cards:**
 ```html
-<div class="control-item">
-  <!-- Line 1: Parameter Title -->
-  <div class="control-title">Neighbor Signatures Cap</div>
-  <!-- Line 2: Monospace Quantitative Value -->
-  <div class="control-value" id="val-neighbor-chars">2400 chars</div>
-  <!-- Line 3: Range Slider Track -->
-  <input type="range" id="sim-neighbor-chars" min="500" max="4500" step="100" value="2400">
+<div class="code-container">
+  <div class="code-header">
+    <div class="code-header-left">
+      <span class="code-lang-tag">SURREALQL</span>
+      <span class="code-file-path">src/db/schema.surql</span>
+    </div>
+    <button class="copy-btn" data-target="surql-indexes" title="Copy code snippet">
+      <svg width="13" height="13" ...></svg>
+      <span>Copy</span>
+    </button>
+  </div>
+  <pre><code id="surql-indexes">...</code></pre>
 </div>
 ```
 
+- Clicking Copy copies code text, animates the button to `✓ Copied!`, and triggers `HapticAudio.copySuccess()`.
+- Aero Mica theme enforces high-contrast dark text (`#0f172a`) on bright frosted card surfaces.
+
 ---
 
-## 🧪 Automated Testing Protocol (9-Gate Audit)
+## 🧪 Automated Testing Protocol (14-Gate Audit)
 
 Never push documentation portal changes without running the automated test suite!
 
@@ -412,16 +314,21 @@ bash .agents/skills/docs-portal/scripts/test-docs.sh
 make docs-test
 ```
 
-### The 9 Automated Verification Gates
+### The 14 Automated Verification Gates:
 1. **Core Asset Presence**: Verifies `index.html`, `style.css`, and `app.js`.
 2. **Mermaid Syntax Auditing**: Detects unescaped `<` or `>` characters in node labels.
 3. **SVG Sizing Invariants**: Validates that CSS does not contain collapsing `width: auto !important` on `.mermaid svg`.
 4. **KaTeX Integration**: Verifies stylesheet, scripts, and auto-render calls.
-5. **Draggable Sidebar Resizer Invariants**: Audits `#sidebar-resizer`, `col-resize`, `initSidebarResizer`, `localStorage` key, and non-clipping text wrapping.
-6. **Year 2500 Mobile Navigation Drawer & Anti-Clobbering**: Audits `#mobile-nav-toggle`, `#mobile-drawer-backdrop`, `#mobile-drawer-close`, `initMobileDrawer`, `.sidebar.mobile-open`, and sticky-safe `overflow-x: clip`.
-7. **Table & Math Touch Overflow Containment**: Ensures all `<table>` tags are inside `.table-wrapper`, min-width is specified, and `.katex-display` has `overflow-x: auto`.
-8. **Static Bundle Build**: Compiles to `_site/` and checks size/file counts.
-9. **Built Bundle Integrity**: Verifies compiled distribution files.
+5. **Draggable Sidebar Resizer Invariants**: Audits `#sidebar-resizer`, `col-resize`, `initSidebarResizer`, and `localStorage` key.
+6. **Sidebar Collapsible Rail**: Audits `#floating-sidebar-toggle`, `#sidebar-close-btn`, `body.sidebar-collapsed`, and `⌘B` shortcuts.
+7. **Sidebar Real-Time Search Filter**: Audits `#sidebar-filter-input` and `initSidebarFilters`.
+8. **Haptic Web Audio Feedback System**: Audits `HapticAudio`, `#audio-toggle-btn`, and `copySuccess` celebration chime.
+9. **Multi-Theme Engine**: Audits `data-theme` support across `liquid`, `mica`, `holo`, `matrix`.
+10. **Fullscreen Visual Theater Workbench**: Audits `#theater-modal`, `#theater-zoom-fit`, and `calculateFitScale`.
+11. **Right-Side TOC Alignment & HUD**: Audits `#toc-sidebar`, `#toc-reading-progress`, `#toc-progress-indicator`, and `sec-sdd-governance`.
+12. **Year 2500 Mobile Navigation Drawer & Anti-Clobbering**: Audits `#mobile-nav-toggle`, `#mobile-drawer-backdrop`, and sticky-safe `overflow-x: clip`.
+13. **Table & Math Touch Overflow Containment**: Ensures all `<table>` tags are inside `.table-wrapper`, min-width is specified, and `.katex-display` has `overflow-x: auto`.
+14. **Static Bundle Packaging & Output Integrity**: Compiles to `_site/` and checks size/file counts.
 
 ---
 
@@ -450,10 +357,24 @@ When documenting a new tool (e.g. `Chapter 05 · New Tool`):
    </div>
    ```
 
-2. **Add Chapter Section (`docs/site/index.html`)**:
+2. **Update Right TOC (`docs/site/index.html`)**:
+   Add a matching `.toc-chapter-group`:
+   ```html
+   <div class="toc-chapter-group" data-chapter="ch5">
+     <div class="toc-chapter-heading">05 · New Tool</div>
+     <ul class="toc-list">
+       <li class="toc-item"><a href="#ch5-new-tool" class="toc-link"><span class="toc-bullet"></span>System Overview</a></li>
+       <li class="toc-item"><a href="#sec-new-arch" class="toc-link"><span class="toc-bullet"></span>Architecture Topology</a></li>
+       <li class="toc-item"><a href="#sec-new-theory" class="toc-link"><span class="toc-bullet"></span>Theoretical Foundations</a></li>
+       <li class="toc-item"><a href="#sec-new-usage" class="toc-link"><span class="toc-bullet"></span>Usage &amp; Quickstart</a></li>
+     </ul>
+   </div>
+   ```
+
+3. **Add Chapter Section (`docs/site/index.html`)**:
    Enclose all comparison tables in `<div class="table-wrapper">`, KaTeX in `$$ ... $$`, and diagrams in `.canvas-container`.
 
-3. **Verify and Deploy**:
+4. **Verify and Deploy**:
    ```bash
    make docs-test
    git commit -am "feat(docs): add Chapter 05 documentation"
