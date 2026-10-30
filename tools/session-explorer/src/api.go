@@ -672,4 +672,62 @@ func (h *APIHandler) HandleFile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
+// HandleGlobalAgentContext returns machine-wide agent context (rules, skills, plugins, MCP, hooks).
+// Implements: R-039, AC-040, AC-044
+func (h *APIHandler) HandleGlobalAgentContext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := h.index.DiscoverGlobalAgentContext()
+	writeJSON(w, ctx)
+}
+
+// HandleWorkspaceAgentContext returns workspace-specific and inherited agent context.
+// Implements: R-039, AC-041, AC-044
+func (h *APIHandler) HandleWorkspaceAgentContext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	workspace := r.URL.Query().Get("workspace")
+	if workspace == "" {
+		workspace = r.URL.Query().Get("project")
+	}
+
+	ctx := h.index.DiscoverWorkspaceAgentContext(workspace)
+	writeJSON(w, ctx)
+}
+
+// HandleSessionContext returns active rules, invoked skills, and tools for a specific session.
+// Implements: R-039, AC-042, AC-043
+func (h *APIHandler) HandleSessionContext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/sessions/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Session ID required", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[0]
+
+	sctx, err := h.index.ExtractSessionAgentContext(sessionID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	writeJSON(w, sctx)
+}
+
+
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Universal Agent Context & Behavioral Matrix (R-039)**:
+  - Added holistic observability across global instructions (`~/.gemini/config/rules/`, `~/.claude/rules/`), global skills (`~/.gemini/config/skills/`, builtin runbooks, plugins), MCP servers, and lifecycle hooks (`hooks.json`).
+  - Added workspace-level discovery for repository guidelines (`.agents/rules/`, `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `copilot-instructions.md`), skills, and computed precedence cascade (Workspace > Declared > Global > Built-in).
+  - Added in-session behavioral context analysis at `GET /api/sessions/:id/context` distinguishing between **⚡ Actively Invoked Skills** (with invocation counts and step markers) and **💤 On-Demand Skills** (progressive disclosure).
+  - Built liquid-glass **Agent Brain & Context Matrix Modal** (`#agentMatrixModal`) accessible via top header action `🧠 Agent Brain` and Project Hub (`#projectAgentContextBtn`).
+  - Built **In-Session Agent Context Drawer** (`#sessionContextModal`) launched via sticky detail header pill `🧠 Agent Context (<count>)`.
+  - Seamlessly reuses embedded Native File Viewer (R-038) for 1-click high-fidelity Markdown and code inspection with syntax highlighting and line numbers.
+
 ### Fixed
 - **Multi-Tier Intelligent Workspace & Codebase Clustering Engine (R-028, R-005)**:
   - Eliminated false-positive workspace clustering collisions where macOS OneDrive path segments (e.g. `OneDrive-Personal`) caused sessions to be erroneously classified under "Personal".

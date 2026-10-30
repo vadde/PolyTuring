@@ -42,8 +42,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 38 | 38 | 100% |
-| Acceptance Criteria (AC-XXX) | 39 | 39 | 100% |
+| Requirements (R-XXX) | 39 | 39 | 100% |
+| Acceptance Criteria (AC-XXX) | 44 | 44 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -90,6 +90,7 @@ spec: ../../specs/catalog/session-explorer.md
 | R-036 | Universal multi-runtime discovery (IDE, CLI, Copilot, Claude) | `src/scanner.go`, `src/types.go`, `src/main.go` | `src/scanner_test.go` | 🧪 |
 | R-037 | Bounded diagram viewports & fullscreen theater mode | `src/web/src/styles.css`, `src/web/src/app.js` | headless browser | 🧪 |
 | R-038 | Native in-browser file & artifact viewer with syntax highlighting | `src/api.go`, `src/web/src/app.js`, `src/web/index.html` | `src/api_test.go`, headless browser | 🧪 |
+| R-039 | Universal Agent Context & Behavioral Matrix (Global & Workspace Rules, Skills, Instructions & In-Session Influence) | `src/context_scanner.go`, `src/api.go`, `src/web/src/app.js` | `src/context_test.go`, headless browser | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

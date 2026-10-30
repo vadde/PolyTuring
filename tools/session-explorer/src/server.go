@@ -37,6 +37,10 @@ func StartServer(cfg Config, index *SessionIndex) error {
 				api.HandleSessionTail(w, r)
 				return
 			}
+			if strings.HasSuffix(path, "/context") {
+				api.HandleSessionContext(w, r)
+				return
+			}
 			api.HandleSessionDetail(w, r)
 			return
 		}
@@ -45,6 +49,10 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/api/sessions/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/tail") {
 			api.HandleSessionTail(w, r)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/context") {
+			api.HandleSessionContext(w, r)
 			return
 		}
 		api.HandleSessionDetail(w, r)
@@ -56,6 +64,8 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/api/wip", api.HandleWIP)
 	mux.HandleFunc("/api/file", api.HandleFile)
 	mux.HandleFunc("/api/skill/install", api.HandleInstallSkill)
+	mux.HandleFunc("/api/agent/context/global", api.HandleGlobalAgentContext)
+	mux.HandleFunc("/api/agent/context/workspace", api.HandleWorkspaceAgentContext)
 
 	// OpenAPI Spec & Interactive Swagger Docs
 	mux.HandleFunc("/api/openapi.json", func(w http.ResponseWriter, r *http.Request) {

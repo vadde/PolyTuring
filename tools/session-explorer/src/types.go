@@ -277,3 +277,123 @@ type FileContentResponse struct {
 	LineCount int    `json:"line_count"`
 }
 
+// AgentContextScope defines whether a customization is global, workspace, session, builtin, or plugin.
+// Implements: R-039 (Universal Agent Context & Behavioral Matrix)
+type AgentContextScope string
+
+const (
+	ScopeGlobal    AgentContextScope = "global"
+	ScopeWorkspace AgentContextScope = "workspace"
+	ScopeSession   AgentContextScope = "session"
+	ScopeBuiltin   AgentContextScope = "builtin"
+	ScopePlugin    AgentContextScope = "plugin"
+)
+
+// AgentRule represents an instruction or behavioral guideline.
+// Implements: R-039
+type AgentRule struct {
+	Name        string            `json:"name"`
+	Title       string            `json:"title"`
+	Scope       AgentContextScope `json:"scope"`                  // "global", "workspace", "builtin"
+	FilePath    string            `json:"file_path"`
+	Description string            `json:"description,omitempty"`
+	Priority    string            `json:"priority,omitempty"`    // "Critical", "Important", "Constitutional", "Standard"
+	Trigger     string            `json:"trigger,omitempty"`     // "always_on", "model_decision", "user_invoked"
+	LineCount   int               `json:"line_count"`
+	SizeBytes   int64             `json:"size_bytes"`
+	Provider    string            `json:"provider"`              // "antigravity", "claude", "copilot", "cursor"
+	Workspace   string            `json:"workspace,omitempty"`
+}
+
+// AgentSkill represents an on-demand tool capability, runbook, or workflow.
+// Implements: R-039
+type AgentSkill struct {
+	Name          string            `json:"name"`
+	Scope         AgentContextScope `json:"scope"`               // "global", "workspace", "builtin", "plugin"
+	FilePath      string            `json:"file_path"`
+	Description   string            `json:"description"`
+	Category      string            `json:"category,omitempty"`
+	Provider      string            `json:"provider"`            // "antigravity", "claude", "copilot", "cursor"
+	Workspace     string            `json:"workspace,omitempty"`
+	PluginName    string            `json:"plugin_name,omitempty"`
+	HasScripts    bool              `json:"has_scripts"`
+	HasExamples   bool              `json:"has_examples"`
+	HasReferences bool              `json:"has_references"`
+	InvokedCount  int               `json:"invoked_count,omitempty"`  // Count of tool calls or reads in session
+	FirstStepIdx  int               `json:"first_step_idx,omitempty"` // Step index where first triggered
+}
+
+// AgentPlugin represents a packaged bundle of skills, rules, policies, and configurations.
+// Implements: R-039
+type AgentPlugin struct {
+	Name        string   `json:"name"`
+	Version     string   `json:"version,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Path        string   `json:"path"`
+	Skills      []string `json:"skills,omitempty"`
+	Policies    []string `json:"policies,omitempty"`
+}
+
+// MCPServerInfo represents a configured MCP tool provider.
+// Implements: R-039
+type MCPServerInfo struct {
+	Name    string            `json:"name"`
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
+	Scope   AgentContextScope `json:"scope"`
+	Tools   []string          `json:"tools,omitempty"`
+}
+
+// AgentHook represents a lifecycle guardrail script or trigger hook.
+// Implements: R-039
+type AgentHook struct {
+	Name    string            `json:"name"`
+	Event   string            `json:"event"`   // "PreToolUse", "PreInvocation", "Stop"
+	Matcher string            `json:"matcher,omitempty"`
+	Type    string            `json:"type"`    // "command"
+	Command string            `json:"command"`
+	Scope   AgentContextScope `json:"scope"`
+	Timeout int               `json:"timeout,omitempty"`
+}
+
+// GlobalAgentContext represents the machine-wide agent brain state.
+// Implements: R-039
+type GlobalAgentContext struct {
+	Rules       []AgentRule     `json:"rules"`
+	Skills      []AgentSkill    `json:"skills"`
+	Plugins     []AgentPlugin   `json:"plugins"`
+	MCPServers  []MCPServerInfo `json:"mcp_servers"`
+	Hooks       []AgentHook     `json:"hooks"`
+	TotalRules  int             `json:"total_rules"`
+	TotalSkills int             `json:"total_skills"`
+}
+
+// WorkspaceAgentContext represents the merged contextual view for a specific repository.
+// Implements: R-039
+type WorkspaceAgentContext struct {
+	Workspace   string          `json:"workspace"`
+	ProjectName string          `json:"project_name"`
+	Rules       []AgentRule     `json:"rules"`       // Workspace rules + inherited global rules with scope tagging
+	Skills      []AgentSkill    `json:"skills"`      // Workspace skills + inherited global/builtin skills
+	MasterDocs  []string        `json:"master_docs"` // AGENTS.md, CLAUDE.md, .cursorrules
+	MCPServers  []MCPServerInfo `json:"mcp_servers"`
+	Hooks       []AgentHook     `json:"hooks"`
+	TotalRules  int             `json:"total_rules"`
+	TotalSkills int             `json:"total_skills"`
+}
+
+// SessionAgentContext represents active rules, skills, and tools in a conversation session.
+// Implements: R-039
+type SessionAgentContext struct {
+	SessionID       string          `json:"session_id"`
+	Workspace       string          `json:"workspace"`
+	ProjectName     string          `json:"project_name"`
+	ActiveRules     []AgentRule     `json:"active_rules"`
+	ActiveSkills    []AgentSkill    `json:"active_skills"`    // Skills actually invoked during the session
+	AvailableSkills []AgentSkill    `json:"available_skills"` // Skills available via progressive disclosure
+	MCPServers      []MCPServerInfo `json:"mcp_servers"`
+	Subagents       []string        `json:"subagents,omitempty"`
+	SlashCommands   []string        `json:"slash_commands,omitempty"`
+}
+
+

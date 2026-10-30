@@ -265,7 +265,16 @@ const state = {
   fileFindCaseSensitive: false,
   fileFindMatches: [],
   fileFindActiveIndex: -1,
-  sessionFilesMap: new Map() // cleanPath -> { path, name, type, tool, stepIndex }
+  sessionFilesMap: new Map(), // cleanPath -> { path, name, type, tool, stepIndex }
+  agentMatrix: {
+    scope: 'global', // 'global' | 'workspace' | 'cascade'
+    type: 'ALL',     // 'ALL' | 'RULES' | 'SKILLS' | 'PLUGINS' | 'HOOKS'
+    search: '',
+    targetWorkspace: null,
+    globalContext: null,
+    workspaceContext: null
+  },
+  sessionContextData: null
 };
 
 // DOM Elements
@@ -378,6 +387,26 @@ const el = {
   closeSessionFilesModalBtn: document.getElementById('closeSessionFilesModalBtn'),
   sessionFilesTotalCount: document.getElementById('sessionFilesTotalCount'),
   sessionFilesListContainer: document.getElementById('sessionFilesListContainer'),
+  // Agent Context Matrix & Brain Elements (R-039)
+  agentBrainBtn: document.getElementById('agentBrainBtn'),
+  agentMatrixModal: document.getElementById('agentMatrixModal'),
+  closeAgentMatrixModalBtn: document.getElementById('closeAgentMatrixModalBtn'),
+  agentMatrixScopeControl: document.getElementById('agentMatrixScopeControl'),
+  agentMatrixWorkspaceSegment: document.getElementById('agentMatrixWorkspaceSegment'),
+  agentMatrixSearchInput: document.getElementById('agentMatrixSearchInput'),
+  clearAgentMatrixSearchBtn: document.getElementById('clearAgentMatrixSearchBtn'),
+  agentMatrixTotalCountBadge: document.getElementById('agentMatrixTotalCountBadge'),
+  agentMatrixRulesCount: document.getElementById('agentMatrixRulesCount'),
+  agentMatrixSkillsCount: document.getElementById('agentMatrixSkillsCount'),
+  agentMatrixPluginsCount: document.getElementById('agentMatrixPluginsCount'),
+  agentMatrixHooksCount: document.getElementById('agentMatrixHooksCount'),
+  agentMatrixContent: document.getElementById('agentMatrixContent'),
+  detailAgentContextBtn: document.getElementById('detailAgentContextBtn'),
+  detailAgentContextCount: document.getElementById('detailAgentContextCount'),
+  sessionContextModal: document.getElementById('sessionContextModal'),
+  closeSessionContextModalBtn: document.getElementById('closeSessionContextModalBtn'),
+  sessionContextIdBadge: document.getElementById('sessionContextIdBadge'),
+  sessionContextContent: document.getElementById('sessionContextContent'),
   toast: document.getElementById('toastNotification')
 };
 
@@ -591,6 +620,10 @@ function initEventListeners() {
         closeFileViewer();
       } else if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
         closeSessionFilesModal();
+      } else if (el.agentMatrixModal && el.agentMatrixModal.classList.contains('active')) {
+        closeAgentMatrixModal();
+      } else if (el.sessionContextModal && el.sessionContextModal.classList.contains('active')) {
+        closeSessionContextModal();
       } else if (el.searchModal && el.searchModal.classList.contains('active')) {
         closeSearchModal();
       } else if (el.insightsModal && el.insightsModal.classList.contains('active')) {
@@ -995,6 +1028,9 @@ function initEventListeners() {
   if (el.closeSessionFilesModalBtn) {
     el.closeSessionFilesModalBtn.addEventListener('click', closeSessionFilesModal);
   }
+
+  // Agent Matrix Listeners (R-039)
+  initAgentMatrixListeners();
 }
 
 // Local date helper to prevent timezone skew (e.g. UTC shifting into tomorrow)
@@ -1088,6 +1124,20 @@ async function loadSessionDetail(sessionId) {
     state.selectedSessionDetail = data;
 
     showDetailView(data);
+
+    // Fetch session agent context in background (R-039)
+    fetch(`/api/sessions/${sessionId}/context`)
+      .then(r => r.ok ? r.json() : null)
+      .then(ctx => {
+        if (!ctx) return;
+        state.sessionContextData = ctx;
+        if (el.detailAgentContextCount) {
+          const activeRules = ctx.active_rules ? ctx.active_rules.length : 0;
+          const activeSkills = ctx.active_skills ? ctx.active_skills.length : 0;
+          el.detailAgentContextCount.textContent = (activeRules + activeSkills).toString();
+        }
+      })
+      .catch(e => console.warn('Context fetch error:', e));
   } catch (err) {
     console.error('Failed to load session detail:', err);
     showToast(`❌ Error loading session detail: ${err.message}`);
@@ -1357,7 +1407,9 @@ function renderProjectHub() {
             <span class="chip active">📂 ${projSessions.length} Total Sessions</span>
             <span class="chip">👤 ${totalPrompts} Prompts</span>
             <span class="chip">⚡ ${totalTools} Tool Calls</span>
-            <span class="chip">🪜 ${totalSteps.toLocaleString()} Steps</span>
+            <button class="btn-pill" id="projectAgentContextBtn" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4); color: var(--accent-indigo); cursor: pointer;" title="Inspect rules, skills, and instructions for ${escapeHtml(projName)}">
+              🧠 Agent Context
+            </button>
           </div>
         </div>
 
@@ -1410,6 +1462,11 @@ function renderProjectHub() {
         state.projectFilters = { search: '', sort: 'date_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
         if (el.workspaceSelect) el.workspaceSelect.value = '';
         window.location.hash = '#/';
+      });
+
+      // Project Agent Context Listener
+      document.getElementById('projectAgentContextBtn')?.addEventListener('click', () => {
+        openAgentBrainModal(projName);
       });
 
       // In-Project Search Input Listener (Reactive, maintains input focus)
@@ -3596,6 +3653,527 @@ function closeSessionFilesModal() {
   if (el.sessionFilesModal) el.sessionFilesModal.classList.remove('active');
 }
 
+// ==========================================================================
+// Agent Brain & Behavioral Context Matrix Controller (R-039)
+// ==========================================================================
+
+function initAgentMatrixListeners() {
+  if (el.agentBrainBtn) {
+    el.agentBrainBtn.addEventListener('click', () => {
+      openAgentBrainModal();
+    });
+  }
+
+  if (el.closeAgentMatrixModalBtn) {
+    el.closeAgentMatrixModalBtn.addEventListener('click', closeAgentMatrixModal);
+  }
+
+  if (el.detailAgentContextBtn) {
+    el.detailAgentContextBtn.addEventListener('click', () => {
+      if (state.activeTimelineSessionId) {
+        openSessionContextModal(state.activeTimelineSessionId);
+      }
+    });
+  }
+
+  if (el.closeSessionContextModalBtn) {
+    el.closeSessionContextModalBtn.addEventListener('click', closeSessionContextModal);
+  }
+
+  // Scope switcher
+  if (el.agentMatrixScopeControl) {
+    el.agentMatrixScopeControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.agentMatrixScopeControl.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.agentMatrix.scope = btn.dataset.scope;
+        renderAgentMatrix();
+      });
+    });
+  }
+
+  // Type filter chips
+  const typeChips = document.querySelectorAll('.agent-matrix-filter-chips .chip');
+  typeChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      typeChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.agentMatrix.type = chip.dataset.type;
+      renderAgentMatrix();
+    });
+  });
+
+  // Search input
+  if (el.agentMatrixSearchInput) {
+    el.agentMatrixSearchInput.addEventListener('input', (e) => {
+      state.agentMatrix.search = e.target.value.trim().toLowerCase();
+      if (el.clearAgentMatrixSearchBtn) {
+        el.clearAgentMatrixSearchBtn.style.display = state.agentMatrix.search ? 'inline-flex' : 'none';
+      }
+      renderAgentMatrix();
+    });
+  }
+
+  if (el.clearAgentMatrixSearchBtn) {
+    el.clearAgentMatrixSearchBtn.addEventListener('click', () => {
+      state.agentMatrix.search = '';
+      if (el.agentMatrixSearchInput) el.agentMatrixSearchInput.value = '';
+      el.clearAgentMatrixSearchBtn.style.display = 'none';
+      renderAgentMatrix();
+    });
+  }
+}
+
+async function openAgentBrainModal(targetWorkspace) {
+  if (!el.agentMatrixModal) return;
+
+  const ws = targetWorkspace || state.drilledProject || state.filterWorkspace || null;
+  state.agentMatrix.targetWorkspace = ws;
+
+  if (el.agentMatrixWorkspaceSegment) {
+    if (ws) {
+      el.agentMatrixWorkspaceSegment.textContent = `📁 ${ws}`;
+      el.agentMatrixWorkspaceSegment.style.display = 'inline-block';
+    } else {
+      el.agentMatrixWorkspaceSegment.textContent = '📁 Workspace';
+      el.agentMatrixWorkspaceSegment.style.display = 'inline-block';
+    }
+  }
+
+  // If a workspace is specified, default to workspace or cascade scope
+  if (ws && state.agentMatrix.scope === 'global') {
+    state.agentMatrix.scope = 'workspace';
+    if (el.agentMatrixScopeControl) {
+      el.agentMatrixScopeControl.querySelectorAll('.segment-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.scope === 'workspace');
+      });
+    }
+  }
+
+  el.agentMatrixModal.classList.add('active');
+  if (el.agentMatrixContent) {
+    el.agentMatrixContent.innerHTML = '<div class="file-viewer-loading"><div class="loading-spinner"></div><span>Discovering agent rules, skills, and constitutions...</span></div>';
+  }
+
+  try {
+    const promises = [
+      fetch('/api/agent/context/global').then(r => r.json())
+    ];
+    if (ws) {
+      promises.push(fetch(`/api/agent/context/workspace?workspace=${encodeURIComponent(ws)}`).then(r => r.json()));
+    }
+
+    const [globalCtx, wsCtx] = await Promise.all(promises);
+    state.agentMatrix.globalContext = globalCtx;
+    state.agentMatrix.workspaceContext = wsCtx || null;
+
+    renderAgentMatrix();
+  } catch (err) {
+    console.error('Failed to load agent context:', err);
+    if (el.agentMatrixContent) {
+      el.agentMatrixContent.innerHTML = `<div class="file-viewer-error">Failed to discover agent context: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+}
+
+function closeAgentMatrixModal() {
+  if (el.agentMatrixModal) el.agentMatrixModal.classList.remove('active');
+}
+
+function renderAgentMatrix() {
+  if (!el.agentMatrixContent) return;
+
+  const { scope, type, search, globalContext, workspaceContext } = state.agentMatrix;
+  if (!globalContext) return;
+
+  let rules = [];
+  let skills = [];
+  let plugins = [];
+  let mcpServers = [];
+  let hooks = [];
+
+  if (scope === 'global' || !workspaceContext) {
+    rules = globalContext.rules || [];
+    skills = globalContext.skills || [];
+    plugins = globalContext.plugins || [];
+    mcpServers = globalContext.mcp_servers || [];
+    hooks = globalContext.hooks || [];
+  } else if (scope === 'workspace') {
+    rules = (workspaceContext.rules || []).filter(r => r.scope === 'workspace');
+    skills = (workspaceContext.skills || []).filter(s => s.scope === 'workspace');
+    plugins = [];
+    mcpServers = (workspaceContext.mcp_servers || []).filter(m => m.scope === 'workspace');
+    hooks = (workspaceContext.hooks || []).filter(h => h.scope === 'workspace');
+  } else {
+    // 'cascade': workspace overrides + inherited global items
+    rules = workspaceContext.rules || [];
+    skills = workspaceContext.skills || [];
+    plugins = globalContext.plugins || [];
+    mcpServers = workspaceContext.mcp_servers || globalContext.mcp_servers || [];
+    hooks = workspaceContext.hooks || globalContext.hooks || [];
+  }
+
+  // Update badge counts in toolbar
+  if (el.agentMatrixRulesCount) el.agentMatrixRulesCount.textContent = rules.length;
+  if (el.agentMatrixSkillsCount) el.agentMatrixSkillsCount.textContent = skills.length;
+  if (el.agentMatrixPluginsCount) el.agentMatrixPluginsCount.textContent = (plugins.length + mcpServers.length);
+  if (el.agentMatrixHooksCount) el.agentMatrixHooksCount.textContent = hooks.length;
+
+  // Filter items by type
+  let items = [];
+  if (type === 'ALL' || type === 'RULES') {
+    rules.forEach(r => items.push({ kind: 'rule', data: r }));
+  }
+  if (type === 'ALL' || type === 'SKILLS') {
+    skills.forEach(s => items.push({ kind: 'skill', data: s }));
+  }
+  if (type === 'ALL' || type === 'PLUGINS') {
+    plugins.forEach(p => items.push({ kind: 'plugin', data: p }));
+    mcpServers.forEach(m => items.push({ kind: 'mcp', data: m }));
+  }
+  if (type === 'ALL' || type === 'HOOKS') {
+    hooks.forEach(h => items.push({ kind: 'hook', data: h }));
+  }
+
+  // Filter by search query
+  if (search) {
+    items = items.filter(it => {
+      const d = it.data;
+      const textToSearch = [
+        d.name,
+        d.title,
+        d.description,
+        d.file_path || d.path || d.command,
+        d.provider,
+        d.priority,
+        d.trigger
+      ].filter(Boolean).join(' ').toLowerCase();
+      return textToSearch.includes(search);
+    });
+  }
+
+  if (el.agentMatrixTotalCountBadge) {
+    el.agentMatrixTotalCountBadge.textContent = `${items.length} item${items.length === 1 ? '' : 's'}`;
+  }
+
+  if (items.length === 0) {
+    el.agentMatrixContent.innerHTML = `
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
+        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🧠</div>
+        <p style="color: var(--text-muted);">No rules, skills, or instructions matching the active filter.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '<div class="agent-matrix-grid">';
+  items.forEach(it => {
+    if (it.kind === 'rule') {
+      const r = it.data;
+      const isConst = (r.priority || '').includes('Constitutional') || r.name.includes('constitution') || r.name.includes('101');
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">📜 ${escapeHtml(r.title || r.name)}</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                <span class="agent-card-scope-badge ${r.scope}">${r.scope}</span>
+                <span class="agent-card-priority-pill ${isConst ? 'constitutional' : ''}">${escapeHtml(r.priority || 'Standard')}</span>
+                ${r.trigger && r.trigger !== 'always_on' ? `<span class="agent-card-priority-pill" style="color: #67e8f9;">⚡ ${escapeHtml(r.trigger)}</span>` : ''}
+              </div>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase;">${escapeHtml(r.provider || 'antigravity')}</span>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(r.description || 'No summary description available.')}</p>
+          <div class="agent-card-meta">
+            <span>📏 ${r.line_count} lines</span>
+            <span>💾 ${Math.max(1, Math.round(r.size_bytes / 1024))} KB</span>
+            ${r.workspace ? `<span>📁 ${escapeHtml(r.workspace)}</span>` : ''}
+          </div>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(r.file_path)}">${escapeHtml(r.file_path)}</span>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(r.file_path)}" title="Open file in embedded File Viewer">📖 Inspect</button>
+              <button class="btn-icon copy-agent-path-btn" style="width: 26px; height: 26px; font-size: 0.75rem;" data-path="${escapeHtml(r.file_path)}" title="Copy Path">📋</button>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (it.kind === 'skill') {
+      const s = it.data;
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">⚡ ${escapeHtml(s.name)}</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                <span class="agent-card-scope-badge ${s.scope}">${s.scope}</span>
+                ${s.category ? `<span class="agent-card-priority-pill">${escapeHtml(s.category)}</span>` : ''}
+                ${s.plugin_name ? `<span class="agent-card-priority-pill" style="color: #facc15;">🧩 ${escapeHtml(s.plugin_name)}</span>` : ''}
+              </div>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase;">${escapeHtml(s.provider || 'antigravity')}</span>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(s.description || 'On-demand procedural runbook for agentic execution.')}</p>
+          <div class="agent-card-meta">
+            ${s.has_scripts ? '<span>🛠️ Scripts</span>' : ''}
+            ${s.has_examples ? '<span>💡 Examples</span>' : ''}
+            ${s.has_references ? '<span>📚 References</span>' : ''}
+            ${s.workspace ? `<span>📁 ${escapeHtml(s.workspace)}</span>` : ''}
+          </div>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(s.file_path)}">${escapeHtml(s.file_path)}</span>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(s.file_path)}" title="Open skill in embedded File Viewer">📖 Inspect</button>
+              <button class="btn-icon copy-agent-path-btn" style="width: 26px; height: 26px; font-size: 0.75rem;" data-path="${escapeHtml(s.file_path)}" title="Copy Path">📋</button>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (it.kind === 'plugin') {
+      const p = it.data;
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">🧩 ${escapeHtml(p.name)}</span>
+              <span class="agent-card-scope-badge plugin">PLUGIN</span>
+            </div>
+            <span style="font-size: 0.75rem; color: #a5b4fc;">v${escapeHtml(p.version || '1.0.0')}</span>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(p.description || 'Packaged agent customization bundle.')}</p>
+          <div class="agent-card-meta">
+            <span>⚡ ${(p.skills || []).length} skills</span>
+            <span>📋 ${(p.policies || []).length} policies</span>
+          </div>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(p.path)}">${escapeHtml(p.path)}</span>
+            <button class="btn-icon copy-agent-path-btn" style="width: 26px; height: 26px; font-size: 0.75rem;" data-path="${escapeHtml(p.path)}" title="Copy Path">📋</button>
+          </div>
+        </div>
+      `;
+    } else if (it.kind === 'mcp') {
+      const m = it.data;
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">🔌 ${escapeHtml(m.name)}</span>
+              <span class="agent-card-scope-badge ${m.scope}">MCP SERVER</span>
+            </div>
+          </div>
+          <p class="agent-card-desc" style="font-family: monospace; font-size: 0.78rem;">Command: ${escapeHtml(m.command || 'custom')}</p>
+          <div class="agent-card-meta">
+            <span>🔧 ${(m.args || []).join(' ')}</span>
+          </div>
+        </div>
+      `;
+    } else if (it.kind === 'hook') {
+      const h = it.data;
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">🪝 ${escapeHtml(h.name || h.event)}</span>
+              <span class="agent-card-scope-badge ${h.scope}">${escapeHtml(h.event)}</span>
+            </div>
+          </div>
+          <p class="agent-card-desc" style="font-family: monospace; font-size: 0.78rem;">Matcher: ${escapeHtml(h.matcher || 'all')}</p>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(h.command)}">${escapeHtml(h.command)}</span>
+            <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(h.command)}" title="Open hook in File Viewer">📖 Inspect</button>
+          </div>
+        </div>
+      `;
+    }
+  });
+  html += '</div>';
+
+  el.agentMatrixContent.innerHTML = html;
+
+  // Attach 1-click Inspect to openFileViewer
+  el.agentMatrixContent.querySelectorAll('.inspect-agent-file-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openFileViewer(btn.dataset.path);
+    };
+  });
+
+  // Attach Copy Path
+  el.agentMatrixContent.querySelectorAll('.copy-agent-path-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.path, 'Path copied to clipboard!');
+    };
+  });
+}
+
+// In-Session Agent Context Modal
+async function openSessionContextModal(sessionId) {
+  if (!el.sessionContextModal || !el.sessionContextContent) return;
+
+  if (el.sessionContextIdBadge) {
+    el.sessionContextIdBadge.textContent = sessionId;
+  }
+  el.sessionContextModal.classList.add('active');
+  el.sessionContextContent.innerHTML = '<div class="file-viewer-loading"><div class="loading-spinner"></div><span>Analyzing session rules, skills, and tools...</span></div>';
+
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}/context`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ctx = await res.json();
+    renderSessionContext(ctx);
+  } catch (err) {
+    console.error('Failed to load session context:', err);
+    el.sessionContextContent.innerHTML = `<div class="file-viewer-error">Error loading session context: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function closeSessionContextModal() {
+  if (el.sessionContextModal) el.sessionContextModal.classList.remove('active');
+}
+
+function renderSessionContext(ctx) {
+  if (!el.sessionContextContent) return;
+
+  const activeSkills = ctx.active_skills || [];
+  const availableSkills = ctx.available_skills || [];
+  const activeRules = ctx.active_rules || [];
+  const mcpServers = ctx.mcp_servers || [];
+  const subagents = ctx.subagents || [];
+  const slashCommands = ctx.slash_commands || [];
+
+  let html = `
+    <div class="session-context-summary-bar">
+      <div class="session-context-stat-box">
+        <div class="session-context-stat-num">${activeRules.length}</div>
+        <div class="session-context-stat-lbl">Active Rules</div>
+      </div>
+      <div class="session-context-stat-box" style="border-color: rgba(16, 185, 129, 0.4);">
+        <div class="session-context-stat-num" style="color: #34d399;">${activeSkills.length}</div>
+        <div class="session-context-stat-lbl">Skills Invoked</div>
+      </div>
+      <div class="session-context-stat-box">
+        <div class="session-context-stat-num">${availableSkills.length}</div>
+        <div class="session-context-stat-lbl">On-Demand Skills</div>
+      </div>
+      <div class="session-context-stat-box">
+        <div class="session-context-stat-num">${mcpServers.length + subagents.length}</div>
+        <div class="session-context-stat-lbl">Tools &amp; Subagents</div>
+      </div>
+    </div>
+  `;
+
+  // 1. Actively Invoked Skills
+  if (activeSkills.length > 0) {
+    html += `
+      <div class="session-context-section">
+        <div class="session-context-section-title">
+          <span>⚡ Actively Invoked Skills (${activeSkills.length})</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Triggered by tool calls during the session</span>
+        </div>
+        <div class="agent-matrix-grid">
+    `;
+    activeSkills.forEach(s => {
+      html += `
+        <div class="agent-card" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">⚡ ${escapeHtml(s.name)}</span>
+              <span class="session-invoked-skill-pill">⚡ Invoked ${s.invoked_count}x • Step ${s.first_step_idx}</span>
+            </div>
+            <span class="agent-card-scope-badge ${s.scope}">${s.scope}</span>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(s.description || 'Procedural skill runbook.')}</p>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(s.file_path)}">${escapeHtml(s.file_path)}</span>
+            <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(s.file_path)}" title="Open skill in File Viewer">📖 Inspect</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div></div>`;
+  }
+
+  // 2. Active Rules & Guidelines
+  if (activeRules.length > 0) {
+    html += `
+      <div class="session-context-section">
+        <div class="session-context-section-title">
+          <span>📜 Active Rules &amp; Guidelines (${activeRules.length})</span>
+        </div>
+        <div class="agent-matrix-grid">
+    `;
+    activeRules.forEach(r => {
+      const isConst = (r.priority || '').includes('Constitutional') || r.name.includes('constitution') || r.name.includes('101');
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">📜 ${escapeHtml(r.title || r.name)}</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center;">
+                <span class="agent-card-scope-badge ${r.scope}">${r.scope}</span>
+                <span class="agent-card-priority-pill ${isConst ? 'constitutional' : ''}">${escapeHtml(r.priority || 'Standard')}</span>
+              </div>
+            </div>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(r.description || 'Governing guideline for agent actions.')}</p>
+          <div class="agent-card-actions">
+            <span class="agent-card-path" title="${escapeHtml(r.file_path)}">${escapeHtml(r.file_path)}</span>
+            <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(r.file_path)}" title="Open rule in File Viewer">📖 Inspect</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div></div>`;
+  }
+
+  // 3. Available On-Demand Skills
+  if (availableSkills.length > 0) {
+    html += `
+      <div class="session-context-section">
+        <div class="session-context-section-title">
+          <span>💤 Available Skills (${availableSkills.length})</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Mounted in system prompt via progressive disclosure</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    `;
+    availableSkills.forEach(s => {
+      html += `
+        <div class="tool-file-pill inspect-agent-file-btn" style="cursor: pointer;" data-path="${escapeHtml(s.file_path)}" title="${escapeHtml(s.description)}">
+          <span>⚡ ${escapeHtml(s.name)}</span>
+        </div>
+      `;
+    });
+    html += `</div></div>`;
+  }
+
+  // 4. Subagents, MCP & Slash Commands
+  if (subagents.length > 0 || slashCommands.length > 0) {
+    html += `
+      <div class="session-context-section">
+        <div class="session-context-section-title">
+          <span>🤖 Subagents &amp; Commands</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem;">
+          ${subagents.map(sa => `<span class="chip" style="color: #a5b4fc;">🤖 ${escapeHtml(sa)}</span>`).join('')}
+          ${slashCommands.map(cmd => `<span class="chip" style="color: #67e8f9;">⚡ ${escapeHtml(cmd)}</span>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  el.sessionContextContent.innerHTML = html;
+
+  // Attach 1-click Inspect to openFileViewer
+  el.sessionContextContent.querySelectorAll('.inspect-agent-file-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openFileViewer(btn.dataset.path);
+    };
+  });
+}
+
 // Expose modal functions to window for testing, extensions, and automated verification
 window.openDiagramTheater = openDiagramTheater;
 window.closeDiagramTheater = closeDiagramTheater;
@@ -3608,4 +4186,9 @@ window.goToNextFindMatch = goToNextFindMatch;
 window.goToPrevFindMatch = goToPrevFindMatch;
 window.openSessionFilesModal = openSessionFilesModal;
 window.closeSessionFilesModal = closeSessionFilesModal;
+window.openAgentBrainModal = openAgentBrainModal;
+window.closeAgentMatrixModal = closeAgentMatrixModal;
+window.openSessionContextModal = openSessionContextModal;
+window.closeSessionContextModal = closeSessionContextModal;
+
 

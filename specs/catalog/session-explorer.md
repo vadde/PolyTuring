@@ -97,6 +97,7 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-036 | Universal Multi-Runtime Discovery & Provider Architecture (Antigravity IDE + CLI, Claude Code, GitHub Copilot) | Must | ✅ | 🧪 | src/types.go, src/scanner.go, src/main.go, src/api.go, src/web/ |
 | R-037 | Bounded Diagram Viewports & Fullscreen Theater Mode (constrained 440px scrollable canvas, distraction-free pan/zoom theater modal, double-click to expand) | Must | ✅ | 🧪 | src/web/src/styles.css, src/web/src/app.js, src/web/index.html |
 | R-038 | Native In-Browser File & Artifact Viewer (read files securely via GET /api/file, line number gutter, target line anchor scrolling/highlighting, markdown preview with KaTeX/Mermaid, session files aggregation drawer) | Must | ✅ | 🧪 | src/api.go HandleFile, src/web/src/app.js openFileViewer, src/web/index.html |
+| R-039 | Universal Agent Context & Behavioral Matrix: discover and inspect global, workspace, and session rules, skills, plugins, MCP servers, and hooks with precedence cascade and native file viewer inspection | Must | ✅ | 🧪 | context_scanner.go, api.go, context_test.go, src/web/ |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -341,6 +342,18 @@ Retrieves file content safely from local disk for the native in-browser file and
 - Limits file size to 10MB ceiling with HTTP 413 Payload Too Large.
 - Returns HTTP 400 for directories or missing path, and HTTP 404 for nonexistent files.
 
+#### `GET /api/agent/context/global`
+
+Discovers and returns machine-wide agent context (R-039), including global rules (`~/.gemini/config/rules/`), global skills (`~/.gemini/config/skills/`), builtin runbooks, plugins, MCP tool configurations, and lifecycle hooks.
+
+#### `GET /api/agent/context/workspace?workspace=<name|path>`
+
+Discovers workspace-specific agent guidelines (`.agents/rules/`, `AGENTS.md`, `CLAUDE.md`, `.cursorrules`), repo-local skills, hooks, and merges them with inherited global context with explicit scope tagging (`workspace` vs `global` vs `builtin`).
+
+#### `GET /api/sessions/{id}/context`
+
+Analyzes the active rules and guidelines governing a specific session, tracking which skills were **Actively Invoked** (with invocation counts and first step index) versus mounted on-demand via progressive disclosure.
+
 
 ### 3.3 Data Source Specification
 
@@ -467,6 +480,11 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-037 | Given a Markdown file in File Viewer, the preview container dynamically expands to 100% pane width, and mode toggling guarantees strict visual separation without raw content leakage | R-038 |
 | AC-038 | Given a syntax-highlighted code block with line number gutter, vertical scrolling is unified into a single scrollbar on the viewer body, eliminating nested double scrollbars | R-038 |
 | AC-039 | Given file references on the session trail, the UI renders a dual-action chip with an immediate 1-click copy path button (`📋` → `✓`) alongside the open-file pill, and viewer action buttons provide instant micro-feedback (`✓ Copied!`, `✓ Path Copied!`, `✓ Wrapped`) | R-038 |
+| AC-040 | Given the top header bar, user clicking `🧠 Agent Brain` opens the Agent Context Matrix modal displaying Global and Workspace rules, skills, plugins, MCP servers, and hooks with instant search and precedence badges | R-039 |
+| AC-041 | Given a workspace or repository filter, the engine computes the hierarchical cascade (Workspace rules overriding or extending Global rules, workspace skills augmenting global/builtin skills) | R-039 |
+| AC-042 | Given a session detail view, the sticky header renders an Agent Context button (`🧠 Agent Context (<count>)`); clicking opens a drawer showing active rules, invoked skills (with step counts), and on-demand skills | R-039 |
+| AC-043 | Given any rule or skill item, clicking `Inspect` opens its full content directly in the embedded Native File Viewer (R-038) with syntax highlighting, Markdown preview, and line numbers | R-039 |
+| AC-044 | Given multiple assistant ecosystems, the backend provider architecture abstracts rule and skill discovery across Antigravity, Claude Code, GitHub Copilot, and Cursor | R-039 |
 
 ---
 

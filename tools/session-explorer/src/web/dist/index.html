@@ -50,6 +50,9 @@
         <span class="last-sync-label" id="lastSyncLabel">Synced just now</span>
       </div>
 
+      <button class="btn-pill" id="agentBrainBtn" title="Agent Brain & Behavioral Matrix: Explore Global & Workspace Rules, Skills, and Instructions">
+        <span>🧠</span> Agent Brain
+      </button>
       <button class="btn-pill" id="installSkillBtn" title="Install Agent WIP Recovery Skill">
         <span>⚡</span> Install Skill
       </button>
@@ -171,6 +174,9 @@
 
           <!-- Relocated Export Actions and Artifacts in Top Section for Optimal Real Estate Usage -->
           <div class="detail-actions-group">
+            <button class="btn-pill" id="detailAgentContextBtn" title="Inspect active rules, invoked skills, and tools governing this session">
+              🧠 Agent Context (<span id="detailAgentContextCount">0</span>)
+            </button>
             <button class="btn-pill" id="detailFilesBtn" title="Inspect files and artifacts touched in this session">
               📁 Files &amp; Artifacts (<span id="detailFilesCountBadge">0</span>)
             </button>
@@ -442,6 +448,66 @@
           All artifacts generated, files modified, and documents inspected throughout this session. Click any file to open it natively in the browser.
         </p>
         <div id="sessionFilesListContainer">
+          <!-- Injected dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT BRAIN & CONTEXT MATRIX MODAL (R-039) -->
+  <div class="modal-overlay" id="agentMatrixModal" aria-label="Agent Brain & Context Matrix" role="dialog">
+    <div class="modal-box" style="max-width: 960px; max-height: 88vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem;">
+          <span>🧠</span>
+          <span>Agent Brain &amp; Behavioral Matrix</span>
+          <span class="badge" id="agentMatrixTotalCountBadge" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4); color: var(--accent-indigo); font-size: 0.78rem;">0 items</span>
+        </div>
+        <button class="btn-icon" id="closeAgentMatrixModalBtn" title="Close (Esc)">✕</button>
+      </div>
+      <div class="agent-matrix-toolbar">
+        <div class="segmented-control" id="agentMatrixScopeControl" role="group" aria-label="Agent Context Scope">
+          <button class="segment-btn active" data-scope="global">🌐 Global Machine</button>
+          <button class="segment-btn" data-scope="workspace" id="agentMatrixWorkspaceSegment">📁 Workspace</button>
+          <button class="segment-btn" data-scope="cascade">⚡ Precedence Cascade</button>
+        </div>
+        <div class="agent-matrix-search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="agentMatrixSearchInput" placeholder="Filter rules, skills, triggers, or runbooks..." autocomplete="off">
+          <button class="clear-search-btn" id="clearAgentMatrixSearchBtn" style="display: none;">✕</button>
+        </div>
+      </div>
+      <div class="agent-matrix-filter-chips">
+        <button class="chip active" data-type="ALL">All Items</button>
+        <button class="chip" data-type="RULES">📜 Rules &amp; Constitutions (<span id="agentMatrixRulesCount">0</span>)</button>
+        <button class="chip" data-type="SKILLS">⚡ Skills &amp; Runbooks (<span id="agentMatrixSkillsCount">0</span>)</button>
+        <button class="chip" data-type="PLUGINS">🔌 Plugins &amp; MCP (<span id="agentMatrixPluginsCount">0</span>)</button>
+        <button class="chip" data-type="HOOKS">🪝 Lifecycle Hooks (<span id="agentMatrixHooksCount">0</span>)</button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
+        <div id="agentMatrixContent">
+          <!-- Injected dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IN-SESSION AGENT CONTEXT DRAWER (R-039) -->
+  <div class="modal-overlay" id="sessionContextModal" aria-label="Session Agent Context" role="dialog">
+    <div class="modal-box" style="max-width: 900px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem;">
+          <span>🧠</span>
+          <span>Active Session Agent Context</span>
+          <span class="badge" id="sessionContextIdBadge" style="font-family: monospace; font-size: 0.78rem;"></span>
+        </div>
+        <button class="btn-icon" id="closeSessionContextModalBtn" title="Close (Esc)">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          The active rules, constitutions, invoked skills, and tool integrations that governed the agent's behavior during this session.
+        </p>
+        <div id="sessionContextContent">
           <!-- Injected dynamically by app.js -->
         </div>
       </div>

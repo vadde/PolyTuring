@@ -1056,6 +1056,48 @@
   - Prominent headings, crisp dividers, cyan H3 accents, and proportional paragraph rhythm verified.
   - Visual artifacts: `playwright_file_viewer_fullscreen.png` and `playwright_file_viewer_md.png`.
 
+---
+
+### 2026-10-30 — Feature: Universal Agent Context & Behavioral Matrix (R-039)
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Specification, Discovery Scanner, Dual-Sourcing, Visual Context UX & File Viewer Re-use)  
+**Duration**: ~45m
+
+#### Forensic Motivation & Requirements
+- **Holistic Behavioral Matrix Request**: Users needed visibility into the rules, skills, plugins, MCP servers, hooks, and system instructions governing the AI agent's behavior across multiple scopes (Global, Codebase/Workspace, and Session).
+- **Dual-Sourcing Invariant**: Transcripts often omit initial system prompt injections to save context tokens. Relying solely on transcripts yields false negatives, while relying solely on static filesystem discovery cannot tell whether an agent actively utilized a skill. We implemented a dual-sourcing architecture:
+  1. Static filesystem discovery scans configuration directories across assistants (Antigravity, Claude Code, Cursor, Copilot).
+  2. Dynamic transcript analysis inspects tool calls (`read_file`, `view_file`, `invoke_subagent`, MCP executions) to establish empirical invocation counts and step markers.
+
+#### Architectural Implementation
+1. **Data Models (`src/types.go`)**:
+   - `AgentContextScope` (`ScopeGlobal`, `ScopeWorkspace`, `ScopeSession`, `ScopeBuiltin`, `ScopePlugin`).
+   - `AgentRule`, `AgentSkill`, `AgentPlugin`, `MCPServerInfo`, `AgentHook`.
+   - `GlobalAgentContext`, `WorkspaceAgentContext`, `SessionAgentContext`.
+2. **Context Discovery Engine (`src/context_scanner.go`)**:
+   - `DiscoverGlobalAgentContext`: Scans `~/.gemini/config/rules/`, `~/.gemini/config/skills/`, `builtin/skills/`, `plugins/`, `mcp_config.json`, `hooks.json`, Claude Code rules (`~/.claude/rules/*.md`), and Cursor (`~/.cursorrules`).
+   - `DiscoverWorkspaceAgentContext`: Scans `.agents/rules/`, `.agents/skills/`, master docs (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `copilot-instructions.md`), repo-local hooks, and establishes scope cascade priority.
+   - `ExtractSessionAgentContext`: Scans session transcripts to track invoked vs available skills with execution counts, first step index, and active rules.
+3. **REST API Endpoints (`src/api.go`, `src/server.go`)**:
+   - `GET /api/agent/context/global` (`HandleGlobalAgentContext`).
+   - `GET /api/agent/context/workspace?workspace=<name|path>` (`HandleWorkspaceAgentContext`).
+   - `GET /api/sessions/:id/context` (`HandleSessionContext`).
+4. **Liquid-Glass UI/UX & Native File Viewer Integration (`src/web/`)**:
+   - Added `#agentBrainBtn` in top global header launching the comprehensive `#agentMatrixModal`.
+   - Added `#projectAgentContextBtn` in Project Hub hero banner for codebase-scoped rules and skills.
+   - Added `#detailAgentContextBtn` in sticky session header with active badge counters.
+   - Added `#sessionContextModal` drawer cleanly dividing **⚡ Actively Invoked Skills** (with tool execution counts and step jump links) from **💤 Available On-Demand Skills**.
+   - Deep reuse of Native In-Browser File Viewer (R-038): Every rule or skill card features a 1-click `📖 Inspect` action that seamlessly opens the document in the full-viewport reader with KaTeX math, Mermaid diagrams, and in-file find (`openFileViewer`).
+
+#### Verification & Quality Gates
+- **Unit Tests**: Added 4 test suites in `src/context_test.go` (`TestR039_DiscoverGlobalAgentContext`, `TestR039_DiscoverWorkspaceAgentContext_Cascade`, `TestR039_ExtractSessionAgentContext_SkillInvocations`, `TestR039_API_AgentContextEndpoints`).
+- Total test count expanded from 29 to 38 unit tests (`go test ./...` — 100% pass rate).
+- Bundled web assets via Bun (`make build` -> `dist/app.bundle.js`).
+- Rebuilt native Go binary (`bin/session-explorer`).
+- Playwright headless verification confirmed modal opening, 24 global context items, rule inspection in File Viewer, session drawer invocation breakdown (e.g. `dsa-docs-portal` 40x at step 154), and skill file inspection.
+- Living documentation updated across `specs/catalog/session-explorer.md`, `STATUS.md`, `CONTEXT.md`, and `CHANGELOG.md`.
+
 
 
 
