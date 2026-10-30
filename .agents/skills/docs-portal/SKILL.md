@@ -39,30 +39,41 @@ PolyTuring/
 
 The portal uses a **deep cosmic liquid-glass design system** supporting 4 distinct themes:
 
-### Color Palette Tokens
+### Color Palette Tokens & 4-Theme Token Matrix
 
-| Token | CSS Variable | Hex / RGBA Value | Purpose |
-|---|---|---|---|
-| **Canvas Deep Base** | `--bg-deep` | `#0b0f19` | Deep space background canvas |
-| **Card Surface** | `--bg-card` | `rgba(18, 26, 47, 0.55)` | Glassmorphism card background |
-| **Card Border** | `--bg-card-border` | `rgba(255, 255, 255, 0.08)` | Subtle translucent glass card edge |
-| **Hover Border** | `--bg-card-border-glow` | `rgba(0, 242, 254, 0.25)` | Interactive element border focus |
-| **Cyan Accent** | `--accent-cyan` | `#00f2fe` | Primary interactive focus, metrics, active items |
-| **Violet Accent** | `--accent-violet` | `#a855f7` | Diagram relational links, secondary badges |
-| **Emerald Accent** | `--accent-emerald` | `#10b981` | Passing SLA badges, Rust indicators, health |
-| **Amber Accent** | `--accent-amber` | `#f59e0b` | Cautionary callouts, architectural invariant warnings |
-| **Rose Accent** | `--accent-rose` | `#f43f5e` | SLA breaches, error indicators, fatal alerts |
-| **Primary Text** | `--text-main` | `#f1f5f9` | High-contrast body text and titles |
-| **Muted Text** | `--text-muted` | `#94a3b8` | Subtitles, parameter descriptions |
-| **Dim Text** | `--text-dim` | `#64748b` | Captions, footnotes, table metadata |
+| Token | CSS Variable | Liquid Glass | Fluent Aero Mica | Holo Cyberpunk | Matrix Obsidian | Purpose |
+|---|---|---|---|---|---|---|
+| **Canvas Space** | `--bg-space` | `#050813` | `#f6f4ee` | `#03020a` | `#000000` | Deep root page backdrop |
+| **Canvas Deep Base** | `--bg-deep` | `#050813` | `#f6f4ee` | `#03020a` | `#000000` | Deep canvas fill |
+| **Subtle Container** | `--bg-subtle` | `#0c1224` | `#eae6db` | `#0c0822` | `#031407` | Topbars, table headers, widget items |
+| **Surface Translucent**| `--bg-surface` | `rgba(15, 23, 42, 0.65)` | `rgba(255, 255, 255, 0.88)` | `rgba(15, 10, 35, 0.8)` | `rgba(4, 20, 10, 0.8)` | Floating panels, sidebars, header glass |
+| **Surface Hover** | `--bg-surface-hover` | `rgba(30, 41, 59, 0.75)` | `rgba(255, 255, 255, 0.98)` | `rgba(24, 16, 52, 0.92)`| `rgba(6, 30, 15, 0.92)` | Interactive item hover state |
+| **Card Surface** | `--bg-card` | `rgba(13, 20, 39, 0.65)` | `rgba(255, 255, 255, 0.82)` | `rgba(15, 10, 35, 0.78)`| `rgba(4, 20, 10, 0.78)` | Chapter sections, cards, widgets |
+| **Card Border** | `--bg-card-border` | `rgba(255, 255, 255, 0.08)` | `rgba(30, 41, 59, 0.12)` | `rgba(0, 240, 255, 0.25)` | `rgba(16, 185, 129, 0.26)`| Subtle glass card edge divider |
+| **Hover Border Glow** | `--bg-card-border-glow`| `rgba(0, 242, 254, 0.35)` | `rgba(2, 132, 199, 0.45)` | `#ff007f` | `#10b981` | Interactive element border focus |
+| **Cyan Accent** | `--accent-cyan` | `#00f2fe` | `#0284c7` | `#00f0ff` | `#34d399` | Primary focus, metrics, active indicators |
+| **Violet Accent** | `--accent-violet` | `#a855f7` | `#7c3aed` | `#ff007f` | `#059669` | Relational links, secondary badges |
+| **Emerald Accent** | `--accent-emerald` | `#10b981` | `#059669` | `#00ff88` | `#10b981` | Passing SLA badges, healthy statuses |
+| **Amber Accent** | `--accent-amber` | `#f59e0b` | `#d97706` | `#ffaa00` | `#f59e0b` | Cautionary callouts, invariant warnings |
+| **Rose Accent** | `--accent-rose` | `#f43f5e` | `#e11d48` | `#ff0055` | `#ef4444` | SLA breaches, fatal alerts |
+| **Primary Text** | `--text-main` | `#f1f5f9` | `#0f172a` | `#d8f4ff` | `#e6fced` | High-contrast body text and titles |
+| **Muted Text** | `--text-muted` | `#94a3b8` | `#475569` | `#9ac8dd` | `#86efac` | Subtitles, descriptions, captions |
+| **Dim Text** | `--text-dim` | `#64748b` | `#64748b` | `#628ea4` | `#4ade80` | Footnotes, metadata |
+| **Code Surface** | `--code-bg` | `rgba(6, 10, 20, 0.9)` | `#090e1a` | `rgba(7, 4, 22, 0.95)` | `rgba(2, 10, 4, 0.96)` | Sleek terminal background for syntax |
+| **Code Text** | `--code-text` | `#f1f5f9` | `#f1f5f9` | `#d8f4ff` | `#e6fced` | Syntax token foreground |
+| **Badge Background** | `--badge-bg` | `rgba(0, 242, 254, 0.12)` | `rgba(2, 132, 199, 0.1)` | `rgba(255, 170, 0, 0.14)`| `rgba(16, 185, 129, 0.15)`| Pill tags, category chips |
+| **Badge Text** | `--badge-text` | `#00f2fe` | `#0369a1` | `#ffaa00` | `#34d399` | Chip foreground label |
+| **Modal Glass** | `--modal-bg` | `rgba(8, 12, 22, 0.95)` | `rgba(255, 255, 255, 0.98)` | `rgba(10, 7, 24, 0.98)` | `rgba(2, 8, 4, 0.98)` | Fullscreen theater and search dialogs |
+| **Grid Lines** | `--grid-line` | `rgba(255, 255, 255, 0.02)`| `rgba(0, 0, 0, 0.04)` | `rgba(0, 240, 255, 0.03)`| `rgba(16, 185, 129, 0.03)`| Ambient background perspective mesh |
 
 ### Theme Invariants:
 1. **Liquid Glass (`[data-theme="liquid"]`)**: Default deep cosmic glass with vibrant cyan/violet edge glows.
 2. **Fluent Aero Mica (`[data-theme="mica"]`)**:
-   - **High-Contrast Code Blocks**: Code blocks MUST use dark text on bright frosted surface (`background: #ffffff; color: #0f172a !important;`). Never leave white-on-white text!
-   - **Crisp Paper Surfaces**: Frosted glass with subtle slate borders and deep navy accents (`--accent-cyan: #0284c7;`).
+   - **Zero Hardcoded Dark Styles**: NEVER hardcode `rgba(15, 23, 42, ...)` or `#fff` into component rules. Always inherit from `var(--...)`.
+   - **High-Contrast Terminal Code Blocks**: Code blocks maintain a sleek deep slate terminal surface (`#090e1a`) with crisp `#f1f5f9` text for razor-sharp syntax highlighting contrast.
+   - **Crisp Frosted Paper Surfaces**: Cards, sidebar, and headers use `rgba(255, 255, 255, 0.82)` with dark slate text (`#0f172a`), muted text (`#475569`), and subtle borders (`rgba(30, 41, 59, 0.12)`).
 3. **Holo Cyberpunk Neon (`[data-theme="holo"]`)**: High-saturation hot-pink (`#ff007f`) and electric cyan (`#00f0ff`) contrast grid.
-4. **Matrix Obsidian (`[data-theme="matrix"]`)**: Matte pure-black stealth palette with emerald accents (`#10b981`).
+4. **Matrix Obsidian (`[data-theme="matrix"]`)**: Matte pure-black stealth palette (`#000000`) with emerald accents (`#10b981`).
 
 ---
 
@@ -251,12 +262,27 @@ flowchart TB
 2. **Sub-Millisecond Zoom/Pan SLA**:
    - `.theater-surface` MUST specify `transition: none !important;` to eliminate pointer lag.
    - Panning uses `translate(${panX}px, ${panY}px) scale(${zoom})` for 1:1 pixel accuracy.
-3. **Clear UX Distinction: `100%` vs `Fit`**:
-   - `100%` (`#theater-zoom-reset`): Resets scale to **`1.0`** (true 1:1 native design scale).
-   - `Fit` (`#theater-zoom-fit`): Dynamically calculates exact scale based on live viewport boundaries and SVG `viewBox` (`calculateFitScale`).
-4. **SVG Text Selection**:
+3. **Unconstrained SVG ViewBox Dimensioning**:
+   - When cloning SVG into `#theater-surface`, extract `viewBox` width and height (`[minX, minY, vbW, vbH]`).
+   - Assign explicit unconstrained pixel dimensions:
+     ```javascript
+     cleanSvg.style.width = vbW + 'px';
+     cleanSvg.style.height = vbH + 'px';
+     cleanSvg.style.maxWidth = 'none';
+     cleanSvg.style.maxHeight = 'none';
+     ```
+   - **Why this is mandatory**: Global CSS rules apply `.mermaid svg { width: 100% !important; max-width: 100% !important; }` to fit diagrams within card containers. Without setting explicit pixel width on the cloned SVG, CSS forces the diagram to shrink to modal bounds, causing `scale(1.0)` and `Fit` to look identical! Explicit pixel dimensions unlock **true 1:1 crisp physical resolution** at 100%.
+4. **Clear UX Distinction: `100%` vs `Fit`**:
+   - `100%` (`#theater-zoom-reset`): Sets zoom scale to **`1.0`** (true native physical resolution). Panning allows exploring detailed clusters without pixel blur.
+   - `Fit` (`#theater-zoom-fit`): Dynamically calculates optimal fit scale `Math.min(availW / vbW, availH / vbH)` so the entire diagram fits cleanly inside the viewport margins with zero clipping.
+5. **Fluid Multiplicative Wheel Zoom**:
+   - Trackpad and mouse wheel zooming uses multiplicative scaling (`factor = e.deltaY < 0 ? 1.15 : 0.87`) clamped between `0.15` and `5.0`.
+6. **Scroll Position Grounding & Flash-Focus Animation**:
+   - Opening theater preserves `savedScrollY = window.scrollY || window.pageYOffset;`.
+   - Closing theater immediately restores `window.scrollTo({ top: savedScrollY, behavior: 'instant' })` and triggers `.flash-focus` on the source container to eliminate disorientation ("treasure hunt" bugs).
+7. **SVG Text Selection**:
    - `.theater-surface svg text, foreignObject, span` have `user-select: text !important; cursor: text;` so engineers can highlight and copy symbol names directly.
-5. **Safari WebKit Flex-SVG Sizing Invariant**:
+8. **Safari WebKit Flex-SVG Sizing Invariant**:
    ```css
    .mermaid svg {
      display: block !important;

@@ -879,22 +879,38 @@
     let activeTheaterPanX = 0;
     let activeTheaterPanY = 0;
     let lastActiveSourceCanvas = null;
+    let savedScrollY = 0;
 
     // Helper: calculate optimal viewport fit scale
     function calculateFitScale(svgEl) {
       if (!theaterViewport || !svgEl) return 1.0;
-      let vbW = 800, vbH = 600;
-      if (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width > 0) {
-        vbW = svgEl.viewBox.baseVal.width;
-        vbH = svgEl.viewBox.baseVal.height;
-      } else {
-        const rect = svgEl.getBoundingClientRect();
-        vbW = rect.width || 800;
-        vbH = rect.height || 600;
+      let vbW = 0, vbH = 0;
+      const vb = svgEl.getAttribute('viewBox');
+      if (vb) {
+        const parts = vb.trim().split(/[\s,]+/).map(Number);
+        if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
+          vbW = parts[2];
+          vbH = parts[3];
+        }
       }
+      if (!vbW || !vbH) {
+        if (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width > 0) {
+          vbW = svgEl.viewBox.baseVal.width;
+          vbH = svgEl.viewBox.baseVal.height;
+        } else {
+          const rect = svgEl.getBoundingClientRect();
+          vbW = rect.width || 800;
+          vbH = rect.height || 600;
+        }
+      }
+      vbW = vbW || 800;
+      vbH = vbH || 500;
       const availW = Math.max(300, (theaterViewport.clientWidth || window.innerWidth) - 64);
       const availH = Math.max(200, (theaterViewport.clientHeight || window.innerHeight) - 64);
-      return Math.min(2.5, Math.max(0.25, Math.min(availW / vbW, availH / vbH)));
+      const fitW = availW / vbW;
+      const fitH = availH / vbH;
+      const scale = Math.min(fitW, fitH);
+      return Math.max(0.15, Math.min(scale, 3.5));
     }
 
     function applyTheaterTransform() {
@@ -989,26 +1005,59 @@
 
       if (fullscreenBtn && theaterModal && theaterSurface) {
         fullscreenBtn.addEventListener('click', () => {
-          openTheater(titleTag, surface.innerHTML, canvas);
+          openTheater(titleTag, canvas);
         });
       }
     });
 
     // Theater Mode Opening & Lifecycle
-    function openTheater(title, innerContent, sourceCanvas) {
-      if (!theaterModal || !theaterSurface) return;
+    function openTheater(title, sourceCanvas) {
+      if (!theaterModal || !theaterSurface || !sourceCanvas) return;
+
+      // 1. Save scroll position precisely BEFORE opening
+      savedScrollY = window.scrollY || window.pageYOffset;
       lastActiveSourceCanvas = sourceCanvas;
 
       const titleText = theaterTitle?.querySelector('.theater-title-text');
       if (titleText) {
         titleText.innerText = title;
+      } else if (theaterTitle) {
+        theaterTitle.innerText = title;
       }
 
-      theaterSurface.innerHTML = innerContent;
-      activeTheaterPanX = 0;
-      activeTheaterPanY = 0;
+      theaterSurface.innerHTML = '';
 
-      // Use HTML5 dialog showModal if available, fallback to CSS class
+      // 2. Clone SVG with unconstrained viewBox pixel dimensions
+      let originalSvg = sourceCanvas.querySelector('.mermaid svg') || sourceCanvas.querySelector('svg');
+      if (originalSvg) {
+        const cleanSvg = originalSvg.cloneNode(true);
+        cleanSvg.removeAttribute('style');
+
+        let vbW = 0, vbH = 0;
+        const vb = cleanSvg.getAttribute('viewBox');
+        if (vb) {
+          const parts = vb.trim().split(/[\s,]+/).map(Number);
+          if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
+            vbW = parts[2];
+            vbH = parts[3];
+          }
+        }
+        if (vbW && vbH) {
+          cleanSvg.style.width = vbW + 'px';
+          cleanSvg.style.height = vbH + 'px';
+        } else {
+          cleanSvg.style.width = '100%';
+          cleanSvg.style.height = 'auto';
+        }
+        cleanSvg.style.maxWidth = 'none';
+        cleanSvg.style.maxHeight = 'none';
+        theaterSurface.appendChild(cleanSvg);
+      } else {
+        const surf = sourceCanvas.querySelector('.canvas-content-surface');
+        if (surf) theaterSurface.innerHTML = surf.innerHTML;
+      }
+
+      // 3. Open modal dialog
       if (typeof theaterModal.showModal === 'function') {
         try {
           theaterModal.showModal();
@@ -1022,13 +1071,11 @@
       document.body.classList.add('theater-open');
       document.body.style.overflow = 'hidden';
 
-      // Auto-fit SVG scale
-      const svg = theaterSurface.querySelector('svg');
-      if (svg) {
-        activeTheaterZoom = calculateFitScale(svg);
-      } else {
-        activeTheaterZoom = 1.0;
-      }
+      // 4. Auto-fit scale on open
+      const renderedSvg = theaterSurface.querySelector('svg');
+      activeTheaterZoom = calculateFitScale(renderedSvg);
+      activeTheaterPanX = 0;
+      activeTheaterPanY = 0;
       applyTheaterTransform();
 
       HapticAudio.theaterOpen();
@@ -1049,13 +1096,22 @@
 
       document.body.classList.remove('theater-open');
       document.body.style.overflow = '';
+      if (theaterSurface) theaterSurface.innerHTML = '';
 
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
 
+      // Restore user's exact scroll position instantly (zero jump / lost context)
+      window.scrollTo({ top: savedScrollY, behavior: 'instant' });
+
+      // Highlight source container with flash-focus glow
       if (lastActiveSourceCanvas) {
-        pulseElement(lastActiveSourceCanvas);
+        const container = lastActiveSourceCanvas;
+        requestAnimationFrame(() => {
+          container.classList.add('flash-focus');
+          setTimeout(() => container?.classList.remove('flash-focus'), 1800);
+        });
       }
 
       HapticAudio.sidebarClose();
@@ -1148,8 +1204,8 @@
 
       theaterViewport.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const delta = e.deltaY < 0 ? 0.12 : -0.12;
-        activeTheaterZoom = Math.min(4.0, Math.max(0.25, activeTheaterZoom + delta));
+        const factor = e.deltaY < 0 ? 1.15 : 0.87;
+        activeTheaterZoom = Math.max(0.15, Math.min(5.0, Number((activeTheaterZoom * factor).toFixed(2))));
         applyTheaterTransform();
       }, { passive: false });
     }

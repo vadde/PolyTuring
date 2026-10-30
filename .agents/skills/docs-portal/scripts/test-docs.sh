@@ -140,21 +140,31 @@ fi
 echo "   ✅ Pure Web Audio API haptic feedback engine verified."
 
 # 9. Verify Multi-Theme Engine
-echo "→ 9. Auditing Multi-Theme Engine..."
+echo "→ 9. Auditing Multi-Theme Engine & Harmonic Token Contracts..."
 for theme in liquid mica holo matrix; do
   if ! grep -q "data-theme=\"${theme}\"" "${SITE_DIR}/style.css"; then
     echo "❌ Missing ${theme} theme definition in style.css"
     exit 1
   fi
 done
+for token in "--bg-subtle" "--code-text" "--badge-bg" "--badge-text" "--modal-bg" "--input-bg" "--scrollbar-thumb" "--grid-line"; do
+  if ! grep -q -- "${token}" "${SITE_DIR}/style.css"; then
+    echo "❌ Missing token ${token} in style.css"
+    exit 1
+  fi
+done
+if grep -q "background:\s*rgba(11,\s*16,\s*28,\s*0\.4)" "${SITE_DIR}/style.css"; then
+  echo "❌ Found hardcoded dark chapter-section background in style.css! Must use var(--bg-card)."
+  exit 1
+fi
 if ! grep -q 'polyturing_theme' "${SITE_DIR}/app.js"; then
   echo "❌ Missing polyturing_theme persistence in app.js"
   exit 1
 fi
-echo "   ✅ 4-Theme engine verified (Liquid, Mica, Holo, Matrix)."
+echo "   ✅ 4-Theme engine & token contracts verified (Liquid, Mica, Holo, Matrix)."
 
 # 10. Verify Fullscreen Visual Theater Modal
-echo "→ 10. Auditing Fullscreen Theater Modal Workbench..."
+echo "→ 10. Auditing Fullscreen Theater Modal Workbench & Fit/100% Invariants..."
 if ! grep -q 'id="theater-modal"' "${SITE_DIR}/index.html"; then
   echo "❌ Missing #theater-modal in index.html"
   exit 1
@@ -167,7 +177,15 @@ if ! grep -q 'calculateFitScale' "${SITE_DIR}/app.js"; then
   echo "❌ Missing calculateFitScale function in app.js"
   exit 1
 fi
-echo "   ✅ Fullscreen theater workbench with dynamic fit verified."
+if ! grep -q 'cleanSvg.style.width\s*=\s*vbW\s*+\s*.px.' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing explicit unconstrained viewBox pixel sizing on cloned SVG in app.js"
+  exit 1
+fi
+if ! grep -q 'savedScrollY' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing savedScrollY scroll position preservation in app.js"
+  exit 1
+fi
+echo "   ✅ Fullscreen theater workbench with dynamic fit & 100% native scale verified."
 
 # 11. Verify Clean Canvas Architecture, Ambient Reading Progress & Back-to-Top FAB
 echo "→ 11. Auditing Clean Canvas Architecture, Ambient Progress & Back-to-Top FAB..."
