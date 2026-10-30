@@ -169,25 +169,41 @@ if ! grep -q 'calculateFitScale' "${SITE_DIR}/app.js"; then
 fi
 echo "   ✅ Fullscreen theater workbench with dynamic fit verified."
 
-# 11. Verify Right-Side TOC Alignment & Reading Progress HUD
-echo "→ 11. Auditing Right-Side TOC Alignment & HUD..."
-if ! grep -q 'id="toc-sidebar"' "${SITE_DIR}/index.html"; then
-  echo "❌ Missing #toc-sidebar element in index.html"
+# 11. Verify Clean Canvas Architecture, Ambient Reading Progress & Back-to-Top FAB
+echo "→ 11. Auditing Clean Canvas Architecture, Ambient Progress & Back-to-Top FAB..."
+if grep -q 'id="toc-sidebar"' "${SITE_DIR}/index.html"; then
+  echo "❌ Found redundant #toc-sidebar! PolyTuring clean canvas architecture mandates single-source-of-truth navigation in left sidebar."
   exit 1
 fi
-if ! grep -q 'id="toc-reading-progress"' "${SITE_DIR}/index.html"; then
-  echo "❌ Missing #toc-reading-progress HUD in index.html"
+if ! grep -q 'id="global-reading-progress"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #global-reading-progress in header of index.html"
   exit 1
 fi
-if ! grep -q 'id="toc-progress-indicator"' "${SITE_DIR}/index.html"; then
-  echo "❌ Missing #toc-progress-indicator bar in index.html"
+if ! grep -q 'id="back-to-top-fab"' "${SITE_DIR}/index.html"; then
+  echo "❌ Missing #back-to-top-fab floating button in index.html"
+  exit 1
+fi
+if ! grep -q '\.global-reading-progress' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing .global-reading-progress in style.css"
+  exit 1
+fi
+if ! grep -q '\.back-to-top-fab' "${SITE_DIR}/style.css"; then
+  echo "❌ Missing .back-to-top-fab in style.css"
+  exit 1
+fi
+if ! grep -q 'globalProgressBar' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing globalProgressBar handler in app.js"
+  exit 1
+fi
+if ! grep -q 'backToTopFab' "${SITE_DIR}/app.js"; then
+  echo "❌ Missing backToTopFab handler in app.js"
   exit 1
 fi
 if ! grep -q 'href="#sec-sdd-governance"' "${SITE_DIR}/index.html"; then
-  echo "❌ Missing sec-sdd-governance in TOC index.html"
+  echo "❌ Missing sec-sdd-governance in Left Navigation tree of index.html"
   exit 1
 fi
-echo "   ✅ Right-side TOC alignment and reading progress HUD verified."
+echo "   ✅ Clean canvas architecture, ambient reading progress rail & Back-to-Top FAB verified."
 
 # 12. Verify Year 2500 Mobile Navigation Drawer & Anti-Clobbering Invariants
 echo "→ 12. Auditing Mobile Navigation Drawer & Anti-Clobbering invariants..."

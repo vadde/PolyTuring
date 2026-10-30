@@ -1,7 +1,7 @@
 ---
 name: docs-portal
 description: >-
-  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers Year 2500 cosmic liquid-glass design system, 4-theme engine (Liquid Glass, Fluent Aero Mica, Holo Cyberpunk, Matrix Obsidian), Haptic Web Audio feedback micro-transients, interactive draggable sidebar resizer and collapsible rail (⌘B / [), live sidebar search filter, commute gadget mobile drawer, zero-truncation titles, touch-overflow containment, 1:1 ScrollSpy and right-side TOC reading progress HUD, Mermaid SVG layout rules, fullscreen visual theater workbench with dynamic viewport fit and SVG text selection, KaTeX math typesetting, interactive simulators, and the 14-gate automated headless audit suite.
+  Authoritative engineering guide and automated testing protocol for the PolyTuring Living Documentation Portal. Covers Year 2500 cosmic liquid-glass design system, 4-theme engine (Liquid Glass, Fluent Aero Mica, Holo Cyberpunk, Matrix Obsidian), Haptic Web Audio feedback micro-transients, interactive draggable sidebar resizer and collapsible rail (⌘B / [), live sidebar search filter, clean-canvas single-source-of-truth navigation architecture, ambient top reading progress rail, floating glassmorphic Back-to-Top FAB, commute gadget mobile drawer, zero-truncation titles, touch-overflow containment, Mermaid SVG layout rules, fullscreen visual theater workbench with dynamic viewport fit and SVG text selection, KaTeX math typesetting, interactive simulators, and the 14-gate automated headless audit suite.
 ---
 
 # 📚 Living Documentation Portal Engineering Skill
@@ -21,7 +21,7 @@ PolyTuring/
 ├── Makefile                               # Canonical DevEx commands (docs-test, docs-serve, docs-build)
 ├── docs/site/
 │   ├── index.html                         # Semantic HTML5 layout, chapter disclosure trees, widgets, mobile drawer
-│   ├── style.css                          # Liquid glass tokens, 4-theme engine, resizer, collapsible rail, TOC HUD
+│   ├── style.css                          # Liquid glass tokens, 4-theme engine, resizer, collapsible rail, clean canvas
 │   └── app.js                             # Haptic audio, ScrollSpy, sidebar filter, collapsible rail, theater mode
 ├── scripts/
 │   └── build-docs.sh                      # Static bundle packaging script (outputs to _site/)
@@ -142,48 +142,44 @@ Fixed-width sidebars degrade user experience by clipping titles on ultra-wide sc
 
 ---
 
-## 📑 Right-Side "On This Page" TOC HUD & 1:1 Synchrony Invariant
+## 📐 Clean Canvas Architecture, Ambient Reading Progress & Back-to-Top FAB
 
-The right-side Table of Contents provides an interactive, live-updating outline that strictly mirrors the main content:
+PolyTuring enforces a **Single Source of Navigation Truth** in the Left Navigation tree, deliberately eliminating redundant right-side TOC sidebars to maximize the reading stage:
 
 ```html
-<aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of Contents">
-  <div class="toc-header-hud">
-    <div class="toc-header-title-wrap">
-      <span class="toc-header-icon">📑</span>
-      <span class="toc-title">On This Page</span>
-    </div>
-    <div class="toc-header-actions">
-      <span class="toc-reading-progress" id="toc-reading-progress">0%</span>
-      <button class="toc-jump-top-btn" id="toc-jump-top" title="Back to Top (Home)">⌃</button>
-    </div>
+<!-- Ambient Top Reading Progress Bar (Pinned to Sticky Header) -->
+<header class="header-glass">
+  ...
+  <div class="global-reading-progress-track">
+    <div class="global-reading-progress" id="global-reading-progress"></div>
   </div>
-  <div class="toc-progress-track">
-    <div class="toc-progress-indicator" id="toc-progress-indicator"></div>
-  </div>
-  <nav class="toc-nav" id="toc-nav">
-    <div class="toc-chapter-group" data-chapter="ch0">
-      <div class="toc-chapter-heading">00 · Manifesto</div>
-      <ul class="toc-list">
-        <li class="toc-item"><a href="#ch0-manifesto" class="toc-link active"><span class="toc-bullet"></span>Platform Manifesto</a></li>
-        ...
-      </ul>
-    </div>
-    ...
-  </nav>
-</aside>
+</header>
+
+<!-- Floating Glassmorphic Back-to-Top FAB (Pinned to Bottom-Right) -->
+<button class="back-to-top-fab" id="back-to-top-fab" aria-label="Back to Top" title="Back to Top (Home)">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+</button>
 ```
 
-### Operational Invariants for TOC:
-1. **1:1 Exact Heading Alignment**: Every TOC label must 100% align with the corresponding section header in `<main>` (e.g. `sec-sdd-governance` must never be omitted or mislabeled).
-2. **Dynamic Reading Progress**: HUD `#toc-reading-progress` and `#toc-progress-indicator` track document scroll depth in real time (`0%` to `100%`).
-3. **Bi-Directional Synchrony**:
-   - ScrollSpy tracks **ALL** unique target anchors referenced across Left Nav and Right TOC.
-   - Highlights the active section with `.active` and lights up the parent chapter with `.active-chapter`.
-   - Never mutates open/collapsed state during passive scrolling.
-4. **Smooth Anchor Interception**:
-   - Clicking any TOC or Left Nav link intercepts native jump, automatically uncollapses parent chapter in `<main>`, scrolls with an 80px cushion below the sticky header, applies a 1.8s `.flash-focus` neon glow, and triggers `HapticAudio.tap()`.
-5. **Back to Top Action**: `#toc-jump-top` smoothly scrolls to top and triggers `HapticAudio.collapse()`.
+### Operational Invariants for Canvas & Reading HUD:
+1. **Zero Redundant Sidebars**: Never add secondary right-side TOC panes that duplicate the Left Navigation. In a dense single-page architecture, dual sidebars compress the central reading canvas on laptops from `1120px` down to `840px`, squeezing Mermaid diagrams and comparison tables.
+2. **Ambient Header Reading Progress Bar**:
+   - Pinned directly to the bottom edge of `.header-glass` (`position: absolute; bottom: 0; left: 0; width: 100%; height: 2.5px;`).
+   - Linear gradient fill from `--accent-cyan` to `--accent-violet` tracking scroll progress `(window.scrollY / totalScrollable) * 100%`.
+   - Consumes **0 pixels** of lateral reading width.
+3. **Floating Glassmorphic Back-to-Top FAB**:
+   - Pinned at `bottom: 32px; right: 32px;` with frosted glass backdrop (`rgba(13, 20, 39, 0.75)`, blur `16px`).
+   - Automatically transitions to `.visible` (`opacity: 1; transform: translateY(0);`) when `window.scrollY > 300px`.
+   - Smoothly scrolls to top on click and triggers `HapticAudio.play('tap')`.
+4. **Dynamic Left Nav ScrollSpy**:
+   - ScrollSpy monitors all anchor targets referenced in `.nav-tree-link`.
+   - As the user reads through the document, the corresponding tree group automatically expands (`.expanded`), the active chapter header glows with `.active-branch`, and the active link receives `.active`.
+   - The active tree group gently scrolls into view within the sidebar (`scrollIntoView({ block: 'nearest', behavior: 'smooth' })`).
+5. **Fluid Content Stage**:
+   - `.content-area` expands to `max-width: 1400px; margin: 0 auto; width: 100%;`.
+   - When the sidebar is collapsed (`body.sidebar-collapsed`), `.content-area` receives `padding-left: 68px; padding-right: 68px;` providing an expansive, distraction-free reading sanctuary.
 
 ---
 
@@ -297,8 +293,60 @@ Interactive code containers feature frosted glass headers, semantic language pil
 </div>
 ```
 
-- Clicking Copy copies code text, animates the button to `✓ Copied!`, and triggers `HapticAudio.copySuccess()`.
+- Clicking Copy copies code text, animates the button to `✓ Copied!`, and triggers `HapticAudio.play('copySuccess')`.
 - Aero Mica theme enforces high-contrast dark text (`#0f172a`) on bright frosted card surfaces.
+
+---
+
+## 🛡️ Future Static Page Design & Anti-Conflict Architectural Protocol
+
+To avoid layout regressions, broken CSS inheritance, or conflicting sidebars in future edits, follow these non-negotiable architectural invariants:
+
+### 1. The Single Navigation Hierarchy Invariant
+- **Rule**: Never construct secondary right-side navigation sidebars. The Left Navigation tree is the single source of truth for the entire page.
+- **Why**: Multi-page frameworks (Docusaurus) need in-page right TOCs because the left sidebar navigates between separate HTML documents. In PolyTuring, the portal is a monolithic single-page reference deck; duplicate TOCs halve the available reading width.
+
+### 2. The DOM Layering & Stacking Invariant
+All elements MUST follow this deterministic DOM order:
+```html
+<body>
+  <!-- Layer 1: Global Sticky Glass Header (z-index: 1000) -->
+  <header class="header-glass">
+    ...
+    <div class="global-reading-progress-track">
+      <div class="global-reading-progress" id="global-reading-progress"></div>
+    </div>
+  </header>
+
+  <!-- Layer 2: Modals & Fullscreen Workbenches (Top Layer Dialog / z-index: 2000) -->
+  <div class="search-modal" id="search-modal">...</div>
+  <dialog id="theater-modal" class="theater-modal">...</dialog>
+
+  <!-- Layer 3: Main Layout Container (z-index: 10) -->
+  <div class="layout-container">
+    <button class="floating-sidebar-toggle" id="floating-sidebar-toggle">...</button>
+    <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop"></div>
+    <aside class="sidebar" id="main-sidebar">...</aside>
+    <div class="sidebar-resizer" id="sidebar-resizer"></div>
+    <main class="content-area">...</main>
+  </div>
+
+  <!-- Layer 4: Floating Action Controls (z-index: 999) -->
+  <button class="back-to-top-fab" id="back-to-top-fab">...</button>
+
+  <script src="app.js"></script>
+</body>
+```
+
+### 3. The Responsive Containment Invariants
+- **Overflow Safe Guard**: Always use `overflow-x: clip;` on `html, body, .layout-container`. Never use `overflow-x: hidden;` (breaks `position: sticky` in WebKit).
+- **Table Isolation**: Never render a `<table>` directly in `.content-area`. Always wrap in `<div class="table-wrapper"><table>...</table></div>`.
+- **Diagram Isolation**: Never render raw `<pre class="mermaid">` directly in content flow without `.canvas-container > .canvas-viewport > .canvas-content-surface`.
+- **Math Overflow**: Always verify KaTeX block formulas render within `.katex-display` which has `overflow-x: auto; max-width: 100%;`.
+
+### 4. The Audio Synthesis Invariant
+- Never load `.mp3` or `.wav` sound files. All acoustic feedback must use `HapticAudio` synthesized via Web Audio oscillators.
+- Always check `STATE.isBatchExpanding` during bulk operations to prevent acoustic clipping.
 
 ---
 
@@ -317,7 +365,7 @@ make docs-test
 ### The 14 Automated Verification Gates:
 1. **Core Asset Presence**: Verifies `index.html`, `style.css`, and `app.js`.
 2. **Mermaid Syntax Auditing**: Detects unescaped `<` or `>` characters in node labels.
-3. **SVG Sizing Invariants**: Validates that CSS does not contain collapsing `width: auto !important` on `.mermaid svg`.
+3. **SVG Sizing Invariants**: Validates responsive `width: 100% !important;` and no 0px collapsing.
 4. **KaTeX Integration**: Verifies stylesheet, scripts, and auto-render calls.
 5. **Draggable Sidebar Resizer Invariants**: Audits `#sidebar-resizer`, `col-resize`, `initSidebarResizer`, and `localStorage` key.
 6. **Sidebar Collapsible Rail**: Audits `#floating-sidebar-toggle`, `#sidebar-close-btn`, `body.sidebar-collapsed`, and `⌘B` shortcuts.
@@ -325,7 +373,7 @@ make docs-test
 8. **Haptic Web Audio Feedback System**: Audits `HapticAudio`, `#audio-toggle-btn`, and `copySuccess` celebration chime.
 9. **Multi-Theme Engine**: Audits `data-theme` support across `liquid`, `mica`, `holo`, `matrix`.
 10. **Fullscreen Visual Theater Workbench**: Audits `#theater-modal`, `#theater-zoom-fit`, and `calculateFitScale`.
-11. **Right-Side TOC Alignment & HUD**: Audits `#toc-sidebar`, `#toc-reading-progress`, `#toc-progress-indicator`, and `sec-sdd-governance`.
+11. **Clean Canvas Architecture, Ambient Reading Progress & Back-to-Top FAB**: Audits `#global-reading-progress`, `#back-to-top-fab`, ensures `#toc-sidebar` is absent, and verifies `sec-sdd-governance` in Left Nav.
 12. **Year 2500 Mobile Navigation Drawer & Anti-Clobbering**: Audits `#mobile-nav-toggle`, `#mobile-drawer-backdrop`, and sticky-safe `overflow-x: clip`.
 13. **Table & Math Touch Overflow Containment**: Ensures all `<table>` tags are inside `.table-wrapper`, min-width is specified, and `.katex-display` has `overflow-x: auto`.
 14. **Static Bundle Packaging & Output Integrity**: Compiles to `_site/` and checks size/file counts.
@@ -357,24 +405,10 @@ When documenting a new tool (e.g. `Chapter 05 · New Tool`):
    </div>
    ```
 
-2. **Update Right TOC (`docs/site/index.html`)**:
-   Add a matching `.toc-chapter-group`:
-   ```html
-   <div class="toc-chapter-group" data-chapter="ch5">
-     <div class="toc-chapter-heading">05 · New Tool</div>
-     <ul class="toc-list">
-       <li class="toc-item"><a href="#ch5-new-tool" class="toc-link"><span class="toc-bullet"></span>System Overview</a></li>
-       <li class="toc-item"><a href="#sec-new-arch" class="toc-link"><span class="toc-bullet"></span>Architecture Topology</a></li>
-       <li class="toc-item"><a href="#sec-new-theory" class="toc-link"><span class="toc-bullet"></span>Theoretical Foundations</a></li>
-       <li class="toc-item"><a href="#sec-new-usage" class="toc-link"><span class="toc-bullet"></span>Usage &amp; Quickstart</a></li>
-     </ul>
-   </div>
-   ```
-
-3. **Add Chapter Section (`docs/site/index.html`)**:
+2. **Add Chapter Section in `<main class="content-area">` (`docs/site/index.html`)**:
    Enclose all comparison tables in `<div class="table-wrapper">`, KaTeX in `$$ ... $$`, and diagrams in `.canvas-container`.
 
-4. **Verify and Deploy**:
+3. **Verify and Deploy**:
    ```bash
    make docs-test
    git commit -am "feat(docs): add Chapter 05 documentation"

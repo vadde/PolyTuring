@@ -1166,19 +1166,18 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 13. 1:1 SCROLLSPY & REVAMPED RIGHT-SIDE TOC ENGINE
+  // 13. DYNAMIC SCROLLSPY, AMBIENT PROGRESS & BACK-TO-TOP FAB ENGINE
   // ---------------------------------------------------------------------------
   function initScrollSpy() {
     const navTreeLinks = Array.from(document.querySelectorAll('.nav-tree-link'));
-    const tocLinks = Array.from(document.querySelectorAll('.toc-link'));
+    const navTreeGroups = Array.from(document.querySelectorAll('.nav-tree-group'));
     const treeHeaders = Array.from(document.querySelectorAll('.nav-tree-header'));
-    const tocProgressText = document.getElementById('toc-reading-progress');
-    const tocProgressBar = document.getElementById('toc-progress-indicator');
-    const tocJumpTop = document.getElementById('toc-jump-top');
+    const globalProgressBar = document.getElementById('global-reading-progress');
+    const backToTopFab = document.getElementById('back-to-top-fab');
 
-    // Collect all unique targets referenced in either left nav or right TOC
+    // Collect all unique targets referenced in left nav
     const targetMap = new Map();
-    [...navTreeLinks, ...tocLinks].forEach(link => {
+    navTreeLinks.forEach(link => {
       const href = link.getAttribute('href');
       if (href && href.startsWith('#')) {
         const el = document.querySelector(href);
@@ -1189,6 +1188,7 @@
     const trackedItems = Array.from(targetMap.entries()).map(([id, element]) => ({ id, element }));
 
     let isTicking = false;
+    let currentActiveId = null;
 
     window.addEventListener('scroll', () => {
       if (STATE.isNavClicking) return;
@@ -1202,12 +1202,20 @@
     }, { passive: true });
 
     function updateActiveNav() {
-      // 1. Update reading progress in right HUD
+      // 1. Update ambient reading progress bar
       const totalScrollable = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalScrollable > 0) {
+      if (totalScrollable > 0 && globalProgressBar) {
         const pct = Math.min(100, Math.max(0, Math.round((window.scrollY / totalScrollable) * 100)));
-        if (tocProgressText) tocProgressText.innerText = `${pct}%`;
-        if (tocProgressBar) tocProgressBar.style.width = `${pct}%`;
+        globalProgressBar.style.width = `${pct}%`;
+      }
+
+      // 2. Manage Floating Back-to-Top FAB visibility
+      if (backToTopFab) {
+        if (window.scrollY > 300) {
+          backToTopFab.classList.add('visible');
+        } else {
+          backToTopFab.classList.remove('visible');
+        }
       }
 
       const scrollPos = window.scrollY + 120; // Header offset
@@ -1234,18 +1242,22 @@
         }
       }
 
-      if (activeId) {
+      if (activeId && activeId !== currentActiveId) {
+        currentActiveId = activeId;
         applyActiveNavId(activeId);
       }
     }
 
     function applyActiveNavId(id) {
+      let matchedGroup = null;
+
       // 1. Left Navigation Active Classes
       navTreeLinks.forEach(link => {
         if (link.getAttribute('href') === `#${id}`) {
           link.classList.add('active');
           const parentGroup = link.closest('.nav-tree-group');
           if (parentGroup) {
+            matchedGroup = parentGroup;
             treeHeaders.forEach(h => h.classList.remove('active-branch'));
             parentGroup.querySelector('.nav-tree-header')?.classList.add('active-branch');
           }
@@ -1254,56 +1266,18 @@
         }
       });
 
-      // 2. Right TOC Active Classes & Chapter Highlighting
-      document.querySelectorAll('.toc-chapter-group').forEach(grp => grp.classList.remove('active-chapter'));
-
-      tocLinks.forEach(link => {
-        if (link.getAttribute('href') === `#${id}`) {
-          link.classList.add('active');
-          const parentGroup = link.closest('.toc-chapter-group');
-          if (parentGroup) {
-            parentGroup.classList.add('active-chapter');
-          }
-        } else {
-          link.classList.remove('active');
-        }
-      });
+      // 2. Auto-expand active group in sidebar if collapsed & not in batch operation
+      if (matchedGroup && !matchedGroup.classList.contains('expanded') && !STATE.isBatchExpanding && !STATE.isNavClicking) {
+        matchedGroup.classList.add('expanded');
+        matchedGroup.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
     }
 
-    // Right TOC link click interception
-    tocLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        const href = link.getAttribute('href');
-        if (href && href.startsWith('#')) {
-          e.preventDefault();
-          const targetEl = document.querySelector(href);
-          if (targetEl) {
-            ensureSectionExpanded(targetEl);
-            const id = href.slice(1);
-            applyActiveNavId(id);
-
-            const y = targetEl.getBoundingClientRect().top + window.pageYOffset - 80;
-            window.scrollTo({ top: y, behavior: 'smooth' });
-
-            pulseElement(targetEl);
-            HapticAudio.tap();
-
-            STATE.isNavClicking = true;
-            setTimeout(() => { STATE.isNavClicking = false; }, 850);
-
-            if (history.pushState) {
-              history.pushState(null, null, href);
-            }
-          }
-        }
-      });
-    });
-
-    // Back to top HUD action
-    if (tocJumpTop) {
-      tocJumpTop.addEventListener('click', () => {
+    // Back to top FAB action
+    if (backToTopFab) {
+      backToTopFab.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        HapticAudio.collapse();
+        HapticAudio.play('tap');
       });
     }
 

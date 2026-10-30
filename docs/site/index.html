@@ -76,6 +76,11 @@
         <span>GitHub</span>
       </a>
     </div>
+
+    <!-- Global Ambient Reading Progress Bar -->
+    <div class="global-reading-progress-track">
+      <div class="global-reading-progress" id="global-reading-progress"></div>
+    </div>
   </header>
 
   <!-- Global Search Modal -->
@@ -1829,91 +1834,14 @@ graph TD
 
     </main>
 
-    <!-- Table of Contents (Right Sticky Futuristic Outline HUD) -->
-    <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of Contents">
-      <div class="toc-header-hud">
-        <div class="toc-header-title-wrap">
-          <span class="toc-header-icon">📑</span>
-          <span class="toc-title">On This Page</span>
-        </div>
-        <div class="toc-header-actions">
-          <span class="toc-reading-progress" id="toc-reading-progress">0%</span>
-          <button class="toc-jump-top-btn" id="toc-jump-top" title="Back to Top (Home)">⌃</button>
-        </div>
-      </div>
-
-      <div class="toc-progress-track">
-        <div class="toc-progress-indicator" id="toc-progress-indicator"></div>
-      </div>
-
-      <nav class="toc-nav" id="toc-nav">
-        <!-- Chapter 00 -->
-        <div class="toc-chapter-group" data-chapter="ch0">
-          <div class="toc-chapter-heading">00 · Manifesto</div>
-          <ul class="toc-list">
-            <li class="toc-item"><a href="#ch0-manifesto" class="toc-link active"><span class="toc-bullet"></span>Platform Manifesto</a></li>
-            <li class="toc-item"><a href="#sec-context-crisis" class="toc-link"><span class="toc-bullet"></span>Context Window Crisis &amp; Raw Grep</a></li>
-            <li class="toc-item"><a href="#sec-polyturing-triad" class="toc-link"><span class="toc-bullet"></span>The PolyTuring Triad</a></li>
-            <li class="toc-item"><a href="#sec-antigravity-native" class="toc-link"><span class="toc-bullet"></span>Antigravity-First Native Architecture</a></li>
-          </ul>
-        </div>
-
-        <!-- Chapter 01 -->
-        <div class="toc-chapter-group" data-chapter="ch1">
-          <div class="toc-chapter-heading">01 · Omni-Graph</div>
-          <ul class="toc-list">
-            <li class="toc-item"><a href="#ch1-omni-graph" class="toc-link"><span class="toc-bullet"></span>Omni-Graph Overview</a></li>
-            <li class="toc-item"><a href="#sec-omni-arch" class="toc-link"><span class="toc-bullet"></span>4-Tier Container Architecture</a></li>
-            <li class="toc-item"><a href="#sec-omni-galaxies" class="toc-link"><span class="toc-bullet"></span>Galaxy Subsystems &amp; Louvain / Leiden</a></li>
-            <li class="toc-item"><a href="#sec-omni-coupling" class="toc-link"><span class="toc-bullet"></span>Coupling Metrics &amp; Blast Radius</a></li>
-            <li class="toc-item"><a href="#sec-omni-ebf" class="toc-link"><span class="toc-bullet"></span>Ephemeral Branch Fabric (EBF)</a></li>
-            <li class="toc-item"><a href="#sec-omni-ast" class="toc-link"><span class="toc-bullet"></span>Polyglot AST Grammar &amp; Struct Fields</a></li>
-            <li class="toc-item"><a href="#sec-omni-budget" class="toc-link"><span class="toc-bullet"></span>Token Budget Math &amp; Condenser</a></li>
-            <li class="toc-item"><a href="#sec-omni-relational" class="toc-link"><span class="toc-bullet"></span>SurrealDB Relational Indexing</a></li>
-            <li class="toc-item"><a href="#token-simulator" class="toc-link"><span class="toc-bullet"></span>Token Budget Simulator (Interactive)</a></li>
-            <li class="toc-item"><a href="#api-playground" class="toc-link"><span class="toc-bullet"></span>REST API &amp; Curl Sandbox (Interactive)</a></li>
-          </ul>
-        </div>
-
-        <!-- Chapter 02 -->
-        <div class="toc-chapter-group" data-chapter="ch2">
-          <div class="toc-chapter-heading">02 · Session Explorer</div>
-          <ul class="toc-list">
-            <li class="toc-item"><a href="#ch2-session-explorer" class="toc-link"><span class="toc-bullet"></span>Session Explorer Overview</a></li>
-            <li class="toc-item"><a href="#sec-session-arch" class="toc-link"><span class="toc-bullet"></span>Go + Bun Standalone Binary Architecture</a></li>
-            <li class="toc-item"><a href="#sec-session-wip" class="toc-link"><span class="toc-bullet"></span>Agent WIP Recovery &amp; Disambiguation</a></li>
-            <li class="toc-item"><a href="#sec-session-viewer" class="toc-link"><span class="toc-bullet"></span>Liquid Glass UI &amp; In-Page Find</a></li>
-            <li class="toc-item"><a href="#sec-agent-context" class="toc-link"><span class="toc-bullet"></span>Universal Agent Context Matrix</a></li>
-            <li class="toc-item"><a href="#sec-session-swagger" class="toc-link"><span class="toc-bullet"></span>Embedded OpenAPI 3.0 &amp; Swagger UI</a></li>
-            <li class="toc-item"><a href="#sec-session-usage" class="toc-link"><span class="toc-bullet"></span>CLI Commands &amp; Quickstart</a></li>
-          </ul>
-        </div>
-
-        <!-- Chapter 03 -->
-        <div class="toc-chapter-group" data-chapter="ch3">
-          <div class="toc-chapter-heading">03 · Universal Matrix</div>
-          <ul class="toc-list">
-            <li class="toc-item"><a href="#ch3-assistant-matrix" class="toc-link"><span class="toc-bullet"></span>Assistant Matrix Overview</a></li>
-            <li class="toc-item"><a href="#sec-assistant-roadmap" class="toc-link"><span class="toc-bullet"></span>Multi-Assistant Phasing (Copilot, Claude)</a></li>
-            <li class="toc-item"><a href="#sec-assistant-mcp" class="toc-link"><span class="toc-bullet"></span>Universal MCP Extensibility Blueprint</a></li>
-          </ul>
-        </div>
-
-        <!-- Chapter 04 -->
-        <div class="toc-chapter-group" data-chapter="ch4">
-          <div class="toc-chapter-heading">04 · Engineering Rigor</div>
-          <ul class="toc-list">
-            <li class="toc-item"><a href="#sec-appendix-rigor" class="toc-link"><span class="toc-bullet"></span>Engineering Rigor Overview</a></li>
-            <li class="toc-item"><a href="#sec-sdd-governance" class="toc-link"><span class="toc-bullet"></span>Spec-Driven Governance (SDD)</a></li>
-            <li class="toc-item"><a href="#sec-agent-shield" class="toc-link"><span class="toc-bullet"></span>Agentic Defense Shield &amp; Reconnaissance</a></li>
-            <li class="toc-item"><a href="#sec-ci-gates" class="toc-link"><span class="toc-bullet"></span>Continuous Integration Matrix</a></li>
-            <li class="toc-item"><a href="#sec-docs-drift" class="toc-link"><span class="toc-bullet"></span>Documentation Sync Gate</a></li>
-          </ul>
-        </div>
-      </nav>
-    </aside>
-
   </div>
+
+  <!-- Floating Glassmorphic Back to Top FAB -->
+  <button class="back-to-top-fab" id="back-to-top-fab" aria-label="Back to Top" title="Back to Top (Home)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  </button>
 
   <script src="app.js"></script>
 </body>
