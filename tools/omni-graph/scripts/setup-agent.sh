@@ -47,7 +47,9 @@ chmod +x "${TOOL_DIR}/scripts/hook_pre_tool.sh"
 chmod +x "${TOOL_DIR}/scripts/hook_pre_invocation.sh"
 chmod +x "${TOOL_DIR}/scripts/hook_stop.sh"
 chmod +x "${TOOL_DIR}/scripts/omni.sh"
+chmod +x "${TOOL_DIR}/scripts/omni-mcp.py" 2>/dev/null || true
 chmod +x "${TOOL_DIR}/skills/omni-graph/scripts/omni.sh"
+chmod +x "${TOOL_DIR}/skills/omni-graph/scripts/omni-mcp.py" 2>/dev/null || true
 
 # ─── Helper: Safe Hooks Merge ────────────────────────────────────────────────
 merge_hooks_json() {
@@ -123,6 +125,7 @@ if [[ "${TARGET}" == "global" || "${TARGET}" == "--global" ]]; then
   # 2. Install Global Skill
   cp -r "${TOOL_DIR}/skills/omni-graph/"* "${DEST_DIR}/skills/omni-graph/"
   chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni.sh"
+  chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni-mcp.py" 2>/dev/null || true
   echo "  ✅ Installed global skill: ~/.gemini/config/skills/omni-graph/"
 
   # 3. Copy lifecycle hook scripts into global scripts directory
@@ -151,6 +154,7 @@ elif [[ "${TARGET}" == "workspace" || "${TARGET}" == "." ]]; then
   # 2. Install Workspace Skill
   cp -r "${TOOL_DIR}/skills/omni-graph/"* "${DEST_DIR}/skills/omni-graph/"
   chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni.sh"
+  chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni-mcp.py" 2>/dev/null || true
   echo "  ✅ Installed skill: .agents/skills/omni-graph/"
 
   # 3. Copy scripts to .agents/scripts
@@ -253,6 +257,7 @@ else
   # 2. Install Skill
   cp -r "${TOOL_DIR}/skills/omni-graph/"* "${DEST_DIR}/skills/omni-graph/"
   chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni.sh"
+  chmod +x "${DEST_DIR}/skills/omni-graph/scripts/omni-mcp.py" 2>/dev/null || true
   echo "  ✅ Installed skill: ${TARGET_ABS}/.agents/skills/omni-graph/"
 
   # 3. Copy scripts to .agents/scripts

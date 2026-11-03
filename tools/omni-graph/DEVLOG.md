@@ -4,6 +4,46 @@
 > **Append-only** — never delete entries, only add new ones at the top.
 > Each entry captures what happened, what changed, and what to do next.
 
+### 2026-11-03 — Triad Execution Hierarchy, Rosetta Stone & Degraded Recovery Playbook in SKILL.md
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.3.0 Hardening & Architectural Overhaul)
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`
+**Duration**: ~35m
+
+#### Context & Objectives
+- Addressed user inquiry regarding how the 3 interface offerings (Native MCP, Ergonomic CLI, Low-Level Curl fallback) map under the hood, how the installable skill carries all permutations and combinations, and how coding assistants maintain 100% operational continuity even when services or configurations are degraded or out-of-order.
+- Unified `.agents/skills/omni-graph/SKILL.md` and `tools/omni-graph/skills/omni-graph/SKILL.md` into an authoritative, foolproof cognitive manual.
+
+#### Key Updates
+1. **The Deterministic Decision Flowchart**:
+   - Priority 1: Native MCP (`omni_*` tools) when present in model context (zero token consumption, typed JSON schemas).
+   - Priority 2: Ergonomic CLI (`./scripts/omni <subcmd>`) when bash tool access exists (workspace auto-resolution, clean formatting).
+   - Priority 3: Low-Level Curl REST (`http://localhost:8080/api/...`) as the indestructible universal floor.
+2. **Master Rosetta Stone (1-to-1 Equivalence)**:
+   - Formulated a comprehensive mapping table translating 10 core intents across all 3 tiers (Symbol, References, Condense, Search, Doc Search, Galaxies, Query, Relate, Workspaces, Watcher).
+3. **The Degraded & Out-of-Order Self-Healing Playbook**:
+   - Created explicit, step-by-step recovery protocols for 9 real-world scenarios:
+     1. MCP tool not present in model context (switch to CLI without hallucinating tool names).
+     2. CLI permission denied / file not found (`chmod +x` or relative root fallback).
+     3. Daemon down / connection refused (Docker container health inspect, `make up`, and graceful cold fallback respecting the 150-line gate).
+     4. Workspace not indexed or zero nodes (workspace discovery and one-time ingestion).
+     5. Symbol lookup returns 0 matches (dense vector fallback, galaxy mapping).
+     6. Symbol ambiguity across multiple polyglot files (file path & language filtering).
+     7. Subgraph condensation budget exceeded (PPR power iteration truncation & `hops=1` tuning).
+     8. Live watcher telemetry desynchronization (status query & idempotent restart).
+     9. Operating in isolated Git worktrees (worktree sync and branch-scoped queries).
+4. **Script & Installer Synchronization**:
+   - Copied `tools/omni-graph/scripts/omni-mcp.py` to `.agents/skills/omni-graph/scripts/omni-mcp.py` and `tools/omni-graph/skills/omni-graph/scripts/omni-mcp.py`.
+   - Updated `tools/omni-graph/scripts/setup-agent.sh` to ensure `omni-mcp.py` permissions are set (`chmod +x`) during workspace, global, and custom target setups.
+   - Verified both `SKILL.md` copies are 100% identical via `diff -u`.
+
+#### Verification
+- `cargo test --manifest-path tools/omni-graph/Cargo.toml`: 82/82 passing in 0.01s.
+- `make validate-specs`: 0 errors, 0 warnings.
+- `make docs-test`: Deterministically passed all 14 gates.
+
+
 ### 2026-11-03 — Next-Gen Hardening: Watcher Sync, Polyglot ASTs, Galaxy Consolidation, SAIR, Content Partitioning & Agentic Triad (MCP + CLI + Skill)
 
 **Agent/Author**: Antigravity (Google DeepMind)
