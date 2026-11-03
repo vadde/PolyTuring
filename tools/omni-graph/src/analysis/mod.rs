@@ -198,7 +198,8 @@ impl CommunityDetector {
         }
 
         // 2. Partition into macro-clusters (>= min_size) and micro-clusters (< min_size)
-        let (macro_groups, micro_groups): (HashMap<i32, Vec<&DbNode>>, HashMap<i32, Vec<&DbNode>>) =
+        type NodeGroup<'a> = HashMap<i32, Vec<&'a DbNode>>;
+        let (macro_groups, micro_groups): (NodeGroup, NodeGroup) =
             groups.into_iter().partition(|(_, members)| members.len() >= min_size);
 
         // If no cluster meets min_size, merge everything into cluster 0
@@ -311,13 +312,11 @@ impl CommunityDetector {
 
         // 7. Compact community IDs into contiguous 0..K space
         let mut id_map: HashMap<i32, i32> = HashMap::new();
-        let mut next_id = 0;
         let mut sorted_cids: Vec<i32> = assignments.values().copied().collect::<HashSet<_>>().into_iter().collect();
         sorted_cids.sort();
 
-        for cid in sorted_cids {
-            id_map.insert(cid, next_id);
-            next_id += 1;
+        for (next_id, cid) in sorted_cids.into_iter().enumerate() {
+            id_map.insert(cid, next_id as i32);
         }
 
         for val in assignments.values_mut() {
