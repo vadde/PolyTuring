@@ -19,7 +19,14 @@ pub struct ContextCondenser;
 
 impl ContextCondenser {
     /// Compute Personalized PageRank (PPR) restart vector centered on root nodes (R-069)
-    /// Runs power iteration with alpha = 0.85 to prioritize high-centrality call chain neighbors
+    /// Runs power iteration with alpha = 0.85 to prioritize high-centrality call chain neighbors.
+    /// 
+    /// Note on Graph Weighting Invariant:
+    /// This implementation operates over an unweighted symmetric multigraph view where transition
+    /// probabilities are distributed uniformly among neighbors (share = (alpha * u) / len(neighbors)).
+    /// Multi-edge connections naturally scale transition mass by edge multiplicity.
+    /// Calibrated scalar edge weights (IMPLEMENTS: 3.0, CALLS: 2.0, CONTAINS: 0.8) are utilized
+    /// in the community detection and architectural boundary engine in `src/analysis/mod.rs`.
     pub fn compute_ppr_scores(
         root_node_ids: &HashSet<String>,
         candidate_ids: &HashSet<String>,

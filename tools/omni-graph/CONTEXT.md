@@ -26,8 +26,8 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 82 | 82 | 🟢 100% Complete |
-| Acceptance Criteria (AC-XXX) | 37 | 37 | 🟢 100% Complete |
+| Spec Requirements (R-XXX) | 78 | 80 | 🟢 97.5% Complete (2 Deferred to v0.3.1: R-066, R-072) |
+| Acceptance Criteria (AC-XXX) | 35 | 37 | 🟢 94.6% Complete (2 Deferred: AC for R-066, R-072) |
 | Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
 | Test Coverage | 82/82 Unit & Integration Tests | 82 | 🟢 100% Verified in Docker |
 | Topological Containment Backbone (R-063) | Complete | — | 🟢 Workspace, Directory & File DAG backbone with zero disconnected vertices |
