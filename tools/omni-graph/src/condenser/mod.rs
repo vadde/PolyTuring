@@ -1,9 +1,9 @@
 // Subgraph Context Condenser: Multi-hop AST trace compression
-// Implements: R-028 (Sub-1500 token high-fidelity context for LLM agents)
+// Implements: R-028, R-068, R-069 (Sub-1500 token high-fidelity context with PPR & clean Markdown)
 
-use crate::db::{DbLink, DbNode};
+use crate::db::{clean_record_id, DbLink, DbNode};
 use serde::Serialize;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Serialize, Debug)]
 pub struct CondensedContext {
@@ -18,6 +18,68 @@ pub struct CondensedContext {
 pub struct ContextCondenser;
 
 impl ContextCondenser {
+    /// Compute Personalized PageRank (PPR) restart vector centered on root nodes (R-069)
+    /// Runs power iteration with alpha = 0.85 to prioritize high-centrality call chain neighbors
+    pub fn compute_ppr_scores(
+        root_node_ids: &HashSet<String>,
+        candidate_ids: &HashSet<String>,
+        links: &[DbLink],
+        iterations: usize,
+    ) -> HashMap<String, f32> {
+        let alpha = 0.85f32;
+        let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+
+        for link in links {
+            let s = link.source.as_str();
+            let t = link.target.as_str();
+            if candidate_ids.contains(s) && candidate_ids.contains(t) {
+                adj.entry(s).or_default().push(t);
+                adj.entry(t).or_default().push(s); // bidirectional graph view for call context
+            }
+        }
+
+        let num_roots = root_node_ids.len().max(1) as f32;
+        let mut p: HashMap<&str, f32> = HashMap::new();
+        let mut p0: HashMap<&str, f32> = HashMap::new();
+
+        for id in candidate_ids {
+            let initial = if root_node_ids.contains(id) {
+                1.0 / num_roots
+            } else {
+                0.0
+            };
+            p.insert(id.as_str(), initial);
+            if initial > 0.0 {
+                p0.insert(id.as_str(), initial);
+            }
+        }
+
+        let mut next_p: HashMap<&str, f32> = HashMap::with_capacity(candidate_ids.len());
+        for _ in 0..iterations {
+            next_p.clear();
+
+            for (&u, neighbors) in &adj {
+                let u_score = p.get(u).copied().unwrap_or(0.0);
+                if u_score <= 0.0 || neighbors.is_empty() {
+                    continue;
+                }
+                let share = (alpha * u_score) / (neighbors.len() as f32);
+                for &v in neighbors {
+                    *next_p.entry(v).or_insert(0.0) += share;
+                }
+            }
+
+            // Inject restart mass from roots
+            for (&root_id, &init_val) in &p0 {
+                *next_p.entry(root_id).or_insert(0.0) += (1.0 - alpha) * init_val;
+            }
+
+            p = next_p.clone();
+        }
+
+        p.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+    }
+
     /// Condense a multi-hop neighborhood around a node or symbol into an agent-ready markdown block
     pub fn condense(
         target_symbol: &str,
@@ -25,7 +87,6 @@ impl ContextCondenser {
         links: &[DbLink],
         max_hops: usize,
     ) -> CondensedContext {
-        let mut relevant_node_ids = HashSet::new();
         let mut direct_callers = Vec::new();
         let mut direct_callees = Vec::new();
         let mut related_files_set = HashSet::new();
@@ -38,34 +99,28 @@ impl ContextCondenser {
 
         let mut root_node_ids = HashSet::new();
         for root in &root_nodes {
-            relevant_node_ids.insert(root.id.clone());
             root_node_ids.insert(root.id.clone());
             related_files_set.insert(root.file_path.clone());
         }
 
-        // 2. BFS traversal up to max_hops (hard-capped at MAX_CONDENSED_NODES to prevent context blowout)
+        // 2. BFS traversal up to max_hops
         const MAX_CONDENSED_NODES: usize = 60;
+        let mut candidate_node_ids = HashSet::new();
         let mut queue = VecDeque::new();
         for root in &root_nodes {
+            candidate_node_ids.insert(root.id.clone());
             queue.push_back((root.id.clone(), 0));
         }
 
-        let mut truncated_count: usize = 0;
         while let Some((curr_id, depth)) = queue.pop_front() {
             if depth >= max_hops {
                 continue;
             }
 
             for link in links {
-                // Stop expanding if we've hit the node cap
-                if relevant_node_ids.len() >= MAX_CONDENSED_NODES {
-                    truncated_count += 1;
-                    continue;
-                }
-
                 if link.source == curr_id {
                     // Outgoing: curr CALLS target
-                    if relevant_node_ids.insert(link.target.clone()) {
+                    if candidate_node_ids.insert(link.target.clone()) {
                         queue.push_back((link.target.clone(), depth + 1));
                     }
                     if depth == 0 {
@@ -73,7 +128,7 @@ impl ContextCondenser {
                     }
                 } else if link.target == curr_id {
                     // Incoming: source CALLS curr
-                    if relevant_node_ids.insert(link.source.clone()) {
+                    if candidate_node_ids.insert(link.source.clone()) {
                         queue.push_back((link.source.clone(), depth + 1));
                     }
                     if depth == 0 {
@@ -83,10 +138,40 @@ impl ContextCondenser {
             }
         }
 
-        // 3. Format compact Markdown block with two-tier token budgeting (R-028)
+        // Personalized PageRank (PPR) Neighborhood Slicing (R-069)
+        // If candidates exceed MAX_CONDENSED_NODES, prioritize nodes with highest PPR centrality
+        let mut relevant_node_ids = HashSet::new();
+        let truncated_count;
+
+        if candidate_node_ids.len() > MAX_CONDENSED_NODES {
+            let ppr_scores = Self::compute_ppr_scores(&root_node_ids, &candidate_node_ids, links, 25);
+            let mut sorted_candidates: Vec<String> = candidate_node_ids.into_iter().collect();
+            sorted_candidates.sort_by(|a, b| {
+                let sa = ppr_scores.get(a.as_str()).copied().unwrap_or(0.0);
+                let sb = ppr_scores.get(b.as_str()).copied().unwrap_or(0.0);
+                sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // Retain all root nodes plus top central neighbors
+            for root_id in &root_node_ids {
+                relevant_node_ids.insert(root_id.clone());
+            }
+            for nid in sorted_candidates {
+                if relevant_node_ids.len() >= MAX_CONDENSED_NODES {
+                    break;
+                }
+                relevant_node_ids.insert(nid);
+            }
+            truncated_count = links.iter().filter(|l| !relevant_node_ids.contains(&l.source) || !relevant_node_ids.contains(&l.target)).count();
+        } else {
+            relevant_node_ids = candidate_node_ids;
+            truncated_count = 0;
+        }
+
+        // 3. Format compact Markdown block with strict two-tier token budgeting (R-028, R-068)
         // Reserves at least 35% of token budget (~2100 chars) for Section 4 structural traces
-        const MAX_OUTPUT_CHARS: usize = 6000;
-        const MAX_SYMBOLS_CHARS: usize = 3800;
+        const MAX_OUTPUT_CHARS: usize = 5800;
+        const MAX_SYMBOLS_CHARS: usize = 3600;
 
         let mut md = String::new();
         md.push_str(&format!("### 🧭 Omni-Graph AST Subgraph: `{}`\n\n", target_symbol));
@@ -134,9 +219,11 @@ impl ContextCondenser {
 
         md.push_str("\n#### Structural Relationships (Call / Import Traces)\n");
         for link in links.iter().filter(|l| relevant_node_ids.contains(&l.source) || relevant_node_ids.contains(&l.target)) {
+            let src_clean = clean_record_id(&link.source);
+            let tgt_clean = clean_record_id(&link.target);
             let edge_str = format!(
                 "- `{}` ──[{}: {}]──▶ `{}`\n",
-                link.source, link.category, link.edge_type, link.target
+                src_clean, link.category, link.edge_type, tgt_clean
             );
             if md.len() + edge_str.len() > MAX_OUTPUT_CHARS {
                 md.push_str(
@@ -147,7 +234,18 @@ impl ContextCondenser {
             md.push_str(&edge_str);
         }
 
-        let token_estimate = md.len() / 4; // Standard heuristic: 4 chars/token
+        let mut token_estimate = md.len() / 4; // Standard heuristic: 4 chars/token
+        if token_estimate > 1495 {
+            let max_bytes = 1490 * 4;
+            if md.len() > max_bytes {
+                let truncated = &md[..max_bytes];
+                if let Some(last_nl) = truncated.rfind('\n') {
+                    md.truncate(last_nl);
+                    md.push_str("\n> ⚠️ Strict 1500 token ceiling applied.\n");
+                }
+                token_estimate = md.len() / 4;
+            }
+        }
 
         CondensedContext {
             root_symbol: target_symbol.to_string(),

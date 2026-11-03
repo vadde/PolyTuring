@@ -887,6 +887,42 @@ mod condenser_tests {
             "Must output structural call traces despite numerous large neighbor nodes"
         );
     }
+
+    #[test]
+    fn test_condense_ppr_centrality_ranks_hub_higher() {
+        use std::collections::HashSet;
+
+        let root_id = "root".to_string();
+        let mut root_ids = HashSet::new();
+        root_ids.insert(root_id.clone());
+
+        let mut candidate_ids = HashSet::new();
+        candidate_ids.insert(root_id.clone());
+        candidate_ids.insert("hub".to_string());
+        candidate_ids.insert("leaf".to_string());
+        candidate_ids.insert("sub1".to_string());
+        candidate_ids.insert("sub2".to_string());
+
+        let links = vec![
+            make_link("root", "hub", "CALLS"),
+            make_link("root", "leaf", "CALLS"),
+            make_link("hub", "sub1", "CALLS"),
+            make_link("hub", "sub2", "CALLS"),
+            make_link("sub1", "hub", "CALLS"),
+            make_link("sub2", "hub", "CALLS"),
+        ];
+
+        let ppr = ContextCondenser::compute_ppr_scores(&root_ids, &candidate_ids, &links, 25);
+        let hub_score = ppr.get("hub").copied().unwrap_or(0.0);
+        let leaf_score = ppr.get("leaf").copied().unwrap_or(0.0);
+
+        assert!(
+            hub_score > leaf_score,
+            "Hub with mutual caller cycles must score higher than isolated leaf: {} vs {}",
+            hub_score,
+            leaf_score
+        );
+    }
 }
 
 mod community_tests {
