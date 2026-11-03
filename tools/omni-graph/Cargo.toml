@@ -1,6 +1,6 @@
 [package]
 name = "omni-graph"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["@vadde"]
 description = "100% local multi-container semantic knowledge hub: AST graphs + vector embeddings on Apple Silicon"

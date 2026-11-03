@@ -5,6 +5,23 @@ All notable changes to this tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-03
+
+### Added
+- **Topological Containment Backbone (R-063)**: Hierarchical containment nodes (`ws:workspace`, `ws:dir:<path>`, `ws:file:<path>`) and weighted structural edges (`CONTAINS_DIR` $w=0.2$, `CONTAINS_FILE` $w=0.4$, `CONTAINS` $w=0.8$) guaranteeing 100% DAG reachability from root with zero orphan components.
+- **Personalized PageRank (PPR) Neighborhood Condenser (R-068, R-069)**: 25-step power-iteration Personalized PageRank ($\alpha = 0.85$) centering extraction around root symbol vector $\mathbf{p}_0$ and strictly bounding context to $\le 1,490$ tokens with clean record ID formatting.
+- **Scope-Aware Import Resolution (SAIR) (R-065)**: 3-tier lexical resolution ladder (in-file $\to$ directory/module $\to$ generic verb blacklist) eliminating false-positive call edges for common verbs (`new`, `run`, `init`, `parse`, `handle`).
+- **Dual-Tier Content Partitioning (R-067)**: Dedicated storage and vector index partitioning into Code and Documentation tiers, curing Markdown Semantic Shadowing during dense vector retrieval.
+- **Hierarchical Galaxy Subsystem Consolidation (R-064)**: 3-criterion hierarchical community rollup enforcing cluster noise floor $\ge 5$ and limiting output to top 15 macro galaxies (reducing payload from 292 KB to 8.6 KB).
+- **Polyglot Tree-Sitter Parsers (Java, C, C++) (R-060, R-061)**: Added Tree-sitter parsers extracting Java classes, interfaces, records, methods, and C/C++ structs, classes, functions, namespaces, and `#include` dependencies.
+- **Detached Property Filtering (R-062)**: Filtered detached TS/JS object literal properties (`cursor`, `color`, `borderRadius`), eliminating spurious single-node galaxies.
+- **Native Model Context Protocol (MCP) Server (R-070, R-078)**: Stdio JSON-RPC 2.0 MCP server (`tools/omni-graph/scripts/omni-mcp.py`) executing hermetically via `uv run --script` with PEP 723 metadata.
+- **Ergonomic Subcommand CLI (`scripts/omni`, R-077)**: Lightweight POSIX subcommand CLI with auto-detected workspace resolution and formatted ASCII tables.
+- **The Agentic Triad Cognitive Skill (R-079)**: Synchronized `SKILL.md` with Deterministic Decision Flowchart, Master Rosetta Stone, and 9-Scenario Degraded Recovery Playbook.
+
+### Fixed
+- **Live Watch Telemetry Synchronization & Guardrail (R-074, R-076)**: Included `status == "syncing"` in watcher status checks, eliminating active sync task cancellation mid-flight and preserving cumulative metrics across re-watches.
+
 ## [0.2.2] - 2026-10-09
 
 ### Added
