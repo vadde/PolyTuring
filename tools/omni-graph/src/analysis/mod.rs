@@ -57,7 +57,10 @@ pub fn get_edge_weight(edge_type: &str) -> f32 {
         "IMPLEMENTS" => 3.0,
         "CALLS" => 2.0,
         "TYPE_REF" => 1.5,
-        "IMPORTS" | "CONTAINS" => 1.0,
+        "IMPORTS" => 1.0,
+        "CONTAINS" => 0.8,
+        "CONTAINS_FILE" => 0.4,
+        "CONTAINS_DIR" => 0.2,
         _ => 1.0,
     }
 }
@@ -169,6 +172,158 @@ impl CommunityDetector {
         }
 
         normalized
+    }
+
+    /// Hierarchical directory- and topology-aware community consolidation (R-064).
+    /// Merges micro-clusters (< min_size nodes) into dominant macro-clusters based on:
+    /// 1. Direct cross-boundary link weights (topological affinity)
+    /// 2. Common directory / module path affinity (spatial locality)
+    /// 3. Dominant parent cluster fallback
+    pub fn consolidate_communities(
+        nodes: &[DbNode],
+        links: &[DbLink],
+        assignments: &mut HashMap<String, i32>,
+        min_size: usize,
+    ) {
+        if nodes.is_empty() || assignments.is_empty() || min_size <= 1 {
+            return;
+        }
+
+        // 1. Group nodes by their current community ID
+        let mut groups: HashMap<i32, Vec<&DbNode>> = HashMap::new();
+        for node in nodes {
+            if let Some(&cid) = assignments.get(&node.id) {
+                groups.entry(cid).or_default().push(node);
+            }
+        }
+
+        // 2. Partition into macro-clusters (>= min_size) and micro-clusters (< min_size)
+        type NodeGroup<'a> = HashMap<i32, Vec<&'a DbNode>>;
+        let (macro_groups, micro_groups): (NodeGroup, NodeGroup) =
+            groups.into_iter().partition(|(_, members)| members.len() >= min_size);
+
+        // If no cluster meets min_size, merge everything into cluster 0
+        if macro_groups.is_empty() {
+            for val in assignments.values_mut() {
+                *val = 0;
+            }
+            return;
+        }
+
+        // If there are no micro-clusters, simply ensure compact 0..K indexing
+        if micro_groups.is_empty() {
+            return;
+        }
+
+        // 3. Precompute directory and file sets for each macro cluster
+        let mut macro_dirs: HashMap<i32, HashSet<String>> = HashMap::new();
+        let mut macro_node_ids: HashMap<i32, HashSet<&str>> = HashMap::new();
+        let mut macro_sizes: Vec<(i32, usize)> = Vec::new();
+
+        for (&cid, members) in &macro_groups {
+            let mut dirs = HashSet::new();
+            let mut nids = HashSet::new();
+            for m in members {
+                nids.insert(m.id.as_str());
+                if let Some(parent) = std::path::Path::new(&m.file_path).parent() {
+                    let p = parent.to_string_lossy().to_string();
+                    if !p.is_empty() && p != "." {
+                        dirs.insert(p);
+                    }
+                }
+            }
+            macro_sizes.push((cid, members.len()));
+            macro_dirs.insert(cid, dirs);
+            macro_node_ids.insert(cid, nids);
+        }
+        macro_sizes.sort_by_key(|(_, sz)| std::cmp::Reverse(*sz));
+        let largest_macro_cid = macro_sizes[0].0;
+
+        // 4. Build node-to-macro map for fast topological edge lookup
+        let mut node_to_macro: HashMap<&str, i32> = HashMap::new();
+        for (&cid, nids) in &macro_node_ids {
+            for &nid in nids {
+                node_to_macro.insert(nid, cid);
+            }
+        }
+
+        // 5. For each micro-group, determine target macro cluster
+        let mut merge_map: HashMap<i32, i32> = HashMap::new();
+
+        for (&micro_cid, members) in &micro_groups {
+            let member_nids: HashSet<&str> = members.iter().map(|m| m.id.as_str()).collect();
+
+            // Criterion 1: Topological affinity (edge connections to any macro cluster)
+            let mut edge_affinity: HashMap<i32, f32> = HashMap::new();
+            for link in links {
+                let s_in = member_nids.contains(link.source.as_str());
+                let t_in = member_nids.contains(link.target.as_str());
+                if s_in && !t_in {
+                    if let Some(&target_macro) = node_to_macro.get(link.target.as_str()) {
+                        *edge_affinity.entry(target_macro).or_insert(0.0) += get_edge_weight(&link.edge_type);
+                    }
+                } else if !s_in && t_in {
+                    if let Some(&source_macro) = node_to_macro.get(link.source.as_str()) {
+                        *edge_affinity.entry(source_macro).or_insert(0.0) += get_edge_weight(&link.edge_type);
+                    }
+                }
+            }
+
+            if let Some((&best_macro, _)) = edge_affinity
+                .iter()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            {
+                merge_map.insert(micro_cid, best_macro);
+                continue;
+            }
+
+            // Criterion 2: Directory / Spatial locality
+            let mut dir_match_counts: HashMap<i32, usize> = HashMap::new();
+            for m in members.as_slice() {
+                if let Some(parent) = std::path::Path::new(&m.file_path).parent() {
+                    let p = parent.to_string_lossy().to_string();
+                    if !p.is_empty() && p != "." {
+                        for (&mcid, mdirs) in &macro_dirs {
+                            for md in mdirs {
+                                if p == *md || p.starts_with(md) || md.starts_with(&p) {
+                                    *dir_match_counts.entry(mcid).or_insert(0) += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some((best_macro, _)) = dir_match_counts.into_iter().max_by_key(|(_, count)| *count) {
+                merge_map.insert(micro_cid, best_macro);
+                continue;
+            }
+
+            // Criterion 3: Fallback to largest macro cluster
+            merge_map.insert(micro_cid, largest_macro_cid);
+        }
+
+        // 6. Apply merges to assignments
+        for val in assignments.values_mut() {
+            if let Some(&target_cid) = merge_map.get(val) {
+                *val = target_cid;
+            }
+        }
+
+        // 7. Compact community IDs into contiguous 0..K space
+        let mut id_map: HashMap<i32, i32> = HashMap::new();
+        let mut sorted_cids: Vec<i32> = assignments.values().copied().collect::<HashSet<_>>().into_iter().collect();
+        sorted_cids.sort();
+
+        for (next_id, cid) in sorted_cids.into_iter().enumerate() {
+            id_map.insert(cid, next_id as i32);
+        }
+
+        for val in assignments.values_mut() {
+            if let Some(&compact) = id_map.get(val) {
+                *val = compact;
+            }
+        }
     }
 
     /// Compute full architectural metrics (Ca, Ce, Instability, roles) and generate galaxy records
@@ -392,10 +547,11 @@ impl GraphRagEngine {
         prompt: &str,
         top_k: usize,
         workspace: Option<&str>,
+        include_docs: bool,
     ) -> Result<GraphRagResponse, String> {
-        // 1. Microscopic Vector Search
+        // 1. Microscopic Vector Search with Content-Tier Partitioning (R-067)
         let query_vec = embedder.embed_single(prompt).await?;
-        let vector_hits = db.search_vector(&query_vec, top_k, workspace).await?;
+        let vector_hits = db.search_vector(&query_vec, top_k, workspace, include_docs).await?;
 
         // 2. Collect Seed Symbols and IDs
         let mut seed_symbols = Vec::new();

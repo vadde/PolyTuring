@@ -376,10 +376,15 @@ impl DbClient {
             None => String::new(),
         };
 
+        let default_emb = vec![0.0f32; 384];
+        let mut global_idx = 0;
+
         // Chunk in batches of 50 nodes to avoid HTTP payload buffer limits on large files
-        for (chunk_nodes, chunk_embs) in nodes.chunks(50).zip(embeddings.chunks(50)) {
+        for chunk_nodes in nodes.chunks(50) {
             let mut query = String::new();
-            for (node, emb) in chunk_nodes.iter().zip(chunk_embs.iter()) {
+            for node in chunk_nodes {
+                let emb = embeddings.get(global_idx).unwrap_or(&default_emb);
+                global_idx += 1;
                 let emb_str = serde_json::to_string(emb).unwrap_or_else(|_| "[]".to_string());
                 let escaped_text = surql_escape(&node.text);
                 let escaped_label = surql_escape(&node.label);
@@ -417,7 +422,12 @@ impl DbClient {
                 let escaped_cat = surql_escape(&edge.category);
 
                 let src_parts: Vec<&str> = edge.source_id.split(':').collect();
-                let src_resolution_surql = if src_parts.len() == 3 {
+                let is_3part_label = src_parts.len() == 3
+                    && src_parts[1] != "dir"
+                    && src_parts[1] != "file"
+                    && src_parts[1] != "workspace";
+
+                let src_resolution_surql = if is_3part_label {
                     // 3-part ID: ws:file:label (e.g. emitted by impl_item or receiver type without line number - R-039, R-045)
                     let s_ws = surql_escape(src_parts[0]);
                     let s_file = surql_escape(src_parts[1]);
@@ -446,18 +456,68 @@ impl DbClient {
                         escaped_cat
                     ));
                 } else {
-                    // Scoped edge resolution: check local source file first to avoid cross-package collisions (R-035)
+                    // Scope-Aware Import Resolution (SAIR - R-065):
+                    // 1. Check local source file first
+                    // 2. Fall back to directory / module scope
+                    // 3. For generic common verbs ("new", "run", "init", etc.), DO NOT link to arbitrary cross-package files
                     let source_file = edge.source_id.split(':').nth(1).unwrap_or("");
                     let escaped_file = surql_escape(source_file);
+                    let parent_dir = std::path::Path::new(source_file)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let escaped_dir = surql_escape(&parent_dir);
+
+                    let is_generic_verb = matches!(
+                        edge.target_label.to_lowercase().as_str(),
+                        "new" | "run" | "init" | "start" | "stop" | "handle" | "execute"
+                            | "get" | "set" | "update" | "create" | "delete" | "parse"
+                            | "build" | "render" | "test" | "main"
+                    );
+
+                    let resolution_sql = if !parent_dir.is_empty() {
+                        if is_generic_verb {
+                            format!(
+                                "LET $local_targets = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{file}' AND label = '{lbl}' LIMIT 1);\n\
+                                 LET $targets = IF array::len($local_targets) > 0 THEN $local_targets ELSE (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND string::starts_with(file_path, '{pdir}/') AND label = '{lbl}' LIMIT 1) END;\n",
+                                ws = escaped_ws,
+                                file = escaped_file,
+                                pdir = escaped_dir,
+                                lbl = escaped_label
+                            )
+                        } else {
+                            format!(
+                                "LET $local_targets = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{file}' AND label = '{lbl}' LIMIT 1);\n\
+                                 LET $dir_targets = IF array::len($local_targets) > 0 THEN $local_targets ELSE (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND string::starts_with(file_path, '{pdir}/') AND label = '{lbl}' LIMIT 1) END;\n\
+                                 LET $targets = IF array::len($dir_targets) > 0 THEN $dir_targets ELSE (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND label = '{lbl}' LIMIT 1) END;\n",
+                                ws = escaped_ws,
+                                file = escaped_file,
+                                pdir = escaped_dir,
+                                lbl = escaped_label
+                            )
+                        }
+                    } else {
+                        if is_generic_verb {
+                            format!(
+                                "LET $targets = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{file}' AND label = '{lbl}' LIMIT 1);\n",
+                                ws = escaped_ws,
+                                file = escaped_file,
+                                lbl = escaped_label
+                            )
+                        } else {
+                            format!(
+                                "LET $local_targets = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{file}' AND label = '{lbl}' LIMIT 1);\n\
+                                 LET $targets = IF array::len($local_targets) > 0 THEN $local_targets ELSE (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND label = '{lbl}' LIMIT 1) END;\n",
+                                ws = escaped_ws,
+                                file = escaped_file,
+                                lbl = escaped_label
+                            )
+                        }
+                    };
+
+                    query.push_str(&resolution_sql);
                     query.push_str(&format!(
-                        "LET $local_targets = (SELECT VALUE id FROM node WHERE workspace = '{}' AND file_path = '{}' AND label = '{}' LIMIT 1);\n\
-                         LET $targets = IF array::len($local_targets) > 0 THEN $local_targets ELSE (SELECT VALUE id FROM node WHERE workspace = '{}' AND label = '{}' LIMIT 1) END;\n\
-                         RELATE $src->linked_to->$targets SET workspace = '{}', type = '{}', category = '{}';\n",
-                        escaped_ws,
-                        escaped_file,
-                        escaped_label,
-                        escaped_ws,
-                        escaped_label,
+                        "RELATE $src->linked_to->$targets SET workspace = '{}', type = '{}', category = '{}';\n",
                         escaped_ws,
                         escaped_type,
                         escaped_cat
@@ -469,18 +529,31 @@ impl DbClient {
         Ok(())
     }
 
-    /// Semantic search using vector cosine similarity on HNSW index (R-007, R-009)
+    /// Semantic search using vector cosine similarity on HNSW index (R-007, R-009, R-067)
     pub async fn search_vector(
         &self,
         query_vec: &[f32],
         k: usize,
         workspace: Option<&str>,
+        include_docs: bool,
     ) -> Result<Vec<SearchResult>, String> {
         let vec_json = serde_json::to_string(query_vec).map_err(|e| e.to_string())?;
-        let where_clause = match workspace {
-            Some(ws) if !ws.is_empty() => format!("WHERE workspace = '{}'", surql_escape(ws)),
-            _ => String::new(),
+        let mut conditions = Vec::new();
+        if let Some(ws) = workspace {
+            if !ws.is_empty() {
+                conditions.push(format!("workspace = '{}'", surql_escape(ws)));
+            }
+        }
+        if !include_docs {
+            conditions.push("language != 'markdown' AND !string::ends_with(file_path, '.md')".to_string());
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
         };
+
         let q = format!(
             "SELECT id, workspace, label, kind, file_path, language, text, community, line_start, line_end, \
              vector::similarity::cosine(embedding, {}) AS similarity \

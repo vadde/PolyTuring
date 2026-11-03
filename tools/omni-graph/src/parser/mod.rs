@@ -93,6 +93,21 @@ impl CodeParser {
                 p.set_language(&tree_sitter_typescript::language_typescript()).ok()?;
                 ("typescript", p)
             }
+            "java" => {
+                let mut p = Parser::new();
+                p.set_language(&tree_sitter_java::language()).ok()?;
+                ("java", p)
+            }
+            "c" | "h" => {
+                let mut p = Parser::new();
+                p.set_language(&tree_sitter_c::language()).ok()?;
+                ("c", p)
+            }
+            "cpp" | "hpp" | "cc" | "cxx" | "c++" | "h++" | "hh" => {
+                let mut p = Parser::new();
+                p.set_language(&tree_sitter_cpp::language()).ok()?;
+                ("cpp", p)
+            }
             _ => return None,
         };
 
@@ -112,6 +127,35 @@ impl CodeParser {
         );
 
         Some(ParseResult { nodes, edges })
+    }
+
+    /// Extracts function identifier from C/C++ function_definition declarator chain
+    fn extract_c_function_name<'a>(node: Node<'a>, content: &'a str) -> Option<&'a str> {
+        let mut curr = node.child_by_field_name("declarator")?;
+        loop {
+            match curr.kind() {
+                "function_declarator" | "pointer_declarator" | "reference_declarator" => {
+                    curr = curr.child_by_field_name("declarator")?;
+                }
+                "qualified_identifier" => {
+                    if let Some(name_node) = curr.child_by_field_name("name") {
+                        return Some(&content[name_node.byte_range()]);
+                    }
+                    let raw = &content[curr.byte_range()];
+                    let clean = raw.rsplit("::").next().unwrap_or(raw);
+                    return Some(clean);
+                }
+                "identifier" | "field_identifier" => {
+                    return Some(&content[curr.byte_range()]);
+                }
+                _ => {
+                    if let Some(name_node) = curr.child_by_field_name("name") {
+                        return Some(&content[name_node.byte_range()]);
+                    }
+                    return None;
+                }
+            }
+        }
     }
 
     /// Extracts the receiver type identifier from a Go `method_declaration` receiver parameter list.
@@ -241,6 +285,33 @@ impl CodeParser {
                     symbols.push(clean.to_string());
                 }
             }
+        } else if language == "java" {
+            // Examples:
+            // "import com.example.model.User;"
+            // "import static org.junit.Assert.assertEquals;"
+            if let Some(import_part) = trimmed.strip_prefix("import ") {
+                let clean_import = import_part.trim_start_matches("static ").trim();
+                if let Some(last_seg) = clean_import.rsplit('.').next() {
+                    let clean = last_seg.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                    if !clean.is_empty() && clean != "*" && !symbols.contains(&clean.to_string()) {
+                        symbols.push(clean.to_string());
+                    }
+                }
+            }
+        } else if language == "c" || language == "cpp" {
+            // Examples:
+            // "#include <vector>"
+            // "#include \"user.h\""
+            if let Some(inc) = trimmed.strip_prefix("#include") {
+                let clean_inc = inc.trim().trim_matches(|c: char| c == '<' || c == '>' || c == '"' || c == '\'');
+                if let Some(last_seg) = clean_inc.rsplit('/').next() {
+                    let base = last_seg.split('.').next().unwrap_or(last_seg);
+                    let clean = base.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                    if !clean.is_empty() && !symbols.contains(&clean.to_string()) {
+                        symbols.push(clean.to_string());
+                    }
+                }
+            }
         }
 
         symbols
@@ -263,11 +334,13 @@ impl CodeParser {
 
         let mut node_id: Option<String> = None;
 
-        // Extract functions, methods, and macros
+        // Extract functions, methods, constructors, and macros
         // Go: function_declaration (top-level func), method_declaration (receiver method), method_elem / method_spec (interface)
         // Rust: function_item, macro_definition
         // Python: function_definition, async_function_definition
         // JS/TS: function_declaration, method_definition
+        // Java: method_declaration, constructor_declaration
+        // C/C++: function_definition
         if kind == "function_item"
             || kind == "function_definition"
             || kind == "async_function_definition"
@@ -277,7 +350,14 @@ impl CodeParser {
             || kind == "method_spec"
             || kind == "method_elem"
             || kind == "macro_definition"
+            || kind == "constructor_declaration"
         {
+            let c_fn_name = if kind == "function_definition" && (language == "c" || language == "cpp") {
+                Self::extract_c_function_name(node, content)
+            } else {
+                None
+            };
+
             let name_opt = node.child_by_field_name("name").or_else(|| {
                 if kind == "method_spec" || kind == "method_elem" {
                     node.child(0)
@@ -286,13 +366,14 @@ impl CodeParser {
                 }
             });
 
-            if let Some(name_node) = name_opt {
-                let name = &content[name_node.byte_range()];
+            if let Some(name) = c_fn_name.or_else(|| name_opt.map(|n| &content[n.byte_range()])) {
                 let snippet = &content[node.byte_range()];
                 let text = Self::safe_truncate(snippet, 1000);
 
                 let node_kind = if kind == "method_declaration" || kind == "method_definition" || kind == "method_spec" || kind == "method_elem" {
                     "method"
+                } else if kind == "constructor_declaration" {
+                    "constructor"
                 } else if kind == "macro_definition" {
                     "macro"
                 } else {
@@ -430,9 +511,12 @@ impl CodeParser {
         // Rust: struct_item, type_item, enum_item, trait_item
         // Python: class_definition
         // JS/TS: class_definition, class_declaration, interface_declaration, type_alias_declaration, enum_declaration
+        // Java: class_declaration, interface_declaration, record_declaration, enum_declaration
+        // C/C++: struct_specifier, class_specifier, enum_specifier, namespace_definition
         else if kind == "struct_item"
             || kind == "class_definition"
             || kind == "class_declaration"
+            || kind == "record_declaration"
             || kind == "type_item"
             || kind == "type_spec"
             || kind == "interface_declaration"
@@ -440,6 +524,10 @@ impl CodeParser {
             || kind == "enum_declaration"
             || kind == "enum_item"
             || kind == "trait_item"
+            || kind == "struct_specifier"
+            || kind == "class_specifier"
+            || kind == "enum_specifier"
+            || kind == "namespace_definition"
         {
             if let Some(name_node) = node.child_by_field_name("name") {
                 let name = &content[name_node.byte_range()];
@@ -448,11 +536,13 @@ impl CodeParser {
 
                 let struct_kind = match kind {
                     "type_spec" => Self::infer_go_type_kind(node),
-                    "class_definition" | "class_declaration" => "class",
+                    "class_definition" | "class_declaration" | "class_specifier" => "class",
                     "interface_declaration" => "interface",
+                    "record_declaration" => "record",
                     "type_alias_declaration" | "type_item" => "type",
-                    "enum_declaration" | "enum_item" => "enum",
+                    "enum_declaration" | "enum_item" | "enum_specifier" => "enum",
                     "trait_item" => "trait",
+                    "namespace_definition" => "namespace",
                     _ => "struct",
                 };
 
@@ -538,6 +628,89 @@ impl CodeParser {
                     }
                 }
 
+                // Java: extract class inheritance (superclass and super_interfaces) (R-048, R-060)
+                if language == "java" && (kind == "class_declaration" || kind == "interface_declaration" || kind == "record_declaration") {
+                    if let Some(super_class) = node.child_by_field_name("superclass") {
+                        let mut s_cursor = super_class.walk();
+                        for child in super_class.children(&mut s_cursor) {
+                            if child.kind() == "type_identifier" {
+                                let base_name = &content[child.byte_range()].trim();
+                                if !base_name.is_empty() {
+                                    edges.push(ExtractedEdge {
+                                        workspace: workspace.to_string(),
+                                        source_id: id.clone(),
+                                        target_label: base_name.to_string(),
+                                        target_id: None,
+                                        edge_type: "EXTENDS".to_string(),
+                                        category: "EXTRACTED".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    if let Some(interfaces) = node.child_by_field_name("interfaces") {
+                        let mut i_cursor = interfaces.walk();
+                        for child in interfaces.children(&mut i_cursor) {
+                            if child.kind() == "type_list" {
+                                let mut l_cursor = child.walk();
+                                for type_id in child.children(&mut l_cursor) {
+                                    if type_id.kind() == "type_identifier" {
+                                        let iface_name = &content[type_id.byte_range()].trim();
+                                        if !iface_name.is_empty() {
+                                            edges.push(ExtractedEdge {
+                                                workspace: workspace.to_string(),
+                                                source_id: id.clone(),
+                                                target_label: iface_name.to_string(),
+                                                target_id: None,
+                                                edge_type: "IMPLEMENTS".to_string(),
+                                                category: "EXTRACTED".to_string(),
+                                            });
+                                        }
+                                    }
+                                }
+                            } else if child.kind() == "type_identifier" {
+                                let iface_name = &content[child.byte_range()].trim();
+                                if !iface_name.is_empty() {
+                                    edges.push(ExtractedEdge {
+                                        workspace: workspace.to_string(),
+                                        source_id: id.clone(),
+                                        target_label: iface_name.to_string(),
+                                        target_id: None,
+                                        edge_type: "IMPLEMENTS".to_string(),
+                                        category: "EXTRACTED".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // C++: extract base class inheritance (R-048, R-061)
+                if (language == "c" || language == "cpp") && (kind == "class_specifier" || kind == "struct_specifier") {
+                    let mut b_cursor = node.walk();
+                    for child in node.children(&mut b_cursor) {
+                        if child.kind() == "base_class_clause" {
+                            let mut c_cursor = child.walk();
+                            for base_child in child.children(&mut c_cursor) {
+                                if base_child.kind() == "type_identifier" || base_child.kind() == "qualified_identifier" {
+                                    let raw_name = &content[base_child.byte_range()];
+                                    let clean_name = raw_name.rsplit("::").next().unwrap_or(raw_name).trim();
+                                    if !clean_name.is_empty() {
+                                        edges.push(ExtractedEdge {
+                                            workspace: workspace.to_string(),
+                                            source_id: id.clone(),
+                                            target_label: clean_name.to_string(),
+                                            target_id: None,
+                                            edge_type: "EXTENDS".to_string(),
+                                            category: "EXTRACTED".to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 node_id = Some(id);
             }
         }
@@ -564,14 +737,22 @@ impl CodeParser {
                 node_id = Some(id);
             }
         }
-        // Extract struct fields and interface properties (R-057)
+        // Extract struct fields and interface properties (R-057, R-062)
         // Rust & Go: field_declaration
         // TS/JS: property_signature, public_field_definition, field_definition, property_definition
-        else if kind == "field_declaration"
+        // Java: field_declaration (variable_declarator)
+        else if (kind == "field_declaration"
             || kind == "property_signature"
             || kind == "public_field_definition"
             || kind == "field_definition"
-            || kind == "property_definition"
+            || kind == "property_definition")
+            // Prevent detached object literal properties (such as React inline styles: { cursor: 'pointer', color: '#fff' })
+            // from creating isolated orphan nodes that collapse community clustering (R-062).
+            && !(current_parent_id.is_none()
+                && (kind == "property_definition"
+                    || kind == "property_signature"
+                    || kind == "field_definition"
+                    || kind == "public_field_definition"))
         {
             let mut field_names = Vec::new();
             if let Some(name_node) = node.child_by_field_name("name").or_else(|| node.child_by_field_name("property")) {
@@ -581,6 +762,10 @@ impl CodeParser {
                 for c in node.children(&mut cursor) {
                     if c.kind() == "field_identifier" || c.kind() == "property_identifier" {
                         field_names.push(c);
+                    } else if c.kind() == "variable_declarator" {
+                        if let Some(var_name) = c.child_by_field_name("name") {
+                            field_names.push(var_name);
+                        }
                     }
                 }
             }
@@ -639,16 +824,36 @@ impl CodeParser {
                 node_id = Some(id);
             }
         }
+        // Java annotations (R-060)
+        else if kind == "annotation" || kind == "marker_annotation" {
+            if let Some(name_node) = node.child_by_field_name("name") {
+                let name = &content[name_node.byte_range()];
+                let clean_name = name.rsplit('.').next().unwrap_or(name).trim();
+                if let Some(parent) = current_parent_id {
+                    edges.push(ExtractedEdge {
+                        workspace: workspace.to_string(),
+                        source_id: parent.to_string(),
+                        target_label: clean_name.to_string(),
+                        target_id: None,
+                        edge_type: "REFERENCES".to_string(),
+                        category: "EXTRACTED".to_string(),
+                    });
+                }
+            }
+        }
         // Extract function call expressions, method calls, coroutine calls, constructors, and macros
         // Go: call_expression
         // Python: call
         // Rust: call_expression, method_call_expression, macro_invocation
         // JS/TS: call_expression, new_expression
+        // Java: method_invocation, object_creation_expression
         else if kind == "call_expression"
             || kind == "method_call_expression"
             || kind == "call"
             || kind == "new_expression"
             || kind == "macro_invocation"
+            || kind == "method_invocation"
+            || kind == "object_creation_expression"
         {
             if let Some(caller_id) = current_parent_id {
                 let callee_opt = node
@@ -656,6 +861,7 @@ impl CodeParser {
                     .or_else(|| node.child_by_field_name("name"))
                     .or_else(|| node.child_by_field_name("constructor"))
                     .or_else(|| node.child_by_field_name("macro"))
+                    .or_else(|| node.child_by_field_name("type"))
                     .or_else(|| node.child(0));
 
                 if let Some(callee_node) = callee_opt {
@@ -688,10 +894,14 @@ impl CodeParser {
         // Rust: use_declaration
         // Python: import_statement, import_from_statement
         // JS/TS: import_statement
+        // Java: import_declaration
+        // C/C++: preproc_include
         else if kind == "use_declaration"
             || kind == "import_statement"
             || kind == "import_from_statement"
             || kind == "import_spec"
+            || (kind == "import_declaration" && language == "java")
+            || kind == "preproc_include"
         {
             let snippet = &content[node.byte_range()];
             let id = format!("{}:{}:import:{}", workspace, file_path, start_pos.row + 1);

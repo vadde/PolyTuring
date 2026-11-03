@@ -41,7 +41,7 @@
           <div class="brand-title">PolyTuring</div>
           <div class="brand-sub">vadde/PolyTuring monorepo</div>
         </div>
-        <span class="brand-badge">v0.2.2 Living Docs</span>
+        <span class="brand-badge">v0.3.0 Living Docs</span>
       </a>
     </div>
 
@@ -226,6 +226,9 @@
           <a href="#sec-omni-ast" class="nav-tree-link">Polyglot AST &amp; Struct Fields</a>
           <a href="#sec-omni-budget" class="nav-tree-link">Two-Tier Token Budget Math</a>
           <a href="#sec-omni-relational" class="nav-tree-link">SurrealDB Relational Indexing</a>
+          <a href="#sec-omni-triad" class="nav-tree-link">⚡ The Agentic Triad (MCP &amp; CLI)</a>
+          <a href="#sec-omni-topological" class="nav-tree-link">🕸️ Topological Backbone &amp; PPR</a>
+          <a href="#sec-omni-sair" class="nav-tree-link">🛡️ SAIR &amp; Content Partitioning</a>
           <a href="#token-simulator" class="nav-tree-link">Token Budget Simulator</a>
           <a href="#api-playground" class="nav-tree-link">REST API Playbook &amp; Curl</a>
         </div>
@@ -916,6 +919,185 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
           <p>
             During live file modifications, the live watcher daemon performs an <strong>atomic zero-blackout swap</strong>: the HuggingFace TEI vector embedding is computed <em>prior</em> to pruning previous AST nodes. This eliminates the 404 deletion gap from ~250ms down to $\approx 1$ms.
           </p>
+
+          <h3 class="section-h2" id="sec-omni-triad">The Unified Agentic Triad: Native MCP, Ergonomic CLI &amp; Cognitive Playbook</h3>
+          <p>
+            Modern AI coding assistants operate across diverse host environments—from IDE-integrated agents with structured function-calling to autonomous terminal agents and automated CI/CD pipelines. Omni-Graph v0.3.0 coordinates across three complementary, zero-friction execution modalities backed by the same high-performance Rust core:
+          </p>
+
+          <div class="canvas-container">
+            <div class="canvas-header-bar">
+              <span class="canvas-type-tag">Agentic Architecture · The Triad Blueprint</span>
+              <div class="canvas-controls-group">
+                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                <span class="zoom-level-badge">100%</span>
+                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                  <span>Theater</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-viewport">
+              <div class="canvas-content-surface">
+                <pre class="mermaid">
+flowchart TB
+    subgraph Brain["🧠 The Brain: Agent Skill (SKILL.md)"]
+        S1["Tactical Mental Model"]
+        S2["Reconnaissance Progression: Macro → Meso → Micro"]
+        S3["Guardrail: Bounded 1500-Token Slicing"]
+    end
+
+    subgraph Nervous["⚡ The Nervous System: Native MCP Server"]
+        MCP1["stdio JSON-RPC 2.0 (2024-11-05 spec)"]
+        MCP2["Hermetic uv run execution"]
+        MCP3["Zero-Token Shell-Free Tool Dispatch"]
+    end
+
+    subgraph Hands["🛠️ The Hands: Ergonomic CLI (scripts/omni)"]
+        CLI1["Lightweight POSIX Subcommands"]
+        CLI2["Auto Workspace and Git Root Detection"]
+        CLI3["Clean Tables and Markdown Formatting"]
+    end
+
+    Brain -->|Directs Protocol Strategy| Nervous
+    Brain -->|Falls Back in Terminal| Hands
+    Nervous -->|Fast AST Queries| CoreDaemon["omni-rust-app (:8080)"]
+    Hands -->|Fast Local Execution| CoreDaemon
+</pre>
+              </div>
+            </div>
+          </div>
+
+          <p>
+            The native Model Context Protocol (MCP) server executes hermetically via <strong><code>uv run --script</code></strong> (PEP 723 inline dependency metadata). It guarantees zero environment drift, requires no manual virtualenv lifecycle management, and provides first-class native tool dispatch for Claude Desktop, Cursor, Windsurf, Roo Code, and the Antigravity CLI:
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <div class="code-header-left">
+                <span class="code-lang-tag">JSON</span>
+                <span class="code-file-path">claude_desktop_config.json</span>
+              </div>
+              <button class="copy-btn" data-target="mcp-config" title="Copy code snippet">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <pre><code id="mcp-config">{
+  "mcpServers": {
+    "omni-graph": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "/absolute/path/to/PolyTuring/tools/omni-graph/scripts/omni-mcp.py"
+      ],
+      "env": {
+        "OMNI_API_URL": "http://localhost:8080",
+        "OMNI_WORKSPACE": "PolyTuring"
+      }
+    }
+  }
+}</code></pre>
+          </div>
+
+          <h3 class="section-h2" id="sec-omni-topological">Topological Containment Backbone &amp; Personalized PageRank (PPR)</h3>
+          <p>
+            In a random software call graph $G(V, E)$, a giant connected component only exists when the average vertex degree exceeds the percolation threshold $\langle k \rangle = \frac{2|E|}{|V|} > 1.0$. Because software call graphs are naturally sparse ($|E|/|V| \approx 1.07$), codebases break into disjoint orphan clusters without containment.
+          </p>
+          <p>
+            Omni-Graph v0.3.0 introduces <strong>Topological Containment Edges</strong> connecting workspaces $\to$ folders $\to$ files $\to$ declared symbols, ensuring 100% DAG reachability from root:
+          </p>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Edge Type</th>
+                  <th>Source $\to$ Target</th>
+                  <th>Weight ($w$)</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>IMPLEMENTS</code></td>
+                  <td>Struct $\to$ Trait / Interface</td>
+                  <td><code>3.0</code></td>
+                  <td>Strong semantic polymorphism binding</td>
+                </tr>
+                <tr>
+                  <td><code>CALLS</code></td>
+                  <td>Function $\to$ Function / Method</td>
+                  <td><code>2.0</code></td>
+                  <td>Control flow execution chain</td>
+                </tr>
+                <tr>
+                  <td><code>TYPE_REF</code></td>
+                  <td>Variable $\to$ Struct / Class Type</td>
+                  <td><code>1.5</code></td>
+                  <td>Structural type dependency</td>
+                </tr>
+                <tr>
+                  <td><code>IMPORTS</code></td>
+                  <td>File $\to$ External Symbol / Package</td>
+                  <td><code>1.0</code></td>
+                  <td>Module dependency boundary</td>
+                </tr>
+                <tr>
+                  <td><code>CONTAINS</code></td>
+                  <td>File $\to$ Declared Symbol</td>
+                  <td><code>0.8</code></td>
+                  <td>Syntactic lexical containment</td>
+                </tr>
+                <tr>
+                  <td><code>CONTAINS_FILE</code></td>
+                  <td>Directory $\to$ Contained File</td>
+                  <td><code>0.4</code></td>
+                  <td>Filesystem directory containment</td>
+                </tr>
+                <tr>
+                  <td><code>CONTAINS_DIR</code></td>
+                  <td>Workspace / Parent Dir $\to$ Subdirectory</td>
+                  <td><code>0.2</code></td>
+                  <td>Hierarchical project scaffolding</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            To prevent naive FIFO truncation from dropping critical orchestrators when neighbor sets exceed 60 nodes, Omni-Graph executes <strong>Personalized PageRank (PPR) power iteration</strong> ($\alpha = 0.85$, 25 iterations) centered on the root symbol vector $\mathbf{p}_0$:
+          </p>
+
+          <div class="callout-card" style="border-left: 4px solid var(--accent-violet);">
+            <div class="callout-header">
+              <span class="callout-icon">📐</span>
+              <span class="callout-title">Power-Iteration PPR Mathematical Formulation</span>
+            </div>
+            <div class="callout-body">
+              $$\mathbf{p}^{(t+1)} = \alpha \mathbf{A}^\top \mathbf{D}^{-1} \mathbf{p}^{(t)} + (1 - \alpha) \mathbf{p}_0$$
+              where $\mathbf{A}$ is the weighted adjacency matrix, $\mathbf{D}$ is the diagonal degree matrix, and $\mathbf{p}_0$ distributes initial restart mass uniformly across root symbols. Neighbors are sorted by $\mathbf{p}^*$ stationary scores, guaranteeing that interconnected hub callers rank significantly higher than isolated leaf functions.
+            </div>
+          </div>
+
+          <h3 class="section-h2" id="sec-omni-sair">Enterprise Disambiguation: Scope-Aware Import Resolution (SAIR) &amp; Content Partitioning</h3>
+          <p>
+            In enterprise polyglot repositories, high-precision code intelligence requires solving two fundamental computational challenges:
+          </p>
+          <ol style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
+            <li><strong>Lexical Scope Ambiguity</strong>: Common polymorphic function identifiers (such as <code>new()</code>, <code>run()</code>, <code>init()</code>, <code>parse()</code>) demand lexical namespace scoping to prevent false-positive dependency edges across unrelated packages.</li>
+            <li><strong>Cross-Modal Semantic Shadowing</strong>: Verbose architectural documentation and narrative changelogs can semantically overshadow concise code signatures during dense vector retrieval.</li>
+          </ol>
+          <p>
+            Omni-Graph v0.3.0 solves both challenges with mathematical precision:
+          </p>
+          <ul style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
+            <li><strong>3-Tier SAIR Resolution Ladder</strong>: Local file scope first $\to$ Directory/module namespace second $\to$ Generic Verb Blacklist (preventing spurious cross-package edge synthesis for common generic verbs).</li>
+            <li><strong>Dual-Tier Content Partitioning</strong>: Storage and vector indexes are partitioned into dedicated code and documentation tiers. Vector search and Graph-RAG queries default to <code>include_docs=false</code>, querying verified source code AST nodes with sub-millisecond precision unless architectural documentation is explicitly requested.</li>
+          </ul>
         </div>
       </section>
 

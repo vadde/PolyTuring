@@ -8,9 +8,9 @@ pub use worktree::{detect_git_worktree, discover_parent_worktrees, WorktreeInfo}
 use crate::analysis::CommunityDetector;
 use crate::db::DbClient;
 use crate::embedder::EmbedderClient;
-use crate::parser::CodeParser;
+use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -249,6 +249,7 @@ impl IngestionPipeline {
         let mut files_skipped = 0;
         let mut total_nodes = 0;
         let mut total_edges = 0;
+        let mut discovered_dirs: HashSet<String> = HashSet::new();
 
         for entry in WalkDir::new(root)
             .into_iter()
@@ -343,6 +344,17 @@ impl IngestionPipeline {
                 .to_string_lossy()
                 .to_string();
 
+            // Collect directory hierarchy for Topological Containment Backbone (R-063)
+            let mut cur_dir = Path::new(&rel_path).parent();
+            while let Some(parent) = cur_dir {
+                let p_str = parent.to_string_lossy().to_string();
+                if p_str.is_empty() || p_str == "." {
+                    break;
+                }
+                discovered_dirs.insert(p_str);
+                cur_dir = parent.parent();
+            }
+
             if !self.cache.is_stale(&rel_path, &hash).await {
                 files_skipped += 1;
                 continue;
@@ -358,9 +370,71 @@ impl IngestionPipeline {
                     continue;
                 }
 
+                // Topological Containment Backbone (R-063): Synthesize File node and containment edges
+                let filename = Path::new(&rel_path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| rel_path.clone());
+                let ext = Path::new(&rel_path)
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let total_lines = content.lines().count().max(1);
+                let preview_text = match content.char_indices().nth(500) {
+                    Some((idx, _)) => &content[..idx],
+                    None => &content,
+                };
+                let file_node_id = format!("{}:file:{}", workspace_name, rel_path);
+                let file_node = ExtractedNode {
+                    id: file_node_id.clone(),
+                    workspace: workspace_name.clone(),
+                    label: filename.clone(),
+                    kind: "file".to_string(),
+                    file_path: rel_path.clone(),
+                    language: ext,
+                    line_start: 1,
+                    line_end: total_lines,
+                    text: preview_text.to_string(),
+                };
+
+                let mut all_nodes = Vec::with_capacity(parse_res.nodes.len() + 1);
+                all_nodes.push(file_node);
+                all_nodes.extend(parse_res.nodes);
+
+                let mut all_edges = parse_res.edges;
+                // Emit CONTAINS edge from File to each extracted symbol
+                for sym in &all_nodes[1..] {
+                    all_edges.push(ExtractedEdge {
+                        workspace: workspace_name.clone(),
+                        source_id: file_node_id.clone(),
+                        target_label: sym.label.clone(),
+                        target_id: Some(sym.id.clone()),
+                        edge_type: "CONTAINS".to_string(),
+                        category: "CONTAINMENT".to_string(),
+                    });
+                }
+
+                // Emit CONTAINS_FILE edge from parent directory (or workspace) to File
+                let parent_dir = Path::new(&rel_path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let dir_source_id = if parent_dir.is_empty() || parent_dir == "." {
+                    format!("{}:workspace", workspace_name)
+                } else {
+                    format!("{}:dir:{}", workspace_name, parent_dir)
+                };
+                all_edges.push(ExtractedEdge {
+                    workspace: workspace_name.clone(),
+                    source_id: dir_source_id,
+                    target_label: filename.clone(),
+                    target_id: Some(file_node_id),
+                    edge_type: "CONTAINS_FILE".to_string(),
+                    category: "CONTAINMENT".to_string(),
+                });
+
                 // Batch vector embeddings via TEI with context-enriched header (R-004, R-037)
-                let enriched_texts: Vec<String> = parse_res
-                    .nodes
+                let enriched_texts: Vec<String> = all_nodes
                     .iter()
                     .map(|n| format!("[{}] {} {} in {}\n{}", n.language, n.kind, n.label, n.file_path, n.text))
                     .collect();
@@ -370,7 +444,7 @@ impl IngestionPipeline {
                     Err(e) => {
                         warn!("Embedding generation failed for {}: {}", rel_path, e);
                         // Zero vector fallback if TEI is busy or degraded
-                        vec![vec![0.0f32; 384]; parse_res.nodes.len()]
+                        vec![vec![0.0f32; 384]; all_nodes.len()]
                     }
                 };
 
@@ -379,18 +453,18 @@ impl IngestionPipeline {
 
                 let mut stored_nodes_ok = false;
                 // Store nodes with workspace namespace and file hash (R-005, Finding #4)
-                if let Err(e) = self.db.store_nodes(&parse_res.nodes, &embeddings, Some(&hash)).await {
+                if let Err(e) = self.db.store_nodes(&all_nodes, &embeddings, Some(&hash)).await {
                     error!("Failed to store nodes for {}: {}", rel_path, e);
                 } else {
-                    total_nodes += parse_res.nodes.len();
+                    total_nodes += all_nodes.len();
                     stored_nodes_ok = true;
                 }
 
                 // Store edges with workspace namespace (R-006)
-                if let Err(e) = self.db.store_edges(&parse_res.edges).await {
+                if let Err(e) = self.db.store_edges(&all_edges).await {
                     error!("Failed to store edges for {}: {}", rel_path, e);
                 } else {
-                    total_edges += parse_res.edges.len();
+                    total_edges += all_edges.len();
                 }
 
                 if stored_nodes_ok {
@@ -412,6 +486,70 @@ impl IngestionPipeline {
                     }
                 }
             }
+        }
+
+        // Store Topological Containment Backbone: Workspace root, directories, and CONTAINS_DIR edges (R-063)
+        let ws_root_node = ExtractedNode {
+            id: format!("{}:workspace", workspace_name),
+            workspace: workspace_name.clone(),
+            label: workspace_name.clone(),
+            kind: "workspace".to_string(),
+            file_path: String::new(),
+            language: String::new(),
+            line_start: 0,
+            line_end: 0,
+            text: format!("Workspace root: {}", workspace_name),
+        };
+
+        let mut dir_nodes = Vec::with_capacity(discovered_dirs.len() + 1);
+        let mut dir_edges = Vec::with_capacity(discovered_dirs.len());
+        dir_nodes.push(ws_root_node);
+
+        for dir in &discovered_dirs {
+            let dir_name = Path::new(dir)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| dir.clone());
+            dir_nodes.push(ExtractedNode {
+                id: format!("{}:dir:{}", workspace_name, dir),
+                workspace: workspace_name.clone(),
+                label: dir_name.clone(),
+                kind: "directory".to_string(),
+                file_path: dir.clone(),
+                language: String::new(),
+                line_start: 0,
+                line_end: 0,
+                text: format!("Directory: {}", dir),
+            });
+
+            let parent_of_dir = Path::new(dir)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let parent_id = if parent_of_dir.is_empty() || parent_of_dir == "." {
+                format!("{}:workspace", workspace_name)
+            } else {
+                format!("{}:dir:{}", workspace_name, parent_of_dir)
+            };
+            dir_edges.push(ExtractedEdge {
+                workspace: workspace_name.clone(),
+                source_id: parent_id,
+                target_label: dir_name,
+                target_id: Some(format!("{}:dir:{}", workspace_name, dir)),
+                edge_type: "CONTAINS_DIR".to_string(),
+                category: "CONTAINMENT".to_string(),
+            });
+        }
+
+        if let Err(e) = self.db.store_nodes(&dir_nodes, &[], None).await {
+            warn!("Failed to store directory backbone nodes: {}", e);
+        } else {
+            total_nodes += dir_nodes.len();
+        }
+        if let Err(e) = self.db.store_edges(&dir_edges).await {
+            warn!("Failed to store directory backbone edges: {}", e);
+        } else {
+            total_edges += dir_edges.len();
         }
 
         // Auto-cluster upon ingestion: Compute Louvain/Leiden modularity communities

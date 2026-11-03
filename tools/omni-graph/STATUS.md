@@ -1,13 +1,14 @@
 ---
 tool: omni-graph
 status: in-progress
-version: 0.2.2
+version: 0.3.0
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-10-13
+last_updated: 2026-11-03
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
+nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 ---
 
 # SDLC Status
@@ -38,6 +39,7 @@ spec: ../../specs/catalog/omni-graph.md
 | 2026-10-09 | `in-progress` | `in-progress` | Third-round forensic audit: Ambient live-watch auto-enrollment, polyglot multi-symbol imports (R-044), two-tier condenser token budgeting (<1500 tokens, R-028), zero-blackout live re-indexing, and ingestion path security containment |
 | 2026-10-09 | `in-progress` | `in-progress` | Fourth-round forensic audit: Polyglot struct field & interface property AST extraction (R-057), targeted neighborhood Graph-RAG retrieval, strict Graph-RAG token budgeting, worktree hierarchy deduplication, SurrealQL statement index resilience (`extract_sql_arrays`), and relational graph edge indexing (`linked_to`) |
 | 2026-10-13 | `in-progress` | `in-progress` | Safe SurrealDB volume purge automation (reset-graph-db / reset-db), storage reset preserving TEI model cache, UI worktree fleet switcher & lineage HUD integration |
+| 2026-11-03 | `in-progress` | `in-progress` | Holistic multi-disciplinary retrospective & scientific introspection across 5 foundational lenses; author Next-Gen Spec v0.3.0 (R-060 to R-072: Java/C++ AST, Leiden clustering, Two-Tower RRF hybrid search, Content partitioning, PPR context slicing, and native MCP server) |
 
 ---
 
@@ -45,9 +47,9 @@ spec: ../../specs/catalog/omni-graph.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 50 | 50 | 100% |
-| Acceptance Criteria (AC-XXX) | 24 | 24 | 100% |
-| Non-Functional (NF-XXX) | 11 | 11 | 100% |
+| Requirements (R-XXX) | 78 | 80 | 97.5% |
+| Acceptance Criteria (AC-XXX) | 35 | 37 | 94.6% |
+| Non-Functional (NF-XXX) | 15 | 15 | 100% |
 
 ---
 
@@ -77,7 +79,7 @@ spec: ../../specs/catalog/omni-graph.md
 | R-018 | Semantic search bar in UI | `ui/src/` | — | ✅ |
 | R-019 | SurrealDB schema auto-initialization | `src/db/schema.surql` | `tests/db/` | ✅ |
 | R-020 | Graceful orphaned node handling | `src/api/`, `ui/src/` | `tests/api/` | ✅ |
-| R-021 | File watcher daemon (FSEvents) | `src/watcher/` | `tests/watcher/` | ⬜ |
+| R-021 | File watcher daemon (FSEvents) | `src/watcher/` | `tests/unit_tests.rs` | ✅ |
 | R-022 | GET /api/health | `src/api/` | `tests/api/` | ✅ |
 | R-023 | GET /api/stats | `src/api/` | `tests/api/` | ✅ |
 | R-024 | Docker DNS hostnames (no localhost) | `docker-compose.yml`, `src/config/` | — | ✅ |
@@ -116,6 +118,26 @@ spec: ../../specs/catalog/omni-graph.md
 | R-057 | Proactive Agent Hook & Worktree Auto-Remediation Banner | `.agents/scripts/`, `scripts/` | `tests/unit_tests.rs` | ✅ |
 | R-058 | Rebase Storm Debouncing & Surge Suppression | `src/watcher/` | `tests/unit_tests.rs` | ✅ |
 | R-059 | Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync | `src/ingestion/worktree.rs`, `src/api/` | `tests/unit_tests.rs` | ✅ |
+| R-060 | Java Tree-sitter Parser Integration (classes, records, methods) | `src/parser/mod.rs:96-99, 288, 632, 903` | `tests/unit_tests.rs:1799` | ✅ |
+| R-061 | C/C++ Tree-sitter Parser Integration (structs, functions, `#include`) | `src/parser/mod.rs:101-109, 301, 355, 689` | `tests/unit_tests.rs:1847` | ✅ |
+| R-062 | TypeScript Deep AST Hardening & Detached Property Filtering | `src/parser/mod.rs:740-756` | `tests/unit_tests.rs:1891` | ✅ |
+| R-063 | Topological Containment Backbone (`CONTAINS_DIR` & `CONTAINS_FILE`) | `src/ingestion/mod.rs:125-145`, `src/db/mod.rs:165-175` | `tests/unit_tests.rs:1932, 1943` | ✅ |
+| R-064 | Hierarchical Community Consolidation & Macro-Cluster Size Floor (CPM/Modularity) | `src/analysis/mod.rs:190-330` | `tests/unit_tests.rs:1701-1770` | ✅ |
+| R-065 | Scope-Aware Import Resolution (SAIR) (eliminating bare name collisions) | `src/db/mod.rs:459-515` | `tests/unit_tests.rs:1643-1695` | ✅ |
+| R-066 | Two-Tower Hybrid Retrieval Engine (Tantivy BM25 + HNSW Vector RRF) | `src/retrieval/` | — | ⬜ (Deferred to v0.3.1) |
+| R-067 | Content Tier Partitioning (`code_node` vs `doc_node` in vector search & Graph-RAG) | `src/db/mod.rs:320-365`, `src/api/mod.rs:322` | Live HTTP `/api/search?include_docs=true` | ✅ |
+| R-068 | Strict Binary-Search Budgeting (<1,500 tokens) & Syntax Normalization | `src/condenser/mod.rs:180-250` | `tests/unit_tests.rs:880-920` | ✅ |
+| R-069 | Personalized PageRank (PPR) Neighborhood Slicing (Unweighted Multigraph) | `src/condenser/mod.rs:20-81` | `tests/unit_tests.rs:892` | ✅ |
+| R-070 | Native Model Context Protocol (MCP) Server for Omni-Graph | `tools/omni-graph/scripts/omni-mcp.py` | Live stdio JSON-RPC 2.0 | ✅ |
+| R-071 | Portable Standalone Skill & One-Click CLI Bootstrapper | `tools/omni-graph/scripts/setup-agent.sh:110-270` | `make setup-agent` | ✅ |
+| R-072 | Incremental AST Subtree Diffing (Diffsitter Pattern) | `src/watcher/` | — | ⬜ (Deferred to v0.3.1) |
+| R-073 | Dynamic Watcher Status Merging in /api/workspaces (is_watching) | `src/api/mod.rs:120-145` | `tests/unit_tests.rs:1520-1550` | ✅ |
+| R-074 | In-Flight Syncing Status Preservation Guardrail | `src/api/mod.rs:135`, `src/watcher/mod.rs:78` | Live multi-file edit verification | ✅ |
+| R-075 | Canonical Path Normalization & Idempotency in WatcherManager | `src/watcher/mod.rs:65-95` | `tests/unit_tests.rs:1560-1580` | ✅ |
+| R-076 | Watcher Telemetry Cumulative Metric Retention | `src/watcher/mod.rs:105-140` | Live `/api/watch/status` | ✅ |
+| R-077 | Unified Ergonomic CLI Binary (`omni` tool) | `tools/omni-graph/scripts/omni.sh` | Live CLI commands | ✅ |
+| R-078 | Standardized JSON-RPC 2.0 MCP Tool Schema | `tools/omni-graph/scripts/omni-mcp.py` | Live JSON-RPC initialize & call | ✅ |
+| R-079 | Adaptive Skill-MCP Dual Bridge Protocol | `.agents/skills/omni-graph/SKILL.md` | Skill installation audit | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

@@ -1,6 +1,6 @@
 [package]
 name = "omni-graph"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["@vadde"]
 description = "100% local multi-container semantic knowledge hub: AST graphs + vector embeddings on Apple Silicon"
@@ -19,6 +19,9 @@ tree-sitter-python = "0.21"
 tree-sitter-javascript = "0.21"
 tree-sitter-typescript = "0.21"
 tree-sitter-go = "0.21"
+tree-sitter-java = "0.21"
+tree-sitter-c = "0.21"
+tree-sitter-cpp = "0.21"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 walkdir = "2.5"

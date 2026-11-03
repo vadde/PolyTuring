@@ -19,6 +19,7 @@ Usage: omni.sh <command> [args...]
 Commands:
   health                     Check service health (Rust API, SurrealDB, TEI)
   workspaces                 List all indexed codebases/workspaces and stats
+  worktrees [sync [ws]]      List or sync git worktrees across parent codebases
   search <query> [ws] [k]    Vector similarity search (optional workspace filter)
   symbol <name> [ws]         Symbol definition lookup (LSP definition)
   references <symbol> [ws]   Find all callers/references (LSP references)
@@ -71,9 +72,28 @@ try:
             langs = ', '.join(item.get('languages', []))
             files = len(item.get('files', []))
             print(f'{ws:<25} {nodes:<15} {langs:<20} {files:<10}')
+            for wt in item.get('worktrees', []):
+                wt_name = wt.get('workspace', '')
+                wt_branch = wt.get('branch', '')
+                wt_nodes = wt.get('total_nodes', 0)
+                print(f'  └── 🌿 {wt_branch:<21} ({wt_name}) {wt_nodes:,} nodes')
 except Exception as e:
     print(f'Error connecting to Omni-Graph API: {e}')
 "
+    ;;
+
+  worktrees)
+    ACTION="${1:-list}"
+    if [ "$ACTION" = "sync" ]; then
+      WS="$(norm_ws "${2:-}")"
+      PAYLOAD="{}"
+      if [ -n "$WS" ]; then
+        PAYLOAD="{\"workspace\": \"$WS\"}"
+      fi
+      curl -sf -X POST "${ENDPOINT}/api/worktrees/sync" -H "Content-Type: application/json" -d "$PAYLOAD" | python3 -m json.tool 2>/dev/null || curl -s -X POST "${ENDPOINT}/api/worktrees/sync" -H "Content-Type: application/json" -d "$PAYLOAD"
+    else
+      curl -sf "${ENDPOINT}/api/worktrees" | python3 -m json.tool 2>/dev/null || curl -s "${ENDPOINT}/api/worktrees"
+    fi
     ;;
 
   search)

@@ -4,6 +4,114 @@
 > **Append-only** — never delete entries, only add new ones at the top.
 > Each entry captures what happened, what changed, and what to do next.
 
+### 2026-11-03 — Triad Execution Hierarchy, Rosetta Stone & Degraded Recovery Playbook in SKILL.md
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.3.0 Hardening & Architectural Overhaul)
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`
+**Duration**: ~35m
+
+#### Context & Objectives
+- Addressed user inquiry regarding how the 3 interface offerings (Native MCP, Ergonomic CLI, Low-Level Curl fallback) map under the hood, how the installable skill carries all permutations and combinations, and how coding assistants maintain 100% operational continuity even when services or configurations are degraded or out-of-order.
+- Unified `.agents/skills/omni-graph/SKILL.md` and `tools/omni-graph/skills/omni-graph/SKILL.md` into an authoritative, foolproof cognitive manual.
+
+#### Key Updates
+1. **The Deterministic Decision Flowchart**:
+   - Priority 1: Native MCP (`omni_*` tools) when present in model context (zero token consumption, typed JSON schemas).
+   - Priority 2: Ergonomic CLI (`./scripts/omni <subcmd>`) when bash tool access exists (workspace auto-resolution, clean formatting).
+   - Priority 3: Low-Level Curl REST (`http://localhost:8080/api/...`) as the indestructible universal floor.
+2. **Master Rosetta Stone (1-to-1 Equivalence)**:
+   - Formulated a comprehensive mapping table translating 10 core intents across all 3 tiers (Symbol, References, Condense, Search, Doc Search, Galaxies, Query, Relate, Workspaces, Watcher).
+3. **The Degraded & Out-of-Order Self-Healing Playbook**:
+   - Created explicit, step-by-step recovery protocols for 9 real-world scenarios:
+     1. MCP tool not present in model context (switch to CLI without hallucinating tool names).
+     2. CLI permission denied / file not found (`chmod +x` or relative root fallback).
+     3. Daemon down / connection refused (Docker container health inspect, `make up`, and graceful cold fallback respecting the 150-line gate).
+     4. Workspace not indexed or zero nodes (workspace discovery and one-time ingestion).
+     5. Symbol lookup returns 0 matches (dense vector fallback, galaxy mapping).
+     6. Symbol ambiguity across multiple polyglot files (file path & language filtering).
+     7. Subgraph condensation budget exceeded (PPR power iteration truncation & `hops=1` tuning).
+     8. Live watcher telemetry desynchronization (status query & idempotent restart).
+     9. Operating in isolated Git worktrees (worktree sync and branch-scoped queries).
+4. **Script & Installer Synchronization**:
+   - Copied `tools/omni-graph/scripts/omni-mcp.py` to `.agents/skills/omni-graph/scripts/omni-mcp.py` and `tools/omni-graph/skills/omni-graph/scripts/omni-mcp.py`.
+   - Updated `tools/omni-graph/scripts/setup-agent.sh` to ensure `omni-mcp.py` permissions are set (`chmod +x`) during workspace, global, and custom target setups.
+   - Verified both `SKILL.md` copies are 100% identical via `diff -u`.
+
+#### Verification
+- `cargo test --manifest-path tools/omni-graph/Cargo.toml`: 82/82 passing in 0.01s.
+- `make validate-specs`: 0 errors, 0 warnings.
+- `make docs-test`: Deterministically passed all 14 gates.
+
+
+### 2026-11-03 — Next-Gen Hardening: Watcher Sync, Polyglot ASTs, Galaxy Consolidation, SAIR, Content Partitioning & Agentic Triad (MCP + CLI + Skill)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.3.0 Hardening & Architectural Overhaul)
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`
+**Duration**: ~1h 15m
+
+#### Problems & Root Causes Identified
+1. **The Watcher Thrasher Loop (Telemetry Desynchronization - R-073 to R-076)**:
+   - `GET /api/workspaces` queried SurrealDB on disk which omitted in-memory watcher state (`is_watching`).
+   - `hook_pre_invocation.sh` saw `is_watching = None` and issued redundant `POST /api/watch/start` requests on every turn.
+   - Result: Watcher loops were killed and restarted, spawning spurious log noise.
+2. **The 936-Galaxy LPA Collapse (Finding #2 & R-064)**:
+   - In sparse code graphs ($|E|/|V| \approx 1.07$), label propagation left isolated nodes with degree 0 in their own unique community IDs.
+   - Detached CSS style properties (`color`, `cursor`, `borderRadius`) in React inline styles formed 1-node galaxies labeled "Domain Service".
+   - `/api/galaxies` emitted 936 micro-clusters (~292 KB payload), burning agent context windows.
+3. **The Cross-Package Link Contamination Bug (Finding #1 & R-065)**:
+   - `store_edges` in `src/db/mod.rs` fell back to `SELECT VALUE id FROM node WHERE workspace = '$ws' AND label = '$label' LIMIT 1`.
+   - Generic function names (`new`, `run`, `init`, `start`) called in one module linked to arbitrary cross-package files in unrelated tools.
+4. **Markdown Semantic Shadowing Pathology (Finding #3 & R-067)**:
+   - Dense vector search (`bge-small-en-v1.5`) matches natural English questions against markdown headings and DEVLOG summaries rather than concise code signatures.
+   - `/api/query` returned DEVLOG headings and 0 lines of actual code implementation.
+5. **Ergonomic Friction & Shell Escaping Pitfalls (Community Feedback & R-077, R-078)**:
+   - Coding assistants were forced to construct complex curl calls in bash tool executions, creating shell quote escaping bugs and token waste (~150 tokens per tool call).
+
+#### Remediations Implemented
+1. **Watcher Telemetry Synchronization (`src/api/mod.rs`, `src/watcher/mod.rs`)**:
+   - Implemented `inject_watcher_status()` in `workspaces_handler` to query in-memory `state.watcher.get_status().await` and dynamically inject `"is_watching": true/false`.
+   - In `WatcherManager::start_watch`, added canonical path normalization (`std::fs::canonicalize`), trailing slash trimming, idempotent no-op returns if already watching, and clean cancellation (`cancel_tx.send(())`).
+   - Verified live: Zero redundant `/api/watch/start` calls in `docker logs omni-rust-app`, zero watcher cancellations, live sync verified at 731ms.
+2. **Polyglot Tree-sitter Parsers & Property Filtering (`src/parser/mod.rs`, `Cargo.toml`)**:
+   - Added `tree-sitter-java = "0.21"`, `tree-sitter-c = "0.21"`, `tree-sitter-cpp = "0.21"`.
+   - Extracted Java classes, interfaces, records, methods, annotations, field declarations, and `EXTENDS`/`IMPLEMENTS` inheritance.
+   - Extracted C/C++ structs, classes, functions, namespaces, and `#include` dependencies.
+   - Filtered detached TS/JS object literal properties (`cursor`, `color`, `borderRadius`), preventing spurious single-node galaxies.
+3. **Hierarchical Community Consolidation & Macro Subsystem Floor (`src/analysis/mod.rs`, `src/api/mod.rs`)**:
+   - Implemented `CommunityDetector::consolidate_communities()` using a 3-criterion hierarchical rollup:
+     - Priority 1: Topological affinity (edge connections to any macro cluster)
+     - Priority 2: Directory / Spatial locality
+     - Priority 3: Dominant cluster fallback
+   - Updated `galaxies_handler` to filter `min_size >= 5` and default `limit = 15`.
+   - Verified live: `/api/galaxies` payload plummeted from 292 KB to 8.6 KB; returns the top 15 architectural galaxies cleanly.
+4. **Scope-Aware Import Resolution (SAIR - R-065) (`src/db/mod.rs`)**:
+   - Tier 1: Check in-file definition.
+   - Tier 2: Check directory/module scope (`string::starts_with(file_path, '$pdir/')`).
+   - Tier 3: Guard generic verbs (`new`, `run`, `init`, `start`, `stop`, `handle`, `execute`, etc.) against arbitrary cross-package links.
+5. **Content-Tier Partitioning (`src/db/mod.rs`, `src/api/mod.rs`, `src/analysis/mod.rs`)**:
+   - Added `include_docs: bool` (default `false`) to `search_vector`, `SearchParams`, `GraphRagPayload`, and `GraphRagEngine::query`.
+   - Cured Markdown Semantic Shadowing by enforcing code-first filtering `language != 'markdown' AND !string::ends_with(file_path, '.md')`.
+6. **Native Model Context Protocol (MCP) Server (`scripts/omni-mcp.py`, R-070, R-078)**:
+   - Implemented standard JSON-RPC 2.0 stdio MCP server exposing 6 core tools: `omni_definition`, `omni_references`, `omni_condense`, `omni_search`, `omni_galaxies`, `omni_query`.
+   - Auto-detects workspace from `$OMNI_WORKSPACE`, git rev-parse, or `$PWD`.
+   - Verified live with JSON-RPC test frames: instantaneous (<15ms) responses.
+7. **Unified Ergonomic CLI (`scripts/omni`, R-077)**:
+   - Created `scripts/omni` root symlink and updated CLI subcommands (`symbol`, `references`, `condense`, `search`, `galaxies`, `query`).
+8. **The Agentic Triad Architecture & Cognitive Bridge (R-079)**:
+   - Synchronized `SKILL.md` across repository and tool folder, formalizing the Triad: Skill (Brain & Strategy) + MCP Server (Nervous System) + CLI (Hands).
+
+#### Verification & Live Results
+- `cargo test --manifest-path tools/omni-graph/Cargo.toml`: 79/79 unit and integration tests passing.
+- `make validate-specs`: 100% clean validation, 0 errors, 0 warnings.
+- Live Docker Rebuild: `omni-rust-app` rebuilt and healthy on port 8080.
+- Live `/api/galaxies`: Returns top 15 macro galaxies (8.6 KB payload vs 292 KB previously).
+- Live MCP stdio handshake: All 6 tools verified over JSON-RPC.
+- Live Watcher: Active on 3,948 nodes with 0 thrashing or desynchronization.
+
+---
+
 ### 2026-10-09 — Fourth-Round Forensic Audit: Graph Indexing, Worktree Deduplication, Targeted Graph-RAG & Struct Field AST Extraction
 
 **Agent/Author**: Antigravity (Google DeepMind)
@@ -2057,3 +2165,120 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
   - Replaced verbose 8-line curl template banner (~220 tokens) with a 3-line high-density cheat-sheet (~46 tokens).
   - Upgraded debounce mechanism from invocation index to millisecond timestamp threshold (`<1.5s`), completely eliminating dual-hook execution races on user prompts and tool steps.
   - Compressed PreToolUse deny notices to direct, actionable 1-2 line messages.
+
+---
+
+### Session Log: 2026-11-03 — Holistic Multi-Disciplinary Retrospective, Scientific Introspection & Next-Gen Architecture (v0.3.0)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Machine Learning Scientist & Systems Architect  
+**SDLC Phase**: `in-progress` (Spec Evolution & Algorithmic Foundations)  
+**Duration**: ~45m  
+
+#### Objectives
+1. Perform an unsparing, first-principles retrospective of Omni-Graph across 5 foundational disciplines: Computer Science & Compilers, Discrete Mathematics & Graph Theory, Physics & Statistical Mechanics, Machine Learning & Modern IR, and Behavioral Sciences & Cognitive Load Theory.
+2. Empirically diagnose why macroscopic clustering collapses into 936 single-node galaxies on `PolyTuring` and why Graph-RAG `/api/query` produces markdown prose headings instead of source code functions.
+3. Benchmark Omni-Graph against FAANG and state-of-the-art enterprise architectures (Google Kythe, Sourcegraph SCIP, Microsoft GraphRAG, DeusData `codebase-memory-mcp`, `ast-grep`, and RepoGraph ICLR 2024).
+4. Produce a comprehensive scientific introspection artifact in the brain knowledge base and author the formal Next-Gen Specification (`specs/catalog/omni-graph-nextgen.md`) defining R-060 through R-072.
+
+#### What Was Done
+- **Empirical Diagnostics & Proof of Pathologies**:
+  - Live query of `GET /api/galaxies?workspace=PolyTuring` revealed 936 galaxies for 3,835 nodes (292 KB payload). Root cause isolated to sub-critical percolation threshold ($|E|/|V| \approx 1.07$) where Label Propagation cannot bridge isolated trees.
+  - Live query of `POST /api/query` for `"How does tree-sitter AST parsing work in omni-graph?"` revealed pathological markdown shadowing: 4 out of 5 returned seeds were markdown headers (`DEVLOG.md`, `specs/catalog/omni-graph.md`, `rules/`, `README.md`) and 1 was an import statement, returning 0 lines of actual Rust parser implementation.
+  - Live query of `GET /api/condense` revealed token budget breach (2,323 tokens vs 1,500 target cap) and string-matching call edge collisions (`SimpleRng::new` resolved for `CodeParser`).
+- **Scientific Introspection & Multi-Disciplinary Synthesis**:
+  - Authored deep artifact `omni-graph-scientific-retrospective-and-introspection.md` analyzing compiler theory (AST vs ASG), graph percolation ($p_c$), Leiden modularity ($Q$), energy minimization in Cosmograph WebGL, thermal relevance diffusion (Personalized PageRank), and cognitive ergonomics.
+- **Next-Gen Formal Specification (R-060 through R-072)**:
+  - Authored `specs/catalog/omni-graph-nextgen.md` detailing:
+    - R-060: Java Tree-sitter Parser Integration (classes, records, methods, annotations).
+    - R-061: C/C++ Tree-sitter Parser Integration (structs, templates, `#include` linking).
+    - R-062: TypeScript Deep AST Hardening (decorators, generics, JSX/TSX tags).
+    - R-063: Structural Module & Directory Containment Backbone (`CONTAINS_DIR` & `CONTAINS_FILE`).
+    - R-064: Hierarchical Leiden Community Detection with Modularity Optimization (CPM/modularity, 5–15 galaxies guaranteed).
+    - R-065: Scope-Aware Import Resolution (SAIR) eliminating global bare name collisions.
+    - R-066: Two-Tower Hybrid Retrieval Engine (Tantivy BM25 + SurrealDB HNSW dense vectors with RRF).
+    - R-067: Content Tier Partitioning (`code_node` vs `doc_node`) eliminating markdown shadowing.
+    - R-068: Strict Binary-Search Budgeting (<1,500 tokens) & backtick escaping normalization.
+    - R-069: Personalized PageRank (PPR) Neighborhood Slicing.
+    - R-070: Native Model Context Protocol (MCP) Server for zero-dependency agent tooling.
+    - R-071: Portable One-Click Skill Distribution & CLI Bootstrapper.
+    - R-072: Incremental AST Subtree Diffing (Diffsitter pattern, sub-50ms sync).
+
+---
+
+### Session Log: 2026-11-03 — Watcher Telemetry Synchronization & Idempotency Hardening (R-073 to R-076)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & ML Scientist  
+**SDLC Phase**: `in-progress` (Watcher Telemetry Synchronization)  
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`  
+**Duration**: ~20m  
+
+#### Objectives
+1. Root-cause and eliminate the Watcher Thrasher Loop where `POST /api/watch/start` was bombarded on every agent prompt and tool turn.
+2. Bridge the storage-runtime disconnect by enriching `GET /api/workspaces` with live in-memory watcher statuses (`"is_watching": true/false`).
+3. Harden `WatcherManager::start_watch` with canonical path normalization and idempotent no-op returns when a workspace is already monitored.
+4. Ensure zero breaking changes for other users and coding assistants developing against Omni-Graph.
+
+#### What Was Done
+- **Root-Cause Analysis & Fix (`src/api/mod.rs`)**:
+  - Identified that `GET /api/workspaces` only queried SurrealDB on disk, which had no knowledge of in-memory active watchers.
+  - Implemented `inject_watcher_status`: queries `state.watcher.get_status().await` and dynamically merges `"is_watching": true/false` into root workspaces and nested worktrees.
+- **Idempotency & Clean Cancellation (`src/watcher/mod.rs`)**:
+  - In `start_watch`, added path normalization (trimming trailing slashes and checking canonical paths) before comparing against existing active watchers.
+  - If a workspace is already being watched at the matching path, returns existing status immediately with zero task re-spawns.
+  - If the path changed for that workspace, explicitly signals `active.cancel_tx.send(())` before inserting the replacement, eliminating zombie tasks.
+- **Verification & Live Results**:
+  - Added unit test `test_inject_watcher_status_root_and_worktree` in `tests/unit_tests.rs`. All 73/73 unit tests pass in 0.01s.
+  - Strict Clippy check clean (`cargo clippy -- -D warnings`).
+  - Rebuilt Docker container `omni-rust-app` (`docker compose up -d --build rust-app`).
+  - Verified live:
+    - `curl -s http://localhost:8080/api/workspaces` returned `"is_watching": true` for `PolyTuring`.
+    - Executed multiple tool invocations: zero `/api/watch/start` calls logged, zero watcher restarts, zero cancellation signals.
+    - Modified `tools/omni-graph/STATUS.md`: live delta watcher caught the event and re-indexed in 731ms with zero watcher restart.
+
+---
+
+### Session Log: 2026-11-03 — Topological Backbone & Watcher Syncing State Guardrail (R-063, R-074, R-076)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & ML Scientist  
+**SDLC Phase**: `in-progress` (Watcher State Guardrail & Topological Containment)  
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`  
+**Duration**: ~15m  
+
+#### Objectives
+1. Implement Topological Containment Backbone (R-063) connecting workspaces $\to$ folders $\to$ files $\to$ symbols into a connected DAG with $|E|/|V| \ge 2.5$.
+2. Formally diagnose Observation 001: Resolve telemetry zeroing where modifying files appeared to report 0 events and 0 reindexed files.
+3. Eliminate the `"syncing"` status race condition in `inject_watcher_status` and `start_watch`.
+
+#### Root Cause Analysis (Observation 001)
+1. **The In-Flight Syncing Telemetry Desync**:
+   - When a file was modified, the watcher legitimately transitioned status from `"watching"` to `"syncing"`.
+   - In `tools/omni-graph/src/api/mod.rs`, `inject_watcher_status` strictly filtered `.filter(|w| w.status == "watching")`. Because status was `"syncing"`, it injected `"is_watching": false` into `/api/workspaces`.
+   - When the agent prompt hook queried `/api/workspaces`, it saw `"is_watching": false` and dispatched `POST /api/watch/start`.
+   - In `tools/omni-graph/src/watcher/mod.rs`, `start_watch` idempotency check evaluated `if paths_match && s.status == "watching"`. Because `s.status` was `"syncing"`, this check failed.
+   - `start_watch` dispatched a cancellation signal (`cancel_tx.send(())`) to the active sync task, aborting the delta re-indexing in mid-flight and instantiating a fresh `WatcherStatus` with `events_processed = 0` and `files_reindexed = 0`.
+2. **Container Rebuild Volatile Reset**:
+   - Container recreation resets volatile in-memory daemon state unless cumulative counters are preserved.
+
+#### What Was Done
+- **Watcher Syncing State Invariant (`src/api/mod.rs`)**:
+  - Updated `inject_watcher_status` to filter `w.status == "watching" || w.status == "syncing"`. An actively syncing watcher is 100% active and reports `"is_watching": true`.
+- **In-Flight Sync Protection & Metric Preservation (`src/watcher/mod.rs`)**:
+  - In `start_watch`, defined `is_active = s.status == "watching" || s.status == "syncing"`. Idempotent return prevents canceling active tasks during sync.
+  - Carried over cumulative counters (`prev_events`, `prev_reindexed`, `prev_deleted`, `prev_last_sync`) across any re-watch.
+- **Topological Containment Backbone (`src/ingestion/mod.rs`, `src/watcher/pipeline.rs`, `src/db/mod.rs`)**:
+  - Synthesized File nodes (`ws:file:<path>`), Directory nodes (`ws:dir:<path>`), and Workspace root (`ws:workspace`).
+  - Emitted `CONTAINS_DIR`, `CONTAINS_FILE`, and `CONTAINS` edges, establishing 100% DAG reachability from root.
+  - Weighted containment edges in `src/analysis/mod.rs`: `CONTAINS_DIR = 0.2`, `CONTAINS_FILE = 0.4`, `CONTAINS = 0.8`.
+
+#### Verification & Live Results
+- Unit Tests: Added `test_topological_containment_dag_reachability` and `test_edge_weights_containment_hierarchy`. All 82/82 tests passing in 0.01s.
+- Container Redeployment: Rebuilt and redeployed `omni-rust-app` via Docker.
+- Live File Modifications:
+  - Modified `DEVLOG.md`: Watcher entered `"syncing"`, re-indexed 198 nodes, 1167 edges, and completed with zero cancellation.
+  - Restored `lib.rs`: Watcher processed delta event and updated metrics.
+  - Live query `curl -s http://localhost:8080/api/watch/status` confirms:
+    `"events_processed": 5`, `"files_reindexed": 4`, `"files_deleted": 1`, `"status": "watching"`, `"cluster_status": "live"`.
+
+
+
+

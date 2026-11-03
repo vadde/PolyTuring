@@ -887,6 +887,42 @@ mod condenser_tests {
             "Must output structural call traces despite numerous large neighbor nodes"
         );
     }
+
+    #[test]
+    fn test_condense_ppr_centrality_ranks_hub_higher() {
+        use std::collections::HashSet;
+
+        let root_id = "root".to_string();
+        let mut root_ids = HashSet::new();
+        root_ids.insert(root_id.clone());
+
+        let mut candidate_ids = HashSet::new();
+        candidate_ids.insert(root_id.clone());
+        candidate_ids.insert("hub".to_string());
+        candidate_ids.insert("leaf".to_string());
+        candidate_ids.insert("sub1".to_string());
+        candidate_ids.insert("sub2".to_string());
+
+        let links = vec![
+            make_link("root", "hub", "CALLS"),
+            make_link("root", "leaf", "CALLS"),
+            make_link("hub", "sub1", "CALLS"),
+            make_link("hub", "sub2", "CALLS"),
+            make_link("sub1", "hub", "CALLS"),
+            make_link("sub2", "hub", "CALLS"),
+        ];
+
+        let ppr = ContextCondenser::compute_ppr_scores(&root_ids, &candidate_ids, &links, 25);
+        let hub_score = ppr.get("hub").copied().unwrap_or(0.0);
+        let leaf_score = ppr.get("leaf").copied().unwrap_or(0.0);
+
+        assert!(
+            hub_score > leaf_score,
+            "Hub with mutual caller cycles must score higher than isolated leaf: {} vs {}",
+            hub_score,
+            leaf_score
+        );
+    }
 }
 
 mod community_tests {
@@ -1223,6 +1259,89 @@ mod cluster_filter_tests {
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].id, 0);
         assert_eq!(filtered[0].node_count, 3);
+    }
+
+    #[test]
+    fn test_consolidate_communities_absorbs_singletons_via_links() {
+        use omni_graph::db::DbLink;
+
+        let nodes = vec![
+            make_node("m1", "src/core/a.rs", "fn_a1"),
+            make_node("m2", "src/core/a.rs", "fn_a2"),
+            make_node("m3", "src/core/a.rs", "fn_a3"),
+            make_node("m4", "src/core/b.rs", "fn_b1"),
+            make_node("m5", "src/core/b.rs", "fn_b2"),
+            make_node("micro1", "src/isolated/c.rs", "isolated_fn"),
+        ];
+
+        let links = vec![
+            DbLink {
+                id: "e1".to_string(),
+                workspace: Some("test".to_string()),
+                source: "micro1".to_string(),
+                target: "m1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            }
+        ];
+
+        let mut assignments = HashMap::new();
+        assignments.insert("m1".to_string(), 0);
+        assignments.insert("m2".to_string(), 0);
+        assignments.insert("m3".to_string(), 0);
+        assignments.insert("m4".to_string(), 0);
+        assignments.insert("m5".to_string(), 0);
+        assignments.insert("micro1".to_string(), 1); // micro-community
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+
+        // micro1 should be absorbed by community 0 due to CALLS link to m1
+        assert_eq!(assignments.values().collect::<std::collections::HashSet<_>>().len(), 1);
+        assert_eq!(assignments["micro1"], assignments["m1"]);
+    }
+
+    #[test]
+    fn test_consolidate_communities_absorbs_via_directory() {
+        let nodes = vec![
+            make_node("m1", "src/core/a.rs", "fn_a1"),
+            make_node("m2", "src/core/a.rs", "fn_a2"),
+            make_node("m3", "src/core/a.rs", "fn_a3"),
+            make_node("m4", "src/core/b.rs", "fn_b1"),
+            make_node("m5", "src/core/b.rs", "fn_b2"),
+            make_node("micro1", "src/core/orphan.rs", "orphan_fn"), // in src/core
+        ];
+
+        let links = vec![]; // no links
+
+        let mut assignments = HashMap::new();
+        assignments.insert("m1".to_string(), 0);
+        assignments.insert("m2".to_string(), 0);
+        assignments.insert("m3".to_string(), 0);
+        assignments.insert("m4".to_string(), 0);
+        assignments.insert("m5".to_string(), 0);
+        assignments.insert("micro1".to_string(), 99); // disconnected
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+
+        // micro1 should be absorbed by macro-community 0 because they share directory "src/core"
+        assert_eq!(assignments.values().collect::<std::collections::HashSet<_>>().len(), 1);
+        assert_eq!(assignments["micro1"], assignments["m1"]);
+    }
+
+    #[test]
+    fn test_consolidate_communities_all_small_merges_to_zero() {
+        let nodes = vec![
+            make_node("1", "src/a.rs", "f1"),
+            make_node("2", "src/b.rs", "f2"),
+        ];
+        let links = vec![];
+        let mut assignments = HashMap::new();
+        assignments.insert("1".to_string(), 10);
+        assignments.insert("2".to_string(), 20);
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+        assert_eq!(assignments["1"], 0);
+        assert_eq!(assignments["2"], 0);
     }
 }
 
@@ -1600,5 +1719,455 @@ mod worktree_tests {
 
         assert!(edges.iter().any(|e| e.edge_type == "CONTAINS" && e.target_label == "Host"));
     }
+
+    #[test]
+    fn test_inject_watcher_status_root_and_worktree() {
+        use omni_graph::api::inject_watcher_status;
+        use omni_graph::watcher::WatcherStatus;
+
+        let mut workspaces = vec![
+            serde_json::json!({
+                "workspace": "PolyTuring",
+                "total_nodes": 3800,
+                "worktrees": [
+                    {
+                        "workspace": "wt-feature",
+                        "total_nodes": 500
+                    },
+                    {
+                        "workspace": "wt-inactive",
+                        "total_nodes": 300
+                    }
+                ]
+            }),
+            serde_json::json!({
+                "workspace": "unwatched-repo",
+                "total_nodes": 120,
+                "worktrees": []
+            })
+        ];
+
+        let active_statuses = vec![
+            WatcherStatus {
+                workspace: "PolyTuring".to_string(),
+                path: "/path/to/PolyTuring".to_string(),
+                status: "watching".to_string(),
+                started_at: "2026-11-03T00:00:00Z".to_string(),
+                files_tracked: 200,
+                last_sync: None,
+                events_processed: 0,
+                files_reindexed: 0,
+                files_deleted: 0,
+                avg_sync_ms: 0,
+                cluster_status: "current".to_string(),
+                last_cluster_at: None,
+                debounce_ms: 500,
+            },
+            WatcherStatus {
+                workspace: "wt-feature".to_string(),
+                path: "/path/to/wt-feature".to_string(),
+                status: "syncing".to_string(), // Actively syncing must be recognized as is_watching == true
+                started_at: "2026-11-03T00:00:00Z".to_string(),
+                files_tracked: 50,
+                last_sync: None,
+                events_processed: 0,
+                files_reindexed: 0,
+                files_deleted: 0,
+                avg_sync_ms: 0,
+                cluster_status: "current".to_string(),
+                last_cluster_at: None,
+                debounce_ms: 500,
+            },
+        ];
+
+        inject_watcher_status(&mut workspaces, &active_statuses);
+
+        // Root workspace PolyTuring is watching
+        assert_eq!(workspaces[0]["is_watching"], serde_json::Value::Bool(true));
+
+        // Nested worktree wt-feature is watching
+        assert_eq!(workspaces[0]["worktrees"][0]["is_watching"], serde_json::Value::Bool(true));
+
+        // Nested worktree wt-inactive is NOT watching
+        assert_eq!(workspaces[0]["worktrees"][1]["is_watching"], serde_json::Value::Bool(false));
+
+        // unwatched-repo is NOT watching
+        assert_eq!(workspaces[1]["is_watching"], serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn parse_java_classes_methods_inheritance_and_imports() {
+        use omni_graph::parser::CodeParser;
+        let java_code = r#"
+        package com.example.service;
+
+        import com.example.model.User;
+        import java.io.Serializable;
+
+        @Service
+        public class UserService extends BaseService implements Serializable {
+            private final UserRepository userRepository;
+
+            public UserService(UserRepository repo) {
+                this.userRepository = repo;
+            }
+
+            public User findById(String id) {
+                return userRepository.findById(id);
+            }
+        }
+        "#;
+        let res = CodeParser::parse_file("test-ws", "UserService.java", java_code)
+            .expect("should parse java code");
+        let nodes = res.nodes;
+        let edges = res.edges;
+
+        // Class
+        assert!(nodes.iter().any(|n| n.label == "UserService" && n.kind == "class"));
+
+        // Constructor and Method
+        assert!(nodes.iter().any(|n| n.label == "UserService" && n.kind == "constructor"));
+        assert!(nodes.iter().any(|n| n.label == "findById" && n.kind == "method"));
+
+        // Field
+        assert!(nodes.iter().any(|n| n.label == "userRepository" && n.kind == "field"));
+
+        // Imports
+        assert!(edges.iter().any(|e| e.edge_type == "IMPORTS" && e.target_label == "User"));
+
+        // Inheritance (EXTENDS & IMPLEMENTS)
+        assert!(edges.iter().any(|e| e.edge_type == "EXTENDS" && e.target_label == "BaseService"));
+        assert!(edges.iter().any(|e| e.edge_type == "IMPLEMENTS" && e.target_label == "Serializable"));
+
+        // Calls (userRepository.findById)
+        assert!(edges.iter().any(|e| e.edge_type == "CALLS" && e.target_label == "findById"));
+    }
+
+    #[test]
+    fn parse_cpp_classes_functions_and_includes() {
+        use omni_graph::parser::CodeParser;
+        let cpp_code = r#"
+        #include <vector>
+        #include "shape.h"
+
+        namespace graphics {
+            class Circle : public Shape {
+            public:
+                double radius;
+                Circle(double r) : radius(r) {}
+                double area() {
+                    return computeArea(radius);
+                }
+            };
+
+            double computeArea(double r) {
+                return 3.14159 * r * r;
+            }
+        }
+        "#;
+        let res = CodeParser::parse_file("test-ws", "circle.cpp", cpp_code)
+            .expect("should parse cpp code");
+        let nodes = res.nodes;
+        let edges = res.edges;
+
+        // Class & namespace
+        assert!(nodes.iter().any(|n| n.label == "Circle" && n.kind == "class"));
+        assert!(nodes.iter().any(|n| n.label == "graphics" && n.kind == "namespace"));
+
+        // Method & function
+        assert!(nodes.iter().any(|n| n.label == "computeArea" && n.kind == "function"));
+
+        // Inheritance (Circle EXTENDS Shape)
+        assert!(edges.iter().any(|e| e.edge_type == "EXTENDS" && e.target_label == "Shape"));
+
+        // Include edges
+        assert!(edges.iter().any(|e| e.edge_type == "IMPORTS" && (e.target_label == "vector" || e.target_label == "shape")));
+
+        // Calls
+        assert!(edges.iter().any(|e| e.edge_type == "CALLS" && e.target_label == "computeArea"));
+    }
+
+    #[test]
+    fn parse_typescript_filter_detached_css_properties() {
+        use omni_graph::parser::CodeParser;
+        let ts_code = r#"
+        export interface UserCardProps {
+            username: string;
+            avatarUrl: string;
+        }
+
+        // Inline object literal (should NOT be extracted as top-level field nodes)
+        const styles = {
+            cursor: 'pointer',
+            color: '#ffffff',
+            borderRadius: '8px'
+        };
+
+        export const renderCard = (props: UserCardProps) => {
+            return props.username;
+        };
+        "#;
+        let res = CodeParser::parse_file("test-ws", "Card.tsx", ts_code)
+            .expect("should parse tsx code");
+        let nodes = res.nodes;
+
+        // Interface and its properties MUST be extracted
+        assert!(nodes.iter().any(|n| n.label == "UserCardProps" && n.kind == "interface"));
+        assert!(nodes.iter().any(|n| n.label == "username" && n.kind == "field"));
+        assert!(nodes.iter().any(|n| n.label == "avatarUrl" && n.kind == "field"));
+
+        // Detached CSS style properties MUST NOT be extracted as fields
+        assert!(!nodes.iter().any(|n| n.label == "cursor"));
+        assert!(!nodes.iter().any(|n| n.label == "borderRadius"));
+        assert!(!nodes.iter().any(|n| n.label == "color"));
+    }
 }
+
+mod topological_backbone_tests {
+    use omni_graph::analysis::get_edge_weight;
+    use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+    use std::collections::{HashSet, VecDeque};
+
+    #[test]
+    fn test_edge_weights_containment_hierarchy() {
+        assert!((get_edge_weight("IMPLEMENTS") - 3.0).abs() < 1e-5);
+        assert!((get_edge_weight("CALLS") - 2.0).abs() < 1e-5);
+        assert!((get_edge_weight("TYPE_REF") - 1.5).abs() < 1e-5);
+        assert!((get_edge_weight("IMPORTS") - 1.0).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS") - 0.8).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS_FILE") - 0.4).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS_DIR") - 0.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_topological_containment_dag_reachability() {
+        let ws = "TestWorkspace";
+        let ws_root_id = format!("{}:workspace", ws);
+
+        // Nodes: 1 workspace + 2 dirs + 2 files + 4 symbols = 9 nodes
+        let nodes = vec![
+            ExtractedNode {
+                id: ws_root_id.clone(),
+                workspace: ws.to_string(),
+                label: ws.to_string(),
+                kind: "workspace".to_string(),
+                file_path: "".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "root".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:dir:src", ws),
+                workspace: ws.to_string(),
+                label: "src".to_string(),
+                kind: "directory".to_string(),
+                file_path: "src".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "dir src".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:dir:src/parser", ws),
+                workspace: ws.to_string(),
+                label: "parser".to_string(),
+                kind: "directory".to_string(),
+                file_path: "src/parser".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "dir parser".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:file:src/main.rs", ws),
+                workspace: ws.to_string(),
+                label: "main.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn main() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:file:src/parser/mod.rs", ws),
+                workspace: ws.to_string(),
+                label: "mod.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 20,
+                text: "pub fn parse() {}".to_string(),
+            },
+            // Symbols in main.rs
+            ExtractedNode {
+                id: format!("{}:src/main.rs:main:1", ws),
+                workspace: ws.to_string(),
+                label: "main".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 5,
+                text: "fn main() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:src/main.rs:Config:6", ws),
+                workspace: ws.to_string(),
+                label: "Config".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 6,
+                line_end: 10,
+                text: "struct Config;".to_string(),
+            },
+            // Symbols in parser/mod.rs
+            ExtractedNode {
+                id: format!("{}:src/parser/mod.rs:parse:1", ws),
+                workspace: ws.to_string(),
+                label: "parse".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "pub fn parse() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:src/parser/mod.rs:AstParser:11", ws),
+                workspace: ws.to_string(),
+                label: "AstParser".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 11,
+                line_end: 20,
+                text: "pub struct AstParser;".to_string(),
+            },
+        ];
+
+        // Edges:
+        // Workspace -> CONTAINS_DIR -> src
+        // src -> CONTAINS_DIR -> src/parser
+        // src -> CONTAINS_FILE -> src/main.rs
+        // src/parser -> CONTAINS_FILE -> src/parser/mod.rs
+        // src/main.rs -> CONTAINS -> main
+        // src/main.rs -> CONTAINS -> Config
+        // src/parser/mod.rs -> CONTAINS -> parse
+        // src/parser/mod.rs -> CONTAINS -> AstParser
+        // main -> CALLS -> parse (AST edge)
+        let edges = vec![
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: ws_root_id.clone(),
+                target_label: "src".to_string(),
+                target_id: Some(format!("{}:dir:src", ws)),
+                edge_type: "CONTAINS_DIR".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src", ws),
+                target_label: "parser".to_string(),
+                target_id: Some(format!("{}:dir:src/parser", ws)),
+                edge_type: "CONTAINS_DIR".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src", ws),
+                target_label: "main.rs".to_string(),
+                target_id: Some(format!("{}:file:src/main.rs", ws)),
+                edge_type: "CONTAINS_FILE".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src/parser", ws),
+                target_label: "mod.rs".to_string(),
+                target_id: Some(format!("{}:file:src/parser/mod.rs", ws)),
+                edge_type: "CONTAINS_FILE".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/main.rs", ws),
+                target_label: "main".to_string(),
+                target_id: Some(format!("{}:src/main.rs:main:1", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/main.rs", ws),
+                target_label: "Config".to_string(),
+                target_id: Some(format!("{}:src/main.rs:Config:6", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/parser/mod.rs", ws),
+                target_label: "parse".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:parse:1", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/parser/mod.rs", ws),
+                target_label: "AstParser".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:AstParser:11", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:src/main.rs:main:1", ws),
+                target_label: "parse".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:parse:1", ws)),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        // 1. Verify BFS reachability from workspace root to ALL nodes
+        let mut adj: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        for edge in &edges {
+            if let Some(ref tgt) = edge.target_id {
+                adj.entry(edge.source_id.clone()).or_default().push(tgt.clone());
+            }
+        }
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(ws_root_id.clone());
+        visited.insert(ws_root_id.clone());
+
+        while let Some(curr) = queue.pop_front() {
+            if let Some(neighbors) = adj.get(&curr) {
+                for nbr in neighbors {
+                    if visited.insert(nbr.clone()) {
+                        queue.push_back(nbr.clone());
+                    }
+                }
+            }
+        }
+
+        for node in &nodes {
+            assert!(
+                visited.contains(&node.id),
+                "Node '{}' of kind '{}' must be reachable from workspace root in topological DAG",
+                node.id,
+                node.kind
+            );
+        }
+
+        assert_eq!(visited.len(), nodes.len(), "Every vertex in the graph must belong to the connected giant component");
+    }
+}
+
 
