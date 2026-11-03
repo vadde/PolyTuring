@@ -123,7 +123,7 @@ impl WatchManager {
         let mut watchers = self.watchers.lock().await;
 
         // Check if already watching (R-074, R-075: Idempotency & path normalization)
-        if let Some(active) = watchers.get(workspace) {
+        let (prev_events, prev_reindexed, prev_deleted, prev_last_sync) = if let Some(active) = watchers.get(workspace) {
             let s = active.status.read().await;
             let clean_path = path.trim_end_matches('/');
             let s_clean = s.path.trim_end_matches('/');
@@ -135,13 +135,17 @@ impl WatchManager {
                     p1.is_some() && p1 == p2
                 };
 
-            if paths_match && s.status == "watching" {
+            let is_active = s.status == "watching" || s.status == "syncing";
+            if paths_match && is_active {
                 return Ok(s.clone());
             }
 
-            // If path changed for this workspace, cleanly cancel old watcher task before replacing
+            // Only cancel old watcher if path actually changed or watcher was in stopped/error state
             let _ = active.cancel_tx.send(()).await;
-        }
+            (s.events_processed, s.files_reindexed, s.files_deleted, s.last_sync.clone())
+        } else {
+            (0, 0, 0, None)
+        };
 
         let root = PathBuf::from(path);
         if !root.exists() || !root.is_dir() {
@@ -157,10 +161,10 @@ impl WatchManager {
             status: "watching".to_string(),
             started_at: now.clone(),
             files_tracked: 0,
-            last_sync: None,
-            events_processed: 0,
-            files_reindexed: 0,
-            files_deleted: 0,
+            last_sync: prev_last_sync,
+            events_processed: prev_events,
+            files_reindexed: prev_reindexed,
+            files_deleted: prev_deleted,
             avg_sync_ms: 0,
             cluster_status: "current".to_string(),
             last_cluster_at: None,

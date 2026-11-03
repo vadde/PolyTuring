@@ -293,7 +293,7 @@ pub fn inject_watcher_status(
 ) {
     let watching_set: HashSet<&str> = active_statuses
         .iter()
-        .filter(|w| w.status == "watching")
+        .filter(|w| w.status == "watching" || w.status == "syncing")
         .map(|w| w.workspace.as_str())
         .collect();
 

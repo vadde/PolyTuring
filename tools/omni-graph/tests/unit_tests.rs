@@ -1766,7 +1766,7 @@ mod worktree_tests {
             WatcherStatus {
                 workspace: "wt-feature".to_string(),
                 path: "/path/to/wt-feature".to_string(),
-                status: "watching".to_string(),
+                status: "syncing".to_string(), // Actively syncing must be recognized as is_watching == true
                 started_at: "2026-11-03T00:00:00Z".to_string(),
                 files_tracked: 50,
                 last_sync: None,
@@ -2169,4 +2169,5 @@ mod topological_backbone_tests {
         assert_eq!(visited.len(), nodes.len(), "Every vertex in the graph must belong to the connected giant component");
     }
 }
+
 
