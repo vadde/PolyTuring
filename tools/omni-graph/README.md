@@ -3,10 +3,11 @@
 > A 100% local, multi-container semantic knowledge hub that models codebases as rich AST graphs augmented with vector embeddings and community clustering — purpose-built for Apple Silicon ARM64 unified memory.
 
 ![Status](https://img.shields.io/badge/status-in--progress-blue)
-![Version](https://img.shields.io/badge/version-0.2.2-emerald)
-![Language](https://img.shields.io/badge/language-rust%20%2B%20react-orange)
+![Version](https://img.shields.io/badge/version-0.3.0-emerald)
+![Language](https://img.shields.io/badge/language-rust%20%2B%20react%20%2B%20python-orange)
 ![Engine](https://img.shields.io/badge/database-SurrealDB%20v2-green)
 ![Embeddings](https://img.shields.io/badge/embeddings-HF%20TEI%20(384--dim)-purple)
+![Protocol](https://img.shields.io/badge/protocol-Native%20MCP%20stdio-blueviolet)
 
 ---
 
@@ -207,34 +208,83 @@ open http://localhost:3000
 
 ---
 
-## 9. CLI & API Reference
+## 9. The Agentic Triad: Skill, MCP, and CLI
 
-### CLI Usage (`omni.sh`)
+Omni-Graph coordinates across three distinct modalities for humans and coding assistants:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        THE AGENTIC TRIAD                               │
+│                                                                        │
+│   🧠 THE BRAIN: Skill (SKILL.md)                                      │
+│      Strategic mental playbook: when to pull 2-hop slices,             │
+│      how to inspect blast radius, hierarchical recon progression.      │
+│                                                                        │
+│   ⚡ THE NERVOUS SYSTEM: Native MCP Server (omni-mcp.py via uv run)    │
+│      Structured JSON-RPC 2.0 stdio protocol delivering zero-token     │
+│      shell-free AST tool calls directly to LLM context.                │
+│                                                                        │
+│   🛠️ THE HANDS: Ergonomic CLI Binary (scripts/omni)                    │
+│      Lightweight subcommands with auto workspace detection,             │
+│      clean formatting, and zero shell quoting errors.                  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Native Model Context Protocol (MCP) Server
+
+Omni-Graph includes a native stdio MCP server (`tools/omni-graph/scripts/omni-mcp.py`) compliant with the 2024-11-05 MCP specification. It uses **hermetic `uv run`** execution, eliminating host Python dependency conflicts.
+
+#### 1. Claude Desktop Setup (`claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "omni-graph": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "/absolute/path/to/PolyTuring/tools/omni-graph/scripts/omni-mcp.py"
+      ],
+      "env": {
+        "OMNI_API_URL": "http://localhost:8080",
+        "OMNI_WORKSPACE": "PolyTuring"
+      }
+    }
+  }
+}
+```
+
+#### 2. Direct Launcher via Makefile
+```bash
+# Automatically uses uv run if uv is installed, falling back to python3
+make omni-mcp
+```
+
+### Ergonomic CLI Usage (`scripts/omni`)
+
+A root symlink `./scripts/omni` auto-detects the active workspace from the Git root:
 
 ```bash
-# Ingest
-./scripts/omni.sh ingest "/path/to/codebase" [project]
+# Symbolic definition lookup (LSP definition in 5ms)
+./scripts/omni symbol "ingest_directory"
 
-# Cluster
-./scripts/omni.sh cluster [project]
+# Find who calls this symbol across the entire codebase
+./scripts/omni references "ingest_directory"
 
-# Workspaces
-./scripts/omni.sh workspaces
+# Extract Personalized PageRank (PPR) condensed slice (<1500 tokens)
+./scripts/omni condense "ingest_directory" [workspace] [hops]
 
-# Semantic search
-./scripts/omni.sh search "query terms" [workspace] [k]
+# Inspect macro architectural galaxies (Leiden community clusters)
+./scripts/omni galaxies
 
-# Symbolic definition lookup (LSP)
-./scripts/omni.sh symbol "init_pool" [workspace]
-
-# Symbolic caller references (LSP)
-./scripts/omni.sh references "init_pool" [workspace]
-
-# Extract condensed AST subgraph slice (<1500 tokens)
-./scripts/omni.sh condense "init_pool" [workspace] [hops]
+# Semantic code search (content-tier filtered to code, excluding markdown)
+./scripts/omni search "parse AST tree sitter"
 
 # Hybrid Graph-RAG prompt query
-./scripts/omni.sh query "How is authentication handled?" [workspace] [k]
+./scripts/omni query "How does live delta synchronization work?"
+
+# Manage live watchers
+./scripts/omni watch status
 ```
 
 ### Agent Enforcement Shield Setup

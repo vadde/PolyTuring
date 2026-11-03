@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """
 omni-mcp.py — Native Model Context Protocol (MCP) stdio server for Omni-Graph.
 Implements: R-070, R-078 (JSON-RPC 2.0 stdio protocol 2024-11-05).

@@ -107,8 +107,12 @@ health: ## Check health of all services
 	@echo "🏥 Health check..."
 	@./scripts/omni.sh health 2>/dev/null || echo "❌ API not responding"
 
-mcp: ## Run native Model Context Protocol (MCP) stdio server for Omni-Graph
-	@python3 ./scripts/omni-mcp.py
+mcp: ## Run native Model Context Protocol (MCP) stdio server for Omni-Graph (hermetic uv runner)
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run ./scripts/omni-mcp.py; \
+	else \
+		python3 ./scripts/omni-mcp.py; \
+	fi
 
 # ─── Ingestion, Clustering & Graph RAG ───────────────────────────────────────
 TARGET_INGEST_PATH := $(if $(INGEST_ARGS),$(firstword $(INGEST_ARGS)),$(if $(TARGET_DIR),$(TARGET_DIR),$(if $(DIR),$(DIR),/workspace)))
