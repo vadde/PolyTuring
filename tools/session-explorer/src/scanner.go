@@ -426,6 +426,9 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	toolCounts := make(map[string]int)
 	projectScores := make(map[string]int)
 	empiricalTouches := make(map[string]int)
+	mutationCounts := make(map[string]int)
+	readCounts := make(map[string]int)
+	execCounts := make(map[string]int)
 	projectWorkspaces := make(map[string]string)
 
 	for scanner.Scan() {
@@ -496,6 +499,11 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 				for _, tc := range entry.ToolCalls {
 					toolCounts[tc.Name]++
 
+					isMutation := tc.Name == "write_file" || tc.Name == "edit_file" || tc.Name == "write_to_file" ||
+						tc.Name == "replace_file_content" || tc.Name == "multi_replace_file_content"
+					isRead := tc.Name == "read_file" || tc.Name == "view_file"
+					isExec := tc.Name == "run_command"
+
 					// Collect candidate paths from tool arguments (Tier 2: Empirical Touch Matrix)
 					var candidatePaths []string
 
@@ -508,12 +516,11 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 						}
 					}
 
-					// Extract paths from CommandLine (run_command)
-					if cmdVal, exists := tc.Args["CommandLine"]; exists {
-						if cmdStr, ok := cmdVal.(string); ok && cmdStr != "" {
-							matches := reCommandPath.FindAllString(cmdStr, -1)
-							for _, p := range matches {
-								candidatePaths = append(candidatePaths, strings.Trim(p, `"'`))
+					// Extract paths from CommandLine (run_command) using targeted parser
+					if isExec {
+						if cmdVal, exists := tc.Args["CommandLine"]; exists {
+							if cmdStr, ok := cmdVal.(string); ok && cmdStr != "" {
+								candidatePaths = append(candidatePaths, extractCommandPaths(cmdStr)...)
 							}
 						}
 					}
@@ -526,19 +533,13 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 									candidatePaths = append(candidatePaths, strings.Trim(s, `"'`))
 								}
 							}
-						} else if argStr, ok := argsVal.(string); ok && strings.Contains(argStr, "/") {
-							matches := reCommandPath.FindAllString(argStr, -1)
-							for _, p := range matches {
-								candidatePaths = append(candidatePaths, strings.Trim(p, `"'`))
-							}
 						}
 					}
 
 					for _, rawPath := range candidatePaths {
 						if rawPath == "" ||
 							strings.HasPrefix(rawPath, "/Untitled") ||
-							strings.Contains(rawPath, "/.gemini/antigravity") ||
-							strings.Contains(rawPath, "/.gemini/") {
+							isInternalRuntimeArtifact(rawPath) {
 							continue
 						}
 
@@ -603,8 +604,8 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 							}
 						}
 
-						// 4. Graceful Degradation: Not a Git repo and not known -> fall back to directory/folder name!
-						if projectName == "" {
+						// 4. Graceful Degradation: Not a Git repo and not known -> fall back to directory/folder name ONLY if not a generic container and not inside hidden dot dirs
+						if projectName == "" && !isGenericParentContainer(rawPath) && !strings.Contains(rawPath, "/.") {
 							derived := canonicalProjectName(extractProjectName(rawPath))
 							if isValidWorkspaceName(derived) {
 								projectName = derived
@@ -619,12 +620,16 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 						}
 
 						if projectName != "" && isValidWorkspaceName(projectName) {
-							// Weight file mutations higher than inspections
+							// Weight file mutations higher than inspections or executions
 							weight := 15
-							if tc.Name == "write_file" || tc.Name == "edit_file" || tc.Name == "write_to_file" {
+							if isMutation {
 								weight = 50
-							} else if tc.Name == "run_command" {
+								mutationCounts[projectName]++
+							} else if isExec {
 								weight = 25
+								execCounts[projectName]++
+							} else if isRead {
+								readCounts[projectName]++
 							}
 							projectScores[projectName] += weight
 							empiricalTouches[projectName] += weight
@@ -673,6 +678,20 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 		}
 	}
 
+	startingWorkspace := authoritativeWorkspace
+	if startingWorkspace == "" {
+		startingWorkspace = session.Workspace
+	}
+
+	// Check if starting workspace is inside an actual Git repo
+	startingGitRoot := findGitRoot(startingWorkspace)
+	if startingGitRoot != "" {
+		pName := canonicalProjectName(filepath.Base(startingGitRoot))
+		if isValidWorkspaceName(pName) && authoritativeProject == "" {
+			authoritativeProject = pName
+		}
+	}
+
 	type pScore struct {
 		name  string
 		score int
@@ -690,7 +709,30 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	})
 
 	var bestProject string
-	if len(scoredList) > 0 {
+
+	// Genesis Invariant: Check if session was started in a generic container or user home directory
+	isGenericStart := startingWorkspace != "" && (isGenericParentContainer(startingWorkspace) || strings.HasPrefix(startingWorkspace, "/Untitled"))
+
+	if isGenericStart && authoritativeProject == "" {
+		// Session was initiated in ~ or a generic non-git directory.
+		// It belongs to "Default" UNLESS the agent performed substantive file mutations (write_file/edit_file)
+		// in a specific repository during this session!
+		var topMutatedProject string
+		maxMutations := 0
+		for name, count := range mutationCounts {
+			cName := canonicalProjectName(name)
+			if count > maxMutations && isValidWorkspaceName(cName) {
+				maxMutations = count
+				topMutatedProject = cName
+			}
+		}
+
+		if topMutatedProject != "" && maxMutations > 0 {
+			bestProject = topMutatedProject
+		} else {
+			bestProject = "Default"
+		}
+	} else if len(scoredList) > 0 {
 		bestProject = scoredList[0].name
 		// If authoritativeProject from DB is present and has empirical touches, prefer it:
 		if authoritativeProject != "" && authoritativeProject != bestProject {
@@ -729,8 +771,10 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	for _, ps := range scoredList {
 		cName := canonicalProjectName(ps.name)
 		if isValidWorkspaceName(cName) && !seenTouched[cName] {
-			// Only include secondary projects in ProjectsTouched if tools genuinely touched them
-			if empiricalTouches[ps.name] > 0 || empiricalTouches[cName] > 0 {
+			// Only include secondary projects in ProjectsTouched if tools genuinely touched them (mutation, read, or explicit exec)
+			if mutationCounts[cName] > 0 || mutationCounts[ps.name] > 0 ||
+				readCounts[cName] > 0 || readCounts[ps.name] > 0 ||
+				execCounts[cName] > 0 || execCounts[ps.name] > 0 {
 				seenTouched[cName] = true
 				session.ProjectsTouched = append(session.ProjectsTouched, cName)
 			}
@@ -738,7 +782,17 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 	}
 
 	// Assign workspace path with container normalization
-	if p, ok := projectWorkspaces[bestProject]; ok && p != "" {
+	if bestProject == "Default" {
+		if startingWorkspace != "" && !strings.HasPrefix(startingWorkspace, "/Untitled") {
+			session.Workspace = startingWorkspace
+		} else {
+			if home, err := os.UserHomeDir(); err == nil && home != "" {
+				session.Workspace = home
+			} else {
+				session.Workspace = "/Users/aparv"
+			}
+		}
+	} else if p, ok := projectWorkspaces[bestProject]; ok && p != "" {
 		session.Workspace = p
 	} else if authoritativeWorkspace != "" && !isGenericParentContainer(authoritativeWorkspace) {
 		session.Workspace = authoritativeWorkspace
@@ -1142,7 +1196,48 @@ func (idx *SessionIndex) computeStats() {
 		idx.stats.RuntimeBreakdown[rm]++
 
 		proj := canonicalProjectName(s.ProjectName)
-		if isValidWorkspaceName(proj) {
+		if proj == "Default" {
+			workspaceSet["Default"] = true
+			ps, exists := projectStatsMap["Default"]
+			if !exists {
+				defPath := "~"
+				if s.Workspace != "" {
+					defPath = s.Workspace
+				}
+				ps = &ProjectSummary{
+					Name:          "Default",
+					Path:          defPath,
+					IsGit:         false,
+					RecentPrompts: make([]string, 0),
+				}
+				projectStatsMap["Default"] = ps
+			}
+			ps.SessionCount++
+			ps.TotalSteps += s.StepCount
+			ps.TotalUserMessages += s.UserMessageCount
+			ps.TotalAgentResponses += s.AgentResponseCount
+			ps.TotalToolCalls += s.ToolCallCount
+			ps.TotalErrors += s.ErrorCount
+
+			if s.LastMessageAt.After(ps.LastActiveAt) {
+				ps.LastActiveAt = s.LastMessageAt
+			} else if ps.LastActiveAt.IsZero() || s.CreatedAt.After(ps.LastActiveAt) {
+				ps.LastActiveAt = s.CreatedAt
+			}
+
+			if s.FirstUserPromptPreview != "" && len(ps.RecentPrompts) < 3 {
+				dup := false
+				for _, rp := range ps.RecentPrompts {
+					if rp == s.FirstUserPromptPreview {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					ps.RecentPrompts = append(ps.RecentPrompts, s.FirstUserPromptPreview)
+				}
+			}
+		} else if isValidWorkspaceName(proj) {
 			workspaceSet[proj] = true
 
 			ps, exists := projectStatsMap[proj]
@@ -1258,7 +1353,7 @@ func (idx *SessionIndex) computeStats() {
 
 	// Collect strictly unique, valid workspaces
 	for ws := range workspaceSet {
-		if isValidWorkspaceName(ws) {
+		if isValidWorkspaceName(ws) || ws == "Default" {
 			idx.stats.Workspaces = append(idx.stats.Workspaces, ws)
 		}
 	}
@@ -1322,6 +1417,8 @@ var (
 	reGitURL      = regexp.MustCompile(`https://github\.com/([a-zA-Z0-9_\-\.]+)/([a-zA-Z0-9_\-\.]+?)(?:\.git|\")`)
 	reGitBranch   = regexp.MustCompile(`\b(main|master|feat/[a-zA-Z0-9_\-\.]+|fix/[a-zA-Z0-9_\-\.]+)\b`)
 	reCommandPath = regexp.MustCompile(`(/(?:Users|home|workspace|private|Volumes|Library|opt|etc|tmp|var)/[a-zA-Z0-9_\-\./]+)`)
+	reCdCmd       = regexp.MustCompile(`(?:^|[;&|]\s*)cd\s+([^\s;&|]+)`)
+	reGitCCmd     = regexp.MustCompile(`(?:^|[;&|]\s*)git\s+(?:--git-dir=[^\s]+\s+)?-C\s+([^\s;&|]+)`)
 )
 
 // sanitizeWorkspacePath strips OS path segments that create false-positive substring matches (e.g. OneDrive-Personal).
@@ -1329,11 +1426,89 @@ func sanitizeWorkspacePath(p string) string {
 	return strings.ReplaceAll(p, "OneDrive-Personal", "OD-P")
 }
 
+// isInternalRuntimeArtifact checks if a path belongs to internal runtime stores (brain transcripts, locks, etc.) or OS temp folders.
+func isInternalRuntimeArtifact(path string) bool {
+	clean := filepath.Clean(strings.Trim(path, `"'`))
+	lower := strings.ToLower(clean)
+	return strings.Contains(lower, "/brain/") ||
+		strings.Contains(lower, "/conversations/") ||
+		strings.Contains(lower, "/presence/") ||
+		strings.Contains(lower, "/annotations/") ||
+		strings.Contains(lower, "/logs/") ||
+		strings.Contains(lower, ".system_generated") ||
+		strings.Contains(lower, ".user_uploaded") ||
+		strings.Contains(lower, "screencaptureui")
+}
+
+// extractCommandPaths extracts verified execution target directory paths from shell command strings.
+// It skips inline interpreter evaluations (-c, -e) and echo statements to prevent mock script paths
+// from hijacking repository identity.
+func extractCommandPaths(cmdStr string) []string {
+	var paths []string
+	cleanCmd := strings.TrimSpace(cmdStr)
+	if cleanCmd == "" {
+		return paths
+	}
+
+	// 1. Explicit cd <path>
+	for _, m := range reCdCmd.FindAllStringSubmatch(cleanCmd, -1) {
+		if len(m) > 1 {
+			p := strings.Trim(m[1], `"'`)
+			if p != "" && strings.HasPrefix(p, "/") {
+				paths = append(paths, p)
+			}
+		}
+	}
+
+	// 2. Explicit git -C <path>
+	for _, m := range reGitCCmd.FindAllStringSubmatch(cleanCmd, -1) {
+		if len(m) > 1 {
+			p := strings.Trim(m[1], `"'`)
+			if p != "" && strings.HasPrefix(p, "/") {
+				paths = append(paths, p)
+			}
+		}
+	}
+
+	// 3. Direct script invocation: runner /path/to/script (e.g. python3 /path/to/script.py, bash /path/to/run.sh)
+	// Guard: If inline execution flag (-c, -e) is present, skip! Inline code contains mock test strings.
+	fields := strings.Fields(cleanCmd)
+	if len(fields) > 0 {
+		first := fields[0]
+		isRunner := first == "python" || first == "python3" || first == "bash" || first == "sh" ||
+			first == "zsh" || first == "node" || first == "ruby" || first == "perl"
+
+		hasInlineFlag := false
+		for _, f := range fields {
+			if f == "-c" || f == "-e" {
+				hasInlineFlag = true
+				break
+			}
+		}
+
+		if isRunner && !hasInlineFlag && len(fields) > 1 {
+			target := strings.Trim(fields[1], `"'`)
+			if strings.HasPrefix(target, "/") {
+				paths = append(paths, target)
+			}
+		} else if strings.HasPrefix(first, "/") {
+			paths = append(paths, strings.Trim(first, `"'`))
+		}
+	}
+
+	return paths
+}
+
 // isGenericParentContainer checks if a workspace path is a broad parent container rather than an actual codebase.
 func isGenericParentContainer(path string) bool {
 	clean := filepath.Clean(strings.Trim(path, `"'`))
 	if clean == "" || clean == "/" || clean == "." || clean == "/Untitled" || strings.HasPrefix(clean, "/Untitled") {
 		return true
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if clean == filepath.Clean(home) {
+			return true
+		}
 	}
 	base := filepath.Base(clean)
 	lower := strings.ToLower(base)
@@ -1517,6 +1692,9 @@ func isValidWorkspaceName(name string) bool {
 	}
 	// Lowercase check against system folders, repository subdirectories, and common keywords
 	lower := strings.ToLower(name)
+	if strings.HasPrefix(lower, "nsird_") || strings.HasPrefix(lower, "test_chrome_profile") || strings.HasPrefix(lower, "ti-strat-") {
+		return false
+	}
 	blocked := map[string]bool{
 		"src": true, "tools": true, "specs": true, "sdlc": true, "docs": true,
 		"scripts": true, "rules": true, "analytics": true, "tests": true,

@@ -796,3 +796,97 @@ func TestWorkspaceFilter_NoOneDrivePersonalCollision(t *testing.T) {
 	}
 }
 
+// TestIntelligentClustering_GenesisHomeSessionProtection verifies that a session initiated in the
+// user's home directory (~) to fix CLI scripts does NOT get hijacked into DSA or any repository
+// merely because inline Python/shell commands mention repository path strings.
+// Implements: R-028 (Genesis Workspace Invariant & Command Touch Sanitization)
+func TestIntelligentClustering_GenesisHomeSessionProtection(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Setup fake DSA and PolyTuring repos in knownProjects
+	dsaRepo := filepath.Join(tmpDir, "knowledge", "DSA")
+	polyRepo := filepath.Join(tmpDir, "knowledge", "PolyTuring")
+	os.MkdirAll(filepath.Join(dsaRepo, ".git"), 0755)
+	os.MkdirAll(filepath.Join(polyRepo, ".git"), 0755)
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil || homeDir == "" {
+		homeDir = "/Users/aparv"
+	}
+
+	// Session transcript modeling c0429a76:
+	// - User in home directory (Command Working Directory: /Users/aparv)
+	// - Agent edits ~/.gemini/antigravity-cli/statusline.py
+	// - Agent executes inline Python test commands containing mock repo paths
+	content := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-03T12:00:00Z","content":"<USER_REQUEST>Fix status line script for antigravity cli</USER_REQUEST>\n<user_information>\nCommand Working Directory: ` + homeDir + `\nActive Workspaces:\n- ` + homeDir + `\n</user_information>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-03T12:01:00Z","content":"Editing statusline","tool_calls":[{"name":"edit_file","args":{"Path":"` + homeDir + `/.gemini/antigravity-cli/statusline.py"}}]}
+{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-03T12:02:00Z","content":"Testing format with mock paths","tool_calls":[{"name":"run_command","args":{"CommandLine":"python3 -c \"import subprocess; repos = ['` + dsaRepo + `', '` + polyRepo + `']; for repo in repos: print(repo)\""}}]}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-03T12:03:00Z","content":"Another inline test","tool_calls":[{"name":"run_command","args":{"CommandLine":"python3 -c \"print(fmt('DSA', 'arrays'))\""}}]}`
+
+	createMockSession(t, tmpDir, "sess-home-cli", content)
+
+	idx := NewSessionIndex(tmpDir, false)
+	idx.knownProjects["DSA"] = dsaRepo
+	idx.knownProjects["PolyTuring"] = polyRepo
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	if len(idx.sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(idx.sessions))
+	}
+
+	s := idx.sessions[0]
+
+	// 1. ProjectName MUST be "Default", NOT "DSA"!
+	if s.ProjectName != "Default" {
+		t.Errorf("expected ProjectName 'Default', got %q", s.ProjectName)
+	}
+
+	// 2. Workspace MUST remain user home directory, NOT hijacked to DSA!
+	if s.Workspace != homeDir {
+		t.Errorf("expected Workspace %q, got %q", homeDir, s.Workspace)
+	}
+
+	// 3. ProjectsTouched MUST NOT contain DSA or PolyTuring from inline python commands
+	for _, pt := range s.ProjectsTouched {
+		if pt == "DSA" || pt == "PolyTuring" {
+			t.Errorf("unexpected project in ProjectsTouched: %q (should have zero touches)", pt)
+		}
+	}
+
+	// 4. stats.Projects must include "Default" with is_git == false
+	stats := idx.GetStats()
+	foundDefault := false
+	for _, p := range stats.Projects {
+		if p.Name == "Default" {
+			foundDefault = true
+			if p.IsGit {
+				t.Errorf("expected Default project to have IsGit == false")
+			}
+			if p.SessionCount != 1 {
+				t.Errorf("expected 1 session in Default project, got %d", p.SessionCount)
+			}
+		}
+		if p.Name == "DSA" && p.SessionCount > 0 {
+			t.Errorf("expected DSA session count to be 0, got %d", p.SessionCount)
+		}
+	}
+	if !foundDefault {
+		t.Errorf("expected 'Default' project in stats.Projects, got: %+v", stats.Projects)
+	}
+
+	// 5. Querying GetSessions for "Default" must return the session
+	defSessions := idx.GetSessions("Default", "date", "desc", time.Time{}, time.Time{})
+	if len(defSessions) != 1 || defSessions[0].ID != "sess-home-cli" {
+		t.Errorf("expected 1 Default session, got %d", len(defSessions))
+	}
+
+	// 6. Querying GetSessions for "DSA" must return ZERO sessions
+	dsaSessions := idx.GetSessions("DSA", "date", "desc", time.Time{}, time.Time{})
+	if len(dsaSessions) != 0 {
+		t.Errorf("expected 0 DSA sessions, got %d", len(dsaSessions))
+	}
+}
+

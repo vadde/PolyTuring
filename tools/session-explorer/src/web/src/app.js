@@ -1221,7 +1221,7 @@ function renderWorkspaceOptions() {
   rawWorkspaces.forEach(ws => {
     if (!ws) return;
     const clean = String(ws).trim();
-    if (clean === '' || clean === 'Default' || clean === 'workspace' || clean === 'aparv') return;
+    if (clean === '' || clean === 'workspace' || clean === 'aparv') return;
     if (clean.includes('.') || clean.includes('/') || clean.includes('\\')) return;
     if (clean.startsWith('.') || clean.startsWith('_')) return;
     const key = clean.toLowerCase();
@@ -1319,7 +1319,8 @@ function renderProjectHub() {
 
     const projSummary = (state.stats && state.stats.projects) ?
       state.stats.projects.find(p => p.name === projName) : null;
-    const projPath = projSummary ? projSummary.path : `/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/${projName}`;
+    const isGitRepo = projSummary ? projSummary.is_git : (projName !== 'Default');
+    const projPath = projSummary ? projSummary.path : (projName === 'Default' ? '~' : `/Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/${projName}`);
     const totalSteps = projSessions.reduce((acc, s) => acc + s.step_count, 0);
     const totalPrompts = projSessions.reduce((acc, s) => acc + s.user_message_count, 0);
     const totalTools = projSessions.reduce((acc, s) => acc + s.tool_call_count, 0);
@@ -1398,7 +1399,7 @@ function renderProjectHub() {
             <div class="project-hero-info">
               <div class="project-hero-title">
                 📁 ${escapeHtml(projName)}
-                <span class="git-badge">git repo</span>
+                <span class="git-badge ${isGitRepo ? '' : 'non-git'}">${isGitRepo ? 'git repo' : 'folder'}</span>
               </div>
               <div class="project-hero-path">${escapeHtml(projPath)}</div>
             </div>
@@ -1730,7 +1731,7 @@ function renderProjectHub() {
             </div>
             <div style="display: flex; gap: 0.4rem; align-items: center;">
               ${sessionBadge}
-              <span class="git-badge">git repo</span>
+              <span class="git-badge ${p.is_git ? '' : 'non-git'}">${p.is_git ? 'git repo' : 'folder'}</span>
             </div>
           </div>
           <div class="project-card-path" title="${escapeHtml(p.path)}">${escapeHtml(p.path)}</div>

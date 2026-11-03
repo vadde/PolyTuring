@@ -598,6 +598,12 @@ body {
   gap: 0.25rem;
 }
 
+.git-badge.non-git {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
 /* Dedicated In-Project Session Stack Toolbar */
 .project-session-toolbar {
   display: flex;

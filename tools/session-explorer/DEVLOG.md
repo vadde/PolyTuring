@@ -6,6 +6,50 @@
 
 ---
 
+### 2026-11-03 — Architecture: Genesis Workspace Invariant & Command Touch Sanitization (R-028)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Intelligent Workspace Clustering Fortification)
+**Duration**: ~35m
+
+#### What Was Done
+- **Problem Investigated**:
+  - Session `c0429a76-8fd7-4d45-bc2b-9cbd579705fe`, initiated in the user's home directory `~` (`/Users/aparv`) to edit `~/.gemini/antigravity-cli/statusline.py`, was unexpectedly misclassified under the `DSA` repository in Session Explorer.
+  - Forensic analysis of session artifacts revealed two critical loopholes:
+    1. **Blanket `/.gemini/` Exclusion**: Line 541 in `scanner.go` excluded all paths containing `/.gemini/`. This intended runtime-log filter inadvertently ignored genuine user dotfile mutations (such as editing `~/.gemini/antigravity-cli/statusline.py`), leaving `/Users/aparv` with 0 empirical touch points.
+    2. **Aggressive Command String Literal Regex Matching**: The command path regex `reCommandPath` matched arbitrary string literals inside inline Python scripts (e.g. `python3 -c "import subprocess; repos = ['/Users/.../knowledge/DSA', ...]"`) and awarded 25 empirical execution touch points per match to `DSA` (accumulating 125+ points).
+    3. `DSA` hijacked `bestProject` by default, overwriting `session.Workspace` to `.../knowledge/DSA`.
+- **Architectural Solution Implemented (R-028 Fortification)**:
+  1. **The Genesis Workspace Invariant**:
+     - Sessions initiated in generic container directories (`~`, `/Users/...`, `/Untitled`) without an authoritative Git repository are constitutionally anchored to `"Default"`.
+     - An external repository can only claim a generic home session if the agent executed substantive physical file mutations (`write_file` or `edit_file`) in that codebase. Inline commands, read inspections, or string literals cannot reassign the session.
+  2. **Execution Command Path Sanitization (`extractCommandPaths`)**:
+     - Replaced indiscriminate regex path matching with structured command parsing: extracts explicit directory targets (`cd <path>`, `git -C <path>`, direct script paths) while strictly skipping inline evaluation scripts (`-c`, `-e`) and print commands.
+  3. **Granular Internal Runtime Filtering (`isInternalRuntimeArtifact`)**:
+     - Replaced blanket `/.gemini/` exclusion with targeted detection of internal session storage structures (`/brain/`, `/conversations/`, `/presence/`, `/annotations/`, `/logs/`, `.system_generated`, `.user_uploaded`, `screencaptureui`). User dotfiles and scripts are now fully recognized.
+  4. **Dynamic Badging & Non-Git Project Hub**:
+     - Sessions in unversioned folders now display a dedicated `folder` badge (`is_git: false`) distinguishing them from Git repositories (`git repo`).
+     - `"Default"` sessions are aggregated into project stats with path `~`.
+  5. **Verification & Tests**:
+     - Added `TestIntelligentClustering_GenesisHomeSessionProtection` to `src/scanner_test.go`.
+     - Ran full test suite across all 39 Go unit tests — 100% pass (`ok 0.429s`).
+     - Verified live daemon endpoint against session `c0429a76-8fd7-4d45-bc2b-9cbd579705fe`: correctly classified under `"Default"`, `Workspace: "/Users/aparv"`, `Projects Touched: None`. `DSA` session count correctly reduced to 4.
+     - Rebuilt frontend assets (`dist/app.bundle.js`, `dist/styles.css`) and standalone binary (`bin/session-explorer`).
+
+#### Files Changed
+- `specs/catalog/session-explorer.md` — Updated R-028 and Section 3.3 for Genesis Invariant
+- `tools/session-explorer/STATUS.md` — Updated timestamp and version 0.3.1
+- `tools/session-explorer/CONTEXT.md` — Updated test count (39 tests) and added Key Decision
+- `tools/session-explorer/CHANGELOG.md` — Added release notes for Genesis Invariant and Command Sanitization
+- `tools/session-explorer/src/scanner.go` — Added Genesis Workspace Invariant, extractCommandPaths, and isInternalRuntimeArtifact
+- `tools/session-explorer/src/scanner_test.go` — Added TestIntelligentClustering_GenesisHomeSessionProtection
+- `tools/session-explorer/src/web/src/app.js` — Dynamic git-badge vs non-git folder badges
+- `tools/session-explorer/src/web/src/styles.css` — Non-git folder badge styling
+- `tools/session-explorer/src/web/dist/` — Rebuilt Bun web bundle
+- `tools/session-explorer/bin/session-explorer` — Recompiled standalone Go binary
+
+---
+
 ### 2026-10-29 — Architecture: Multi-Tier Intelligent Workspace & Codebase Clustering Engine (R-028, R-005)
 
 **Agent/Author**: Antigravity (Google DeepMind)

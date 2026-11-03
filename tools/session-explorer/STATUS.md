@@ -1,11 +1,11 @@
 ---
 tool: session-explorer
 status: review
-version: 0.3.0
+version: 0.3.1
 language: go
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-10-30
+last_updated: 2026-11-03
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---

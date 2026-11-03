@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Genesis Workspace Invariant & Command Touch Sanitization (R-028)**:
+  - Fixed false-positive repository classification where a session started in the user home directory `~` (`/Users/aparv`) was claimed by `DSA` due to inline command string literals (`python3 -c "repos = ['.../DSA']"`).
+  - Enforced the **Genesis Workspace Invariant**: sessions initiated in generic parent directories (`~`, `/Untitled`) without an authoritative Git repository strictly belong to `"Default"` unless substantive file mutations (`write_file`/`edit_file`) occur in an external repository.
+  - Sanitized command execution path extraction (`extractCommandPaths`) to parse only explicit directory targets (`cd`, `git -C`, direct script paths) while skipping inline evaluation scripts (`-c`, `-e`) and print commands.
+  - Refined internal runtime filtering (`isInternalRuntimeArtifact`) to target engine storage artifacts (`/brain/`, `/conversations/`, `/logs/`, `.system_generated`), removing blanket exclusions on user dotfiles (`statusline.py`).
+  - Added visual distinction with dedicated `.git-badge.non-git` (`folder`) badges for unversioned workspaces and aggregated `"Default"` sessions into project metrics.
+
 ### Added
 - **Universal Agent Context & Behavioral Matrix (R-039)**:
   - Added holistic observability across global instructions (`~/.gemini/config/rules/`, `~/.claude/rules/`), global skills (`~/.gemini/config/skills/`, builtin runbooks, plugins), MCP servers, and lifecycle hooks (`hooks.json`).

@@ -86,7 +86,7 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-025 | Show "most frequently used prompts" or prompt frequency analysis | Could | ✅ | 🧪 | scanner.go computeStats(), app.js Insights modal |
 | R-026 | Copy prompt text to clipboard with one click | Should | ✅ | 🧪 | src/web/src/app.js copy buttons + toast |
 | R-027 | Lazy loading / virtual scrolling for large conversation timelines | Should | ✅ | 🧪 | src/web/src/app.js DOM rendering |
-| R-028 | Multi-tier repository and workspace clustering: authoritative DB metadata, weighted empirical tool touches, boundary sanitization, and graceful non-git folder fallback | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
+| R-028 | Multi-tier repository and workspace clustering: authoritative DB metadata, weighted empirical tool touches, command touch sanitization, Genesis Workspace Invariant (home/non-git protection), and graceful non-git folder fallback | Must | ✅ | 🧪 | scanner.go discoverKnownProjects(), scanSession(), scanner_test.go |
 | R-029 | Flexible user-driven grouping modes: Project Hub, Date Timeline, or Flat List | Must | ✅ | 🧪 | src/web/src/app.js renderView(), index.html segmented control |
 | R-030 | Agent Work-In-Progress (WIP) Recovery API (`/api/wip`) | Must | ✅ | 🧪 | scanner.go GetWorkspaceWIP(), api.go HandleWIP |
 | R-031 | Multi-Session Disambiguation Invariant & Mandatory Agent Halting | Must | ✅ | 🧪 | api.go, scripts/wip.sh, session-wip skill |
@@ -363,8 +363,15 @@ Analyzes the active rules and guidelines governing a specific session, tracking 
 | Transcript | JSONL file | `brain/<id>/.system_generated/logs/transcript.jsonl` |
 | Full Transcript | JSONL file | `brain/<id>/.system_generated/logs/transcript_full.jsonl` |
 | Trajectory Metadata | SQLite DB | `conversations/<id>.db` (`trajectory_metadata_blob` table: git repo, branch, workspace URI) |
-| Workspace / Project | string (path / name) | Multi-tier clustering engine: Authoritative DB → Empirical Tool Touches → Prompt Metadata → Folder Name → "Default" |
+| Workspace / Project | string (path / name) | Multi-tier clustering engine: Authoritative DB → Genesis Workspace Invariant → Empirical Tool Touches (Mutations > Reads > Exec Cwd) → Folder Name → "Default" |
 | Git Repo & Branch | string | Extracted from SQLite `trajectory_metadata_blob` or filesystem `.git` traversal |
+
+**Clustering & Identity Hierarchy (R-028 Invariant):**
+1. **Tier 0 (Authoritative Trajectory / Genesis Metadata)**: Probe SQLite `trajectory_metadata_blob` and user info for `WorkspaceURI` and `GitRepo`.
+2. **Genesis Non-Git Invariant**: When a session is initiated in the user's home directory (`~`), root, or a generic parent container without an authoritative Git repository, the session **MUST** remain clustered under `"Default"` unless the agent performed substantive empirical file mutations (`write_file`, `edit_file`) in a specific repository during that session.
+3. **Command Touch Sanitization**: `run_command` only constitutes an empirical tool touch if explicit directory execution (`Cwd`, `Directory`) or directory navigation (`cd <path>`, `git -C <path>`) is present. Blanket regex scraping of arbitrary command strings (especially inside inline `-c` / `-e` interpreter code or `echo` statements) is strictly prohibited to prevent mock test scripts from hijacking session identity.
+4. **Runtime Artifact Exclusion Boundary**: Skip internal runtime stores (`/brain/`, `/conversations/`, `/logs/`, `/presence/`, `/annotations/`, `.system_generated`, `.user_uploaded`), while allowing user code and configuration files (e.g. `~/.gemini/antigravity-cli/statusline.py`) to be recognized.
+5. **Project Hub "Default" Aggregation**: When sessions exist with `ProjectName == "Default"`, aggregate them into a `ProjectSummary` with `is_git: false`, path `~`, and render a dedicated project card on Project Hub with non-git badge styling (`folder` / `ad-hoc`).
 
 **JSONL Entry Schema (per line):**
 

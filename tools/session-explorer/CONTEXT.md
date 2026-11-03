@@ -1,7 +1,7 @@
 ---
 tool: session-explorer
 status: review
-last_session: 2026-10-30
+last_session: 2026-11-03
 last_agent: "Antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `review`
-- **Version**: 0.3.0
+- **Version**: 0.3.1
 - **Language**: Go 1.22+ (backend) + vanilla HTML/CSS/JS (frontend, Bun-bundled)
 - **Category**: GenAI & ML
 
@@ -28,7 +28,7 @@ blockers: []
 | Spec Requirements (R-XXX) | 39 | 39 | ✅ 100% Implemented (R-037, R-038, R-039 completed) |
 | Acceptance Criteria (AC-XXX) | 45 | 45 | 🧪 100% Verified (AC-040..AC-045 added & verified) |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
-| Test Coverage | 100% | 100% | 🧪 38 unit tests passing + headless Playwright verified |
+| Test Coverage | 100% | 100% | 🧪 39 unit tests passing + headless Playwright verified |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |
 
 ---
@@ -109,6 +109,7 @@ blockers: []
 | 2026-10-30 | Universal Agent Context & Behavioral Matrix (R-039) | Unified multi-level discovery hierarchy (Global Machine, Workspace Repository, and Session Runtime) across rules, skills, plugins, MCP servers, and hooks; computes precedence cascade (Workspace > Declared > Global > Built-in); identifies active vs on-demand skills with execution step markers; reuses embedded Native File Viewer for instant 1-click inspection |
 | 2026-10-19 | Pinned Floating Find Widget Invariant | Anchored Find widget to unscrollable .file-viewer-shell frame (position: absolute; top: 66px; right: 24px) rather than scrolling body, ensuring find bar remains 100% visible across multi-page file scrolls (deltaTop = 0px) |
 | 2026-10-20 | Unified Document Typography & 98% Fluid File Viewer Real Estate | Unified markdown hierarchy across session trail and file viewer (.markdown-body, .message-body, .file-viewer-markdown); expanded .file-viewer-shell to 97.5vw and .file-viewer-markdown to 100% fluid width |
+| 2026-11-03 | Genesis Workspace Invariant & Command Touch Sanitization | Generic starting directories (~ or /Untitled) anchor to "Default" unless substantive file mutations occur in a repository; command path extraction skips inline scripts (-c, -e) and print statements, preventing shell script literals from hijacking session identity |
 
 ---
 
@@ -160,4 +161,4 @@ blockers: []
 
 ---
 
-_Last updated: 2026-10-20_
+_Last updated: 2026-11-03_
