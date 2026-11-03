@@ -1923,3 +1923,250 @@ mod worktree_tests {
     }
 }
 
+mod topological_backbone_tests {
+    use omni_graph::analysis::get_edge_weight;
+    use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+    use std::collections::{HashSet, VecDeque};
+
+    #[test]
+    fn test_edge_weights_containment_hierarchy() {
+        assert!((get_edge_weight("IMPLEMENTS") - 3.0).abs() < 1e-5);
+        assert!((get_edge_weight("CALLS") - 2.0).abs() < 1e-5);
+        assert!((get_edge_weight("TYPE_REF") - 1.5).abs() < 1e-5);
+        assert!((get_edge_weight("IMPORTS") - 1.0).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS") - 0.8).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS_FILE") - 0.4).abs() < 1e-5);
+        assert!((get_edge_weight("CONTAINS_DIR") - 0.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_topological_containment_dag_reachability() {
+        let ws = "TestWorkspace";
+        let ws_root_id = format!("{}:workspace", ws);
+
+        // Nodes: 1 workspace + 2 dirs + 2 files + 4 symbols = 9 nodes
+        let nodes = vec![
+            ExtractedNode {
+                id: ws_root_id.clone(),
+                workspace: ws.to_string(),
+                label: ws.to_string(),
+                kind: "workspace".to_string(),
+                file_path: "".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "root".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:dir:src", ws),
+                workspace: ws.to_string(),
+                label: "src".to_string(),
+                kind: "directory".to_string(),
+                file_path: "src".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "dir src".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:dir:src/parser", ws),
+                workspace: ws.to_string(),
+                label: "parser".to_string(),
+                kind: "directory".to_string(),
+                file_path: "src/parser".to_string(),
+                language: "".to_string(),
+                line_start: 0,
+                line_end: 0,
+                text: "dir parser".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:file:src/main.rs", ws),
+                workspace: ws.to_string(),
+                label: "main.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn main() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:file:src/parser/mod.rs", ws),
+                workspace: ws.to_string(),
+                label: "mod.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 20,
+                text: "pub fn parse() {}".to_string(),
+            },
+            // Symbols in main.rs
+            ExtractedNode {
+                id: format!("{}:src/main.rs:main:1", ws),
+                workspace: ws.to_string(),
+                label: "main".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 5,
+                text: "fn main() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:src/main.rs:Config:6", ws),
+                workspace: ws.to_string(),
+                label: "Config".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/main.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 6,
+                line_end: 10,
+                text: "struct Config;".to_string(),
+            },
+            // Symbols in parser/mod.rs
+            ExtractedNode {
+                id: format!("{}:src/parser/mod.rs:parse:1", ws),
+                workspace: ws.to_string(),
+                label: "parse".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "pub fn parse() {}".to_string(),
+            },
+            ExtractedNode {
+                id: format!("{}:src/parser/mod.rs:AstParser:11", ws),
+                workspace: ws.to_string(),
+                label: "AstParser".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/parser/mod.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 11,
+                line_end: 20,
+                text: "pub struct AstParser;".to_string(),
+            },
+        ];
+
+        // Edges:
+        // Workspace -> CONTAINS_DIR -> src
+        // src -> CONTAINS_DIR -> src/parser
+        // src -> CONTAINS_FILE -> src/main.rs
+        // src/parser -> CONTAINS_FILE -> src/parser/mod.rs
+        // src/main.rs -> CONTAINS -> main
+        // src/main.rs -> CONTAINS -> Config
+        // src/parser/mod.rs -> CONTAINS -> parse
+        // src/parser/mod.rs -> CONTAINS -> AstParser
+        // main -> CALLS -> parse (AST edge)
+        let edges = vec![
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: ws_root_id.clone(),
+                target_label: "src".to_string(),
+                target_id: Some(format!("{}:dir:src", ws)),
+                edge_type: "CONTAINS_DIR".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src", ws),
+                target_label: "parser".to_string(),
+                target_id: Some(format!("{}:dir:src/parser", ws)),
+                edge_type: "CONTAINS_DIR".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src", ws),
+                target_label: "main.rs".to_string(),
+                target_id: Some(format!("{}:file:src/main.rs", ws)),
+                edge_type: "CONTAINS_FILE".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:dir:src/parser", ws),
+                target_label: "mod.rs".to_string(),
+                target_id: Some(format!("{}:file:src/parser/mod.rs", ws)),
+                edge_type: "CONTAINS_FILE".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/main.rs", ws),
+                target_label: "main".to_string(),
+                target_id: Some(format!("{}:src/main.rs:main:1", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/main.rs", ws),
+                target_label: "Config".to_string(),
+                target_id: Some(format!("{}:src/main.rs:Config:6", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/parser/mod.rs", ws),
+                target_label: "parse".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:parse:1", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:file:src/parser/mod.rs", ws),
+                target_label: "AstParser".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:AstParser:11", ws)),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            },
+            ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: format!("{}:src/main.rs:main:1", ws),
+                target_label: "parse".to_string(),
+                target_id: Some(format!("{}:src/parser/mod.rs:parse:1", ws)),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        // 1. Verify BFS reachability from workspace root to ALL nodes
+        let mut adj: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        for edge in &edges {
+            if let Some(ref tgt) = edge.target_id {
+                adj.entry(edge.source_id.clone()).or_default().push(tgt.clone());
+            }
+        }
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(ws_root_id.clone());
+        visited.insert(ws_root_id.clone());
+
+        while let Some(curr) = queue.pop_front() {
+            if let Some(neighbors) = adj.get(&curr) {
+                for nbr in neighbors {
+                    if visited.insert(nbr.clone()) {
+                        queue.push_back(nbr.clone());
+                    }
+                }
+            }
+        }
+
+        for node in &nodes {
+            assert!(
+                visited.contains(&node.id),
+                "Node '{}' of kind '{}' must be reachable from workspace root in topological DAG",
+                node.id,
+                node.kind
+            );
+        }
+
+        assert_eq!(visited.len(), nodes.len(), "Every vertex in the graph must belong to the connected giant component");
+    }
+}
+

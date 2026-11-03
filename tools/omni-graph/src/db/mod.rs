@@ -376,10 +376,15 @@ impl DbClient {
             None => String::new(),
         };
 
+        let default_emb = vec![0.0f32; 384];
+        let mut global_idx = 0;
+
         // Chunk in batches of 50 nodes to avoid HTTP payload buffer limits on large files
-        for (chunk_nodes, chunk_embs) in nodes.chunks(50).zip(embeddings.chunks(50)) {
+        for chunk_nodes in nodes.chunks(50) {
             let mut query = String::new();
-            for (node, emb) in chunk_nodes.iter().zip(chunk_embs.iter()) {
+            for node in chunk_nodes {
+                let emb = embeddings.get(global_idx).unwrap_or(&default_emb);
+                global_idx += 1;
                 let emb_str = serde_json::to_string(emb).unwrap_or_else(|_| "[]".to_string());
                 let escaped_text = surql_escape(&node.text);
                 let escaped_label = surql_escape(&node.label);
@@ -417,7 +422,12 @@ impl DbClient {
                 let escaped_cat = surql_escape(&edge.category);
 
                 let src_parts: Vec<&str> = edge.source_id.split(':').collect();
-                let src_resolution_surql = if src_parts.len() == 3 {
+                let is_3part_label = src_parts.len() == 3
+                    && src_parts[1] != "dir"
+                    && src_parts[1] != "file"
+                    && src_parts[1] != "workspace";
+
+                let src_resolution_surql = if is_3part_label {
                     // 3-part ID: ws:file:label (e.g. emitted by impl_item or receiver type without line number - R-039, R-045)
                     let s_ws = surql_escape(src_parts[0]);
                     let s_file = surql_escape(src_parts[1]);

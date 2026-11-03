@@ -57,7 +57,10 @@ pub fn get_edge_weight(edge_type: &str) -> f32 {
         "IMPLEMENTS" => 3.0,
         "CALLS" => 2.0,
         "TYPE_REF" => 1.5,
-        "IMPORTS" | "CONTAINS" => 1.0,
+        "IMPORTS" => 1.0,
+        "CONTAINS" => 0.8,
+        "CONTAINS_FILE" => 0.4,
+        "CONTAINS_DIR" => 0.2,
         _ => 1.0,
     }
 }

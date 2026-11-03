@@ -4,7 +4,7 @@
 use crate::db::DbClient;
 use crate::embedder::EmbedderClient;
 use crate::ingestion::FileCache;
-use crate::parser::CodeParser;
+use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
@@ -71,12 +71,72 @@ impl IncrementalPipeline {
             }
         };
 
+        // Topological Containment Backbone (R-063): Synthesize File node and containment edges
+        let filename = Path::new(rel_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| rel_path.to_string());
+        let ext = Path::new(rel_path)
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let total_lines = content.lines().count().max(1);
+        let preview_text = match content.char_indices().nth(500) {
+            Some((idx, _)) => &content[..idx],
+            None => &content,
+        };
+        let file_node_id = format!("{}:file:{}", workspace, rel_path);
+        let file_node = ExtractedNode {
+            id: file_node_id.clone(),
+            workspace: workspace.to_string(),
+            label: filename.clone(),
+            kind: "file".to_string(),
+            file_path: rel_path.to_string(),
+            language: ext,
+            line_start: 1,
+            line_end: total_lines,
+            text: preview_text.to_string(),
+        };
+
+        let mut all_nodes = Vec::with_capacity(parse_res.nodes.len() + 1);
+        all_nodes.push(file_node);
+        all_nodes.extend(parse_res.nodes);
+
+        let mut all_edges = parse_res.edges;
+        for sym in &all_nodes[1..] {
+            all_edges.push(ExtractedEdge {
+                workspace: workspace.to_string(),
+                source_id: file_node_id.clone(),
+                target_label: sym.label.clone(),
+                target_id: Some(sym.id.clone()),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            });
+        }
+
+        let parent_dir = Path::new(rel_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let dir_source_id = if parent_dir.is_empty() || parent_dir == "." {
+            format!("{}:workspace", workspace)
+        } else {
+            format!("{}:dir:{}", workspace, parent_dir)
+        };
+        all_edges.push(ExtractedEdge {
+            workspace: workspace.to_string(),
+            source_id: dir_source_id,
+            target_label: filename.clone(),
+            target_id: Some(file_node_id),
+            edge_type: "CONTAINS_FILE".to_string(),
+            category: "CONTAINMENT".to_string(),
+        });
+
         // 1. Look up existing community for this file before pruning to preserve community assignment
         let existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
 
         // 2. Generate vector embeddings for newly parsed nodes FIRST (eliminates 404 blackout window)
-        let enriched_texts: Vec<String> = parse_res
-            .nodes
+        let enriched_texts: Vec<String> = all_nodes
             .iter()
             .map(|n| format!("[{}] {} {} in {}\n{}", n.language, n.kind, n.label, n.file_path, n.text))
             .collect();
@@ -85,7 +145,7 @@ impl IncrementalPipeline {
             Ok(embs) => embs,
             Err(e) => {
                 warn!("Embedding generation failed for live sync on '{}': {}", rel_path, e);
-                vec![vec![0.0f32; 384]; parse_res.nodes.len()]
+                vec![vec![0.0f32; 384]; all_nodes.len()]
             }
         };
 
@@ -95,13 +155,13 @@ impl IncrementalPipeline {
         }
 
         // 4. Store new nodes with inherited community
-        if let Err(e) = self.db.store_nodes_with_community(&parse_res.nodes, &embeddings, Some(&hash), existing_comm).await {
+        if let Err(e) = self.db.store_nodes_with_community(&all_nodes, &embeddings, Some(&hash), existing_comm).await {
             error!("Failed to store nodes during live sync for '{}': {}", rel_path, e);
             return Err(e);
         }
 
         // 4. Store new edges
-        if let Err(e) = self.db.store_edges(&parse_res.edges).await {
+        if let Err(e) = self.db.store_edges(&all_edges).await {
             warn!("Failed to store edges during live sync for '{}': {}", rel_path, e);
         }
 
@@ -112,8 +172,8 @@ impl IncrementalPipeline {
             "Live synced file '{}' in workspace '{}' ({} nodes, {} edges)",
             rel_path,
             workspace,
-            parse_res.nodes.len(),
-            parse_res.edges.len()
+            all_nodes.len(),
+            all_edges.len()
         );
 
         Ok(())
