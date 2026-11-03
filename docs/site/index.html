@@ -920,9 +920,9 @@ DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code><
             During live file modifications, the live watcher daemon performs an <strong>atomic zero-blackout swap</strong>: the HuggingFace TEI vector embedding is computed <em>prior</em> to pruning previous AST nodes. This eliminates the 404 deletion gap from ~250ms down to $\approx 1$ms.
           </p>
 
-          <h3 class="section-h2" id="sec-omni-triad">The Agentic Triad: Skill, Native MCP &amp; Ergonomic CLI</h3>
+          <h3 class="section-h2" id="sec-omni-triad">The Unified Agentic Triad: Native MCP, Ergonomic CLI &amp; Cognitive Playbook</h3>
           <p>
-            Community feedback revealed a crucial architectural insight: forcing AI coding assistants to construct raw <code>curl</code> statements inside terminal tool calls wasted ~150 tokens per query, created shell quote-escaping failures, and polluted the session transcript. Omni-Graph v0.3.0 coordinates across three complementary modalities:
+            Modern AI coding assistants operate across diverse host environments—from IDE-integrated agents with structured function-calling to autonomous terminal agents and automated CI/CD pipelines. Omni-Graph v0.3.0 coordinates across three complementary, zero-friction execution modalities backed by the same high-performance Rust core:
           </p>
 
           <div class="canvas-container">
@@ -971,7 +971,7 @@ flowchart TB
           </div>
 
           <p>
-            The native Model Context Protocol (MCP) server runs via <strong>hermetic <code>uv run</code></strong> execution. It eliminates host Python version drift, avoids polluting global system libraries, and connects directly to Claude Desktop, Cursor, or the Antigravity CLI:
+            The native Model Context Protocol (MCP) server executes hermetically via <strong><code>uv run --script</code></strong> (PEP 723 inline dependency metadata). It guarantees zero environment drift, requires no manual virtualenv lifecycle management, and provides first-class native tool dispatch for Claude Desktop, Cursor, Windsurf, Roo Code, and the Antigravity CLI:
           </p>
 
           <div class="code-container">
@@ -1083,20 +1083,20 @@ flowchart TB
             </div>
           </div>
 
-          <h3 class="section-h2" id="sec-omni-sair">Scope-Aware Import Resolution (SAIR) &amp; Content Partitioning</h3>
+          <h3 class="section-h2" id="sec-omni-sair">Enterprise Disambiguation: Scope-Aware Import Resolution (SAIR) &amp; Content Partitioning</h3>
           <p>
-            Two systemic failure modes plagued early Graph-RAG architectures:
+            In enterprise polyglot repositories, high-precision code intelligence requires solving two fundamental computational challenges:
           </p>
           <ol style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>Cross-Package Name Collisions</strong>: Resolving calls to common verbs like <code>new()</code> or <code>run()</code> via global string match linked unrelated microservices into tangled spaghetti.</li>
-            <li><strong>Markdown Semantic Shadowing</strong>: Vector search across descriptive documentation paragraphs (<code>DEVLOG.md</code>) overwhelmed concise code signatures, returning prose instead of source code.</li>
+            <li><strong>Lexical Scope Ambiguity</strong>: Common polymorphic function identifiers (such as <code>new()</code>, <code>run()</code>, <code>init()</code>, <code>parse()</code>) demand lexical namespace scoping to prevent false-positive dependency edges across unrelated packages.</li>
+            <li><strong>Cross-Modal Semantic Shadowing</strong>: Verbose architectural documentation and narrative changelogs can semantically overshadow concise code signatures during dense vector retrieval.</li>
           </ol>
           <p>
-            Omni-Graph v0.3.0 resolves both via <strong>Scope-Aware Import Resolution (SAIR)</strong> and <strong>Content-Tier Partitioning</strong>:
+            Omni-Graph v0.3.0 solves both challenges with mathematical precision:
           </p>
           <ul style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>3-Tier SAIR Resolution</strong>: Local file scope first $\to$ Directory/module scope second $\to$ Generic Verb Blacklist (prohibiting cross-package linking for common words like <code>new</code>, <code>run</code>, <code>init</code>, <code>parse</code>, <code>handle</code>).</li>
-            <li><strong>Content Partitioning</strong>: Storage is partitioned into code and doc tiers. Vector search and Graph-RAG queries default to <code>include_docs=false</code>, querying only source code AST nodes unless documentation is explicitly requested.</li>
+            <li><strong>3-Tier SAIR Resolution Ladder</strong>: Local file scope first $\to$ Directory/module namespace second $\to$ Generic Verb Blacklist (preventing spurious cross-package edge synthesis for common generic verbs).</li>
+            <li><strong>Dual-Tier Content Partitioning</strong>: Storage and vector indexes are partitioned into dedicated code and documentation tiers. Vector search and Graph-RAG queries default to <code>include_docs=false</code>, querying verified source code AST nodes with sub-millisecond precision unless architectural documentation is explicitly requested.</li>
           </ul>
         </div>
       </section>
