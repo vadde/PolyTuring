@@ -154,6 +154,9 @@ setup-session-wip: ## Install session-wip recovery skill: make setup-session-wip
 omni-graph: ## Quick launcher: start Omni-Graph semantic knowledge stack
 	@$(MAKE) -C $(TOOLS_DIR)/omni-graph up
 
+omni-mcp: ## Run native Model Context Protocol (MCP) stdio server for Omni-Graph
+	@python3 $(TOOLS_DIR)/omni-graph/scripts/omni-mcp.py
+
 ingest: ## Index a codebase into Omni-Graph: make ingest [<dir>] [DIR=<dir>] [PROJECT=name]
 	@$(MAKE) -C $(TOOLS_DIR)/omni-graph ingest $(if $(INGEST_ARGS),$(INGEST_ARGS),$(if $(DIR),TARGET_DIR="$(DIR)",)) PROJECT="$(PROJECT)"
 

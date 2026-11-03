@@ -12,6 +12,49 @@ Always use this skill instead of running blind recursive `grep -rn` or reading w
 
 ---
 
+## 🏛️ The Agentic Triad Architecture (How to Execute)
+
+Omni-Graph is architected as a triad optimized for both AI agents and human engineers:
+
+```
+┌─────────────────────────┐       ┌─────────────────────────┐       ┌─────────────────────────┐
+│     1. THE SKILL        │       │   2. NATIVE MCP SERVER  │       │   3. ERGONOMIC CLI      │
+│  (Cognitive Playbook)   │       │   (Structured Nervous)  │       │    (Muscular Hands)     │
+├─────────────────────────┤       ├─────────────────────────┤       ├─────────────────────────┤
+│ • Strategic Brain       │       │ • Zero-Token Shell-Free │       │ • Clean Subcommands     │
+│ • When & Why Strategy   │ ───▶  │ • Native IDE Tools      │  ───▶ │ • Auto Workspace Filter │
+│ • 3-Tier Recon Ladder   │       │ • No Shell Escaping     │       │ • Terminal Formatting   │
+│ • 150-Line Gate Guard   │       │ • Typed JSON Schema     │       │ • Fallback Execution    │
+└─────────────────────────┘       └─────────────────────────┘       └─────────────────────────┘
+```
+
+### Execution Priority Ladder for Coding Agents:
+1. **Tier 1 (Native MCP Tools — Preferred when available)**:
+   If your model environment exposes `omni_*` tools, invoke them directly with typed parameters:
+   - `omni_definition(symbol="CodeParser")` — Precise AST symbol definition, line ranges & signatures
+   - `omni_references(symbol="CodeParser")` — All callers, importers, and dependent tests
+   - `omni_condense(symbol="CodeParser", hops=2)` — Multi-hop call trace slice (<1500 tokens)
+   - `omni_search(query="tree sitter parser", k=5)` — Dense vector semantic search across symbols
+   - `omni_galaxies()` — Top architectural subsystems, coupling metrics & modular boundaries
+   - `omni_query(prompt="How does AST parsing work?")` — Hybrid Graph-RAG architectural brief
+2. **Tier 2 (Ergonomic CLI — In terminal or shell execution)**:
+   Use the clean subcommand CLI `./scripts/omni` (or `./tools/omni-graph/scripts/omni.sh`):
+   - `./scripts/omni symbol CodeParser`
+   - `./scripts/omni references CodeParser`
+   - `./scripts/omni condense CodeParser [hops]`
+   - `./scripts/omni search "tree sitter" [k]`
+   - `./scripts/omni galaxies`
+   - `./scripts/omni query "How does AST parsing work?"`
+3. **Tier 3 (Make Commands — From repository root)**:
+   - `make graph-symbol SYM=CodeParser`
+   - `make graph-references SYM=CodeParser`
+   - `make graph-condense SYM=CodeParser HOPS=2`
+   - `make graph-galaxies`
+   - `make search-graph Q="tree sitter"`
+   - `make query-graph Q="How does AST parsing work?"`
+
+---
+
 ## 🎯 When to Use
 
 1. **Exploring an Unfamiliar Codebase**: When you need to understand the architectural subsystems, packages, or directory relationships without reading hundreds of files.

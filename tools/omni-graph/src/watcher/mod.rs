@@ -122,12 +122,25 @@ impl WatchManager {
     ) -> Result<WatcherStatus, String> {
         let mut watchers = self.watchers.lock().await;
 
-        // Check if already watching
+        // Check if already watching (R-074, R-075: Idempotency & path normalization)
         if let Some(active) = watchers.get(workspace) {
             let s = active.status.read().await;
-            if s.path == path && s.status == "watching" {
+            let clean_path = path.trim_end_matches('/');
+            let s_clean = s.path.trim_end_matches('/');
+            let paths_match = s.path == path
+                || s_clean == clean_path
+                || {
+                    let p1 = std::fs::canonicalize(path).ok();
+                    let p2 = std::fs::canonicalize(&s.path).ok();
+                    p1.is_some() && p1 == p2
+                };
+
+            if paths_match && s.status == "watching" {
                 return Ok(s.clone());
             }
+
+            // If path changed for this workspace, cleanly cancel old watcher task before replacing
+            let _ = active.cancel_tx.send(()).await;
         }
 
         let root = PathBuf::from(path);

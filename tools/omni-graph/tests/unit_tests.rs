@@ -1224,6 +1224,89 @@ mod cluster_filter_tests {
         assert_eq!(filtered[0].id, 0);
         assert_eq!(filtered[0].node_count, 3);
     }
+
+    #[test]
+    fn test_consolidate_communities_absorbs_singletons_via_links() {
+        use omni_graph::db::DbLink;
+
+        let nodes = vec![
+            make_node("m1", "src/core/a.rs", "fn_a1"),
+            make_node("m2", "src/core/a.rs", "fn_a2"),
+            make_node("m3", "src/core/a.rs", "fn_a3"),
+            make_node("m4", "src/core/b.rs", "fn_b1"),
+            make_node("m5", "src/core/b.rs", "fn_b2"),
+            make_node("micro1", "src/isolated/c.rs", "isolated_fn"),
+        ];
+
+        let links = vec![
+            DbLink {
+                id: "e1".to_string(),
+                workspace: Some("test".to_string()),
+                source: "micro1".to_string(),
+                target: "m1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            }
+        ];
+
+        let mut assignments = HashMap::new();
+        assignments.insert("m1".to_string(), 0);
+        assignments.insert("m2".to_string(), 0);
+        assignments.insert("m3".to_string(), 0);
+        assignments.insert("m4".to_string(), 0);
+        assignments.insert("m5".to_string(), 0);
+        assignments.insert("micro1".to_string(), 1); // micro-community
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+
+        // micro1 should be absorbed by community 0 due to CALLS link to m1
+        assert_eq!(assignments.values().collect::<std::collections::HashSet<_>>().len(), 1);
+        assert_eq!(assignments["micro1"], assignments["m1"]);
+    }
+
+    #[test]
+    fn test_consolidate_communities_absorbs_via_directory() {
+        let nodes = vec![
+            make_node("m1", "src/core/a.rs", "fn_a1"),
+            make_node("m2", "src/core/a.rs", "fn_a2"),
+            make_node("m3", "src/core/a.rs", "fn_a3"),
+            make_node("m4", "src/core/b.rs", "fn_b1"),
+            make_node("m5", "src/core/b.rs", "fn_b2"),
+            make_node("micro1", "src/core/orphan.rs", "orphan_fn"), // in src/core
+        ];
+
+        let links = vec![]; // no links
+
+        let mut assignments = HashMap::new();
+        assignments.insert("m1".to_string(), 0);
+        assignments.insert("m2".to_string(), 0);
+        assignments.insert("m3".to_string(), 0);
+        assignments.insert("m4".to_string(), 0);
+        assignments.insert("m5".to_string(), 0);
+        assignments.insert("micro1".to_string(), 99); // disconnected
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+
+        // micro1 should be absorbed by macro-community 0 because they share directory "src/core"
+        assert_eq!(assignments.values().collect::<std::collections::HashSet<_>>().len(), 1);
+        assert_eq!(assignments["micro1"], assignments["m1"]);
+    }
+
+    #[test]
+    fn test_consolidate_communities_all_small_merges_to_zero() {
+        let nodes = vec![
+            make_node("1", "src/a.rs", "f1"),
+            make_node("2", "src/b.rs", "f2"),
+        ];
+        let links = vec![];
+        let mut assignments = HashMap::new();
+        assignments.insert("1".to_string(), 10);
+        assignments.insert("2".to_string(), 20);
+
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+        assert_eq!(assignments["1"], 0);
+        assert_eq!(assignments["2"], 0);
+    }
 }
 
 mod analytics_tests {
@@ -1599,6 +1682,208 @@ mod worktree_tests {
         assert!(fields.iter().any(|f| f.label == "Port"));
 
         assert!(edges.iter().any(|e| e.edge_type == "CONTAINS" && e.target_label == "Host"));
+    }
+
+    #[test]
+    fn test_inject_watcher_status_root_and_worktree() {
+        use omni_graph::api::inject_watcher_status;
+        use omni_graph::watcher::WatcherStatus;
+
+        let mut workspaces = vec![
+            serde_json::json!({
+                "workspace": "PolyTuring",
+                "total_nodes": 3800,
+                "worktrees": [
+                    {
+                        "workspace": "wt-feature",
+                        "total_nodes": 500
+                    },
+                    {
+                        "workspace": "wt-inactive",
+                        "total_nodes": 300
+                    }
+                ]
+            }),
+            serde_json::json!({
+                "workspace": "unwatched-repo",
+                "total_nodes": 120,
+                "worktrees": []
+            })
+        ];
+
+        let active_statuses = vec![
+            WatcherStatus {
+                workspace: "PolyTuring".to_string(),
+                path: "/path/to/PolyTuring".to_string(),
+                status: "watching".to_string(),
+                started_at: "2026-11-03T00:00:00Z".to_string(),
+                files_tracked: 200,
+                last_sync: None,
+                events_processed: 0,
+                files_reindexed: 0,
+                files_deleted: 0,
+                avg_sync_ms: 0,
+                cluster_status: "current".to_string(),
+                last_cluster_at: None,
+                debounce_ms: 500,
+            },
+            WatcherStatus {
+                workspace: "wt-feature".to_string(),
+                path: "/path/to/wt-feature".to_string(),
+                status: "watching".to_string(),
+                started_at: "2026-11-03T00:00:00Z".to_string(),
+                files_tracked: 50,
+                last_sync: None,
+                events_processed: 0,
+                files_reindexed: 0,
+                files_deleted: 0,
+                avg_sync_ms: 0,
+                cluster_status: "current".to_string(),
+                last_cluster_at: None,
+                debounce_ms: 500,
+            },
+        ];
+
+        inject_watcher_status(&mut workspaces, &active_statuses);
+
+        // Root workspace PolyTuring is watching
+        assert_eq!(workspaces[0]["is_watching"], serde_json::Value::Bool(true));
+
+        // Nested worktree wt-feature is watching
+        assert_eq!(workspaces[0]["worktrees"][0]["is_watching"], serde_json::Value::Bool(true));
+
+        // Nested worktree wt-inactive is NOT watching
+        assert_eq!(workspaces[0]["worktrees"][1]["is_watching"], serde_json::Value::Bool(false));
+
+        // unwatched-repo is NOT watching
+        assert_eq!(workspaces[1]["is_watching"], serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn parse_java_classes_methods_inheritance_and_imports() {
+        use omni_graph::parser::CodeParser;
+        let java_code = r#"
+        package com.example.service;
+
+        import com.example.model.User;
+        import java.io.Serializable;
+
+        @Service
+        public class UserService extends BaseService implements Serializable {
+            private final UserRepository userRepository;
+
+            public UserService(UserRepository repo) {
+                this.userRepository = repo;
+            }
+
+            public User findById(String id) {
+                return userRepository.findById(id);
+            }
+        }
+        "#;
+        let res = CodeParser::parse_file("test-ws", "UserService.java", java_code)
+            .expect("should parse java code");
+        let nodes = res.nodes;
+        let edges = res.edges;
+
+        // Class
+        assert!(nodes.iter().any(|n| n.label == "UserService" && n.kind == "class"));
+
+        // Constructor and Method
+        assert!(nodes.iter().any(|n| n.label == "UserService" && n.kind == "constructor"));
+        assert!(nodes.iter().any(|n| n.label == "findById" && n.kind == "method"));
+
+        // Field
+        assert!(nodes.iter().any(|n| n.label == "userRepository" && n.kind == "field"));
+
+        // Imports
+        assert!(edges.iter().any(|e| e.edge_type == "IMPORTS" && e.target_label == "User"));
+
+        // Inheritance (EXTENDS & IMPLEMENTS)
+        assert!(edges.iter().any(|e| e.edge_type == "EXTENDS" && e.target_label == "BaseService"));
+        assert!(edges.iter().any(|e| e.edge_type == "IMPLEMENTS" && e.target_label == "Serializable"));
+
+        // Calls (userRepository.findById)
+        assert!(edges.iter().any(|e| e.edge_type == "CALLS" && e.target_label == "findById"));
+    }
+
+    #[test]
+    fn parse_cpp_classes_functions_and_includes() {
+        use omni_graph::parser::CodeParser;
+        let cpp_code = r#"
+        #include <vector>
+        #include "shape.h"
+
+        namespace graphics {
+            class Circle : public Shape {
+            public:
+                double radius;
+                Circle(double r) : radius(r) {}
+                double area() {
+                    return computeArea(radius);
+                }
+            };
+
+            double computeArea(double r) {
+                return 3.14159 * r * r;
+            }
+        }
+        "#;
+        let res = CodeParser::parse_file("test-ws", "circle.cpp", cpp_code)
+            .expect("should parse cpp code");
+        let nodes = res.nodes;
+        let edges = res.edges;
+
+        // Class & namespace
+        assert!(nodes.iter().any(|n| n.label == "Circle" && n.kind == "class"));
+        assert!(nodes.iter().any(|n| n.label == "graphics" && n.kind == "namespace"));
+
+        // Method & function
+        assert!(nodes.iter().any(|n| n.label == "computeArea" && n.kind == "function"));
+
+        // Inheritance (Circle EXTENDS Shape)
+        assert!(edges.iter().any(|e| e.edge_type == "EXTENDS" && e.target_label == "Shape"));
+
+        // Include edges
+        assert!(edges.iter().any(|e| e.edge_type == "IMPORTS" && (e.target_label == "vector" || e.target_label == "shape")));
+
+        // Calls
+        assert!(edges.iter().any(|e| e.edge_type == "CALLS" && e.target_label == "computeArea"));
+    }
+
+    #[test]
+    fn parse_typescript_filter_detached_css_properties() {
+        use omni_graph::parser::CodeParser;
+        let ts_code = r#"
+        export interface UserCardProps {
+            username: string;
+            avatarUrl: string;
+        }
+
+        // Inline object literal (should NOT be extracted as top-level field nodes)
+        const styles = {
+            cursor: 'pointer',
+            color: '#ffffff',
+            borderRadius: '8px'
+        };
+
+        export const renderCard = (props: UserCardProps) => {
+            return props.username;
+        };
+        "#;
+        let res = CodeParser::parse_file("test-ws", "Card.tsx", ts_code)
+            .expect("should parse tsx code");
+        let nodes = res.nodes;
+
+        // Interface and its properties MUST be extracted
+        assert!(nodes.iter().any(|n| n.label == "UserCardProps" && n.kind == "interface"));
+        assert!(nodes.iter().any(|n| n.label == "username" && n.kind == "field"));
+        assert!(nodes.iter().any(|n| n.label == "avatarUrl" && n.kind == "field"));
+
+        // Detached CSS style properties MUST NOT be extracted as fields
+        assert!(!nodes.iter().any(|n| n.label == "cursor"));
+        assert!(!nodes.iter().any(|n| n.label == "borderRadius"));
+        assert!(!nodes.iter().any(|n| n.label == "color"));
     }
 }
 

@@ -5,9 +5,10 @@ version: 0.2.2
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-10-13
+last_updated: 2026-11-03
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
+nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 ---
 
 # SDLC Status
@@ -38,6 +39,7 @@ spec: ../../specs/catalog/omni-graph.md
 | 2026-10-09 | `in-progress` | `in-progress` | Third-round forensic audit: Ambient live-watch auto-enrollment, polyglot multi-symbol imports (R-044), two-tier condenser token budgeting (<1500 tokens, R-028), zero-blackout live re-indexing, and ingestion path security containment |
 | 2026-10-09 | `in-progress` | `in-progress` | Fourth-round forensic audit: Polyglot struct field & interface property AST extraction (R-057), targeted neighborhood Graph-RAG retrieval, strict Graph-RAG token budgeting, worktree hierarchy deduplication, SurrealQL statement index resilience (`extract_sql_arrays`), and relational graph edge indexing (`linked_to`) |
 | 2026-10-13 | `in-progress` | `in-progress` | Safe SurrealDB volume purge automation (reset-graph-db / reset-db), storage reset preserving TEI model cache, UI worktree fleet switcher & lineage HUD integration |
+| 2026-11-03 | `in-progress` | `in-progress` | Holistic multi-disciplinary retrospective & scientific introspection across 5 foundational lenses; author Next-Gen Spec v0.3.0 (R-060 to R-072: Java/C++ AST, Leiden clustering, Two-Tower RRF hybrid search, Content partitioning, PPR context slicing, and native MCP server) |
 
 ---
 
@@ -116,6 +118,25 @@ spec: ../../specs/catalog/omni-graph.md
 | R-057 | Proactive Agent Hook & Worktree Auto-Remediation Banner | `.agents/scripts/`, `scripts/` | `tests/unit_tests.rs` | ✅ |
 | R-058 | Rebase Storm Debouncing & Surge Suppression | `src/watcher/` | `tests/unit_tests.rs` | ✅ |
 | R-059 | Top-Down Worktree Fleet Auto-Cascade & Dynamic Sync | `src/ingestion/worktree.rs`, `src/api/` | `tests/unit_tests.rs` | ✅ |
+| R-060 | Java Tree-sitter Parser Integration (classes, records, methods) | `src/parser/` | `tests/unit_tests.rs` | ✅ |
+| R-061 | C/C++ Tree-sitter Parser Integration (structs, functions, `#include`) | `src/parser/` | `tests/unit_tests.rs` | ✅ |
+| R-062 | TypeScript Deep AST Hardening & Detached Property Filtering | `src/parser/` | `tests/unit_tests.rs` | ✅ |
+| R-063 | Topological Containment Backbone (`CONTAINS_DIR` & `CONTAINS_FILE`) | `src/ingestion/` | `tests/ingestion/` | ⬜ |
+| R-064 | Hierarchical Community Consolidation & Macro-Cluster Size Floor (CPM/Modularity) | `src/analysis/`, `src/api/` | `tests/unit_tests.rs` | ✅ |
+| R-065 | Scope-Aware Import Resolution (SAIR) (eliminating bare name collisions) | `src/db/` | `tests/unit_tests.rs` | ✅ |
+| R-066 | Two-Tower Hybrid Retrieval Engine (Tantivy BM25 + HNSW Vector RRF) | `src/retrieval/` | `tests/retrieval/` | ⬜ |
+| R-067 | Content Tier Partitioning (`code_node` vs `doc_node` in vector search & Graph-RAG) | `src/db/`, `src/api/`, `src/analysis/` | `tests/unit_tests.rs` | ✅ |
+| R-068 | Strict Binary-Search Budgeting (<1,500 tokens) & Syntax Normalization | `src/condenser/` | `tests/condenser/` | ⬜ |
+| R-069 | Personalized PageRank (PPR) Neighborhood Slicing | `src/analysis/` | `tests/analysis/` | ⬜ |
+| R-070 | Native Model Context Protocol (MCP) Server for Omni-Graph | `scripts/omni-mcp.py` | `scripts/omni-mcp.py` | ✅ |
+| R-071 | Portable Standalone Skill & One-Click CLI Bootstrapper | `skills/omni-graph/` | `tests/setup/` | ⬜ |
+| R-073 | Dynamic Watcher Status Merging in /api/workspaces (is_watching) | `src/api/mod.rs` | `tests/unit_tests.rs` | ✅ |
+| R-074 | Canonical Path Normalization & Idempotency in WatcherManager | `src/watcher/mod.rs` | `tests/unit_tests.rs` | ✅ |
+| R-075 | Clean Task Cancellation on Watcher Path Re-assignment | `src/watcher/mod.rs` | `tests/unit_tests.rs` | ✅ |
+| R-076 | Worktree Fleet Watcher Status Parity | `src/api/mod.rs` | `tests/unit_tests.rs` | ✅ |
+| R-077 | Unified Ergonomic CLI Binary (`omni` tool) | `scripts/omni.sh`, `scripts/omni` | `tests/unit_tests.rs` | ✅ |
+| R-078 | Standardized JSON-RPC 2.0 MCP Tool Schema | `scripts/omni-mcp.py` | `tests/unit_tests.rs` | ✅ |
+| R-079 | Adaptive Skill-MCP Dual Bridge Protocol | `skills/omni-graph/` | `tests/unit_tests.rs` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

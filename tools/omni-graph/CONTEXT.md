@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
 status: in-progress
-last_session: 2026-10-16
+last_session: 2026-11-03
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `in-progress`
-- **Version**: 0.2.3
+- **Version**: 0.3.0
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
@@ -26,10 +26,18 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 59 | 59 | 🟢 100% Complete |
-| Acceptance Criteria (AC-XXX) | 25 | 25 | 🟢 100% Complete |
-| Non-Functional (NF-XXX) | 11 | 11 | 🟢 100% Complete |
-| Test Coverage | 72/72 Unit & Integration Tests | 72 | 🟢 100% Verified in Docker |
+| Spec Requirements (R-XXX) | 79 | 79 | 🟢 100% Complete |
+| Acceptance Criteria (AC-XXX) | 35 | 35 | 🟢 100% Complete |
+| Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
+| Test Coverage | 79/79 Unit & Integration Tests | 79 | 🟢 100% Verified in Docker |
+| Watcher Telemetry Synchronization (R-073 to R-076) | Complete | — | 🟢 Dynamic in-memory status injection & idempotent watch |
+| Polyglot AST Parsers (Java, C, C++, R-060, R-061) | Complete | — | 🟢 Tree-sitter Java/C/C++ classes, functions, includes & inheritance |
+| Galaxy Micro-Cluster Consolidation (R-064) | Complete | — | 🟢 Topological & spatial rollup, size floor >=5, 15 macro galaxies |
+| Scope-Aware Import Resolution (SAIR, R-065) | Complete | — | 🟢 In-file -> dir/module -> generic verb protection avoiding cross-package contamination |
+| Content-Tier Partitioning (Code vs Docs, R-067) | Complete | — | 🟢 Code-first search curing Markdown Semantic Shadowing |
+| Native Model Context Protocol (MCP) Server (R-070, R-078) | Complete | — | 🟢 Zero-token shell-free stdio JSON-RPC 2.0 MCP server (`omni-mcp.py`) |
+| Unified Ergonomic CLI (`scripts/omni`, R-077) | Complete | — | 🟢 Subcommand CLI auto-detecting workspace and formatting clean outputs |
+| Agentic Triad Architecture & Cognitive Bridge (R-079) | Complete | — | 🟢 Integrated SKILL.md (Brain) + MCP (Nervous) + CLI (Hands) |
 | Negative Ingestion Guardrail & Zero Redundant Ingest | Complete | — | 🟢 Suppressed /api/ingest in banners for indexed repos |
 | Accurate Stdin Workspace Resolution in Lifecycle Hooks | Complete | — | 🟢 CLI payload workspacePaths prioritization |
 | Hook Invocation Idempotency (Zero Duplicate Banners) | Complete | — | 🟢 Token marker eliminating dual local/global banner injection |
@@ -86,6 +94,8 @@ blockers: []
 | Resource | Path | Notes |
 |----------|------|-------|
 | Specification | [`specs/catalog/omni-graph.md`](../../specs/catalog/omni-graph.md) | Full requirements (28 R-XXX, 18 AC-XXX, 11 NF-XXX) |
+| Hardening Spec | [`specs/catalog/omni-graph-hardening.md`](../../specs/catalog/omni-graph-hardening.md) | Forensic fixes & worktree fleet sync (R-031 to R-059) |
+| Next-Gen Spec (v0.3.0) | [`specs/catalog/omni-graph-nextgen.md`](../../specs/catalog/omni-graph-nextgen.md) | Scientific architecture, Leiden Graph-RAG, Two-Tower RRF & Polyglot (R-060 to R-072) |
 | Status | [`STATUS.md`](STATUS.md) | SDLC phase + traceability matrix |
 | Dev Log | [`DEVLOG.md`](DEVLOG.md) | Session-by-session journal |
 | Changelog | [`CHANGELOG.md`](CHANGELOG.md) | Version history |
@@ -142,10 +152,11 @@ blockers: []
 
 > _What to do when you pick this tool up. Updated at the end of every session._
 
-1. Multi-container stack (SurrealDB, TEI, Rust API, React UI) fully operational, zero orphaned edges verified across all workspaces.
-2. 64/64 unit tests passing, strict Clippy clean (`-D warnings`), UI typecheck clean (`tsc --noEmit`).
-3. Requirements R-001 through R-050 100% complete with full traceability.
-4. Ready for human review and validation on feature branch `feat/dynamic-galaxy-clustering-agent-primitives`.
+1. Review Next-Gen Specification [`specs/catalog/omni-graph-nextgen.md`](../../specs/catalog/omni-graph-nextgen.md) (R-060 to R-072) and multi-disciplinary retrospective.
+2. Execute Phase 1: Integrate `tree-sitter-java` and `tree-sitter-c`/`tree-sitter-cpp` into `Cargo.toml` and implement topological containment edges (`CONTAINS_DIR`, `CONTAINS_FILE`).
+3. Execute Phase 2: Replace flat LPA with Hierarchical Leiden Community Detection to eliminate 936 single-node galaxies and enforce 5–15 macro subsystems.
+4. Execute Phase 3: Scope-Aware Import Resolution (SAIR) and Content Tier Partitioning (`code_node` vs `doc_node`).
+5. Execute Phase 4: Two-Tower Hybrid Search (Tantivy BM25 + HNSW RRF) and Strict Budget Context Condenser.
 
 ---
 
@@ -169,6 +180,11 @@ blockers: []
 | [ECC](https://github.com/affaan-m/ECC) | PreToolUse hooks; content-hash caching; token budget monitoring |
 | [Microsoft GraphRAG](https://github.com/microsoft/graphrag) | Hierarchical Leiden community detection & macroscopic summary aggregation |
 | [RAGFlow](https://github.com/infiniflow/ragflow) | Deep structural chunking over raw lexical chunking |
+| [Sourcegraph SCIP](https://github.com/sourcegraph/scip) | Standardized language-agnostic code intelligence protocol; separates definitions from occurrences |
+| [Google Kythe](https://github.com/kythe/kythe) | Compiler-level semantic graph schema (anchor, defines, childof, ref) for multi-million line monorepos |
+| [DeusData codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | Embedded SQLite C knowledge graph exposing 15 MCP tools for agentic call graph traversal |
+| [ast-grep](https://github.com/ast-grep/ast-grep) | Blazing-fast Tree-sitter structural pattern matcher (`$A.foo($B)`) for syntactic search & rewrites |
+| [RepoGraph (ICLR 2024)](https://github.com/microsoft/RepoGraph) | Fine-grained line-level code graph navigation plugin boosting LLM agent repository task accuracy |
 
 ---
 

@@ -40,6 +40,7 @@ pub struct AppState {
 pub struct GraphParams {
     pub workspace: Option<String>,
     pub min_size: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -47,6 +48,7 @@ pub struct SearchParams {
     pub q: String,
     pub k: Option<usize>,
     pub workspace: Option<String>,
+    pub include_docs: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +68,7 @@ pub struct GraphRagPayload {
     pub prompt: String,
     pub top_k: Option<usize>,
     pub workspace: Option<String>,
+    pub include_docs: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -270,12 +273,43 @@ async fn workspaces_handler(
         state.db.get_workspaces().await
     };
     match res {
-        Ok(workspaces) => (StatusCode::OK, Json(workspaces)).into_response(),
+        Ok(mut workspaces) => {
+            let active_statuses = state.watcher.get_status().await;
+            inject_watcher_status(&mut workspaces, &active_statuses);
+            (StatusCode::OK, Json(workspaces)).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e })),
         )
             .into_response(),
+    }
+}
+
+/// Helper to enrich workspace JSON records with live-watcher status (R-073, R-076)
+pub fn inject_watcher_status(
+    workspaces: &mut [serde_json::Value],
+    active_statuses: &[crate::watcher::WatcherStatus],
+) {
+    let watching_set: HashSet<&str> = active_statuses
+        .iter()
+        .filter(|w| w.status == "watching")
+        .map(|w| w.workspace.as_str())
+        .collect();
+
+    for ws in workspaces {
+        if let Some(ws_name) = ws.get("workspace").and_then(|v| v.as_str()) {
+            let is_watching = watching_set.contains(ws_name);
+            ws["is_watching"] = serde_json::Value::Bool(is_watching);
+        }
+        if let Some(wts) = ws.get_mut("worktrees").and_then(|v| v.as_array_mut()) {
+            for wt in wts {
+                if let Some(wt_name) = wt.get("workspace").and_then(|v| v.as_str()) {
+                    let is_watching = watching_set.contains(wt_name);
+                    wt["is_watching"] = serde_json::Value::Bool(is_watching);
+                }
+            }
+        }
     }
 }
 
@@ -314,7 +348,8 @@ async fn galaxies_handler(
 ) -> impl IntoResponse {
     let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
-    let min_size = params.min_size.unwrap_or(1);
+    let min_size = params.min_size.unwrap_or(5);
+    let limit = params.limit.unwrap_or(15);
 
     // Record telemetry asynchronously
     let db = state.db.clone();
@@ -357,8 +392,14 @@ async fn galaxies_handler(
                     .cmp(&a.get("node_count").and_then(|v| v.as_u64()))
             });
 
+            let total_matched = galaxies.len();
+            if limit > 0 && galaxies.len() > limit {
+                galaxies.truncate(limit);
+            }
+
             return Json(serde_json::json!({
-                "total_galaxies": galaxies.len(),
+                "total_galaxies": total_matched,
+                "returned_galaxies": galaxies.len(),
                 "workspace": ws,
                 "galaxies": galaxies
             }))
@@ -461,8 +502,14 @@ async fn galaxies_handler(
                     .cmp(&a.get("node_count").and_then(|v| v.as_u64()))
             });
 
+            let total_matched = galaxies.len();
+            if limit > 0 && galaxies.len() > limit {
+                galaxies.truncate(limit);
+            }
+
             Json(serde_json::json!({
-                "total_galaxies": galaxies.len(),
+                "total_galaxies": total_matched,
+                "returned_galaxies": galaxies.len(),
                 "workspace": ws,
                 "galaxies": galaxies
             }))
@@ -498,7 +545,8 @@ async fn search_handler(
 
     // 2. Perform HNSW cosine similarity search
     let ws = normalize_workspace(params.workspace.as_deref());
-    let res = state.db.search_vector(&query_vec, k, ws.as_deref()).await;
+    let include_docs = params.include_docs.unwrap_or(false);
+    let res = state.db.search_vector(&query_vec, k, ws.as_deref(), include_docs).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
     // Record telemetry asynchronously
@@ -904,12 +952,14 @@ async fn query_handler(
     let start = std::time::Instant::now();
     let top_k = payload.top_k.unwrap_or(5);
     let ws = normalize_workspace(payload.workspace.as_deref());
+    let include_docs = payload.include_docs.unwrap_or(false);
     let res = GraphRagEngine::query(
         &state.db,
         &state.embedder,
         &payload.prompt,
         top_k,
         ws.as_deref(),
+        include_docs,
     )
     .await;
     let duration_ms = start.elapsed().as_millis() as i64;
@@ -967,7 +1017,8 @@ async fn cluster_handler(
     match state.db.get_graph(workspace.as_deref()).await {
         Ok((nodes, links)) => {
             let ws_name = workspace.clone().unwrap_or_else(|| "default".to_string());
-            let assignments = CommunityDetector::detect(&nodes, &links, 15);
+            let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
+            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
             let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
             let filtered_summaries: Vec<_> = summaries.into_iter().filter(|s| s.node_count >= min_size).collect();
             let total_communities = filtered_summaries.len();
@@ -1075,7 +1126,8 @@ async fn galaxy_topology_handler(
         if let Ok((nodes, links)) = state.db.get_graph(ws.as_deref()).await {
             if !nodes.is_empty() {
                 let ws_name = ws.clone().unwrap_or_else(|| "default".to_string());
-                let assignments = CommunityDetector::detect(&nodes, &links, 15);
+                let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
+                CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
                 let (_, computed_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
                 let _ = state.db.update_communities(&assignments).await;
                 let _ = state.db.store_galaxies(&ws_name, &computed_records).await;
