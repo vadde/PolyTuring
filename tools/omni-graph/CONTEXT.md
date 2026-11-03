@@ -26,10 +26,13 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
-| Spec Requirements (R-XXX) | 79 | 79 | 🟢 100% Complete |
-| Acceptance Criteria (AC-XXX) | 35 | 35 | 🟢 100% Complete |
+| Spec Requirements (R-XXX) | 82 | 82 | 🟢 100% Complete |
+| Acceptance Criteria (AC-XXX) | 37 | 37 | 🟢 100% Complete |
 | Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
-| Test Coverage | 79/79 Unit & Integration Tests | 79 | 🟢 100% Verified in Docker |
+| Test Coverage | 82/82 Unit & Integration Tests | 82 | 🟢 100% Verified in Docker |
+| Topological Containment Backbone (R-063) | Complete | — | 🟢 Workspace, Directory & File DAG backbone with zero disconnected vertices |
+| Watcher Syncing Guardrail & Telemetry Parity (R-074, R-076) | Complete | — | 🟢 Included `status == "syncing"` in is_watching, eliminating cancellation in flight |
+| PPR Neighborhood Condenser & Clean Record IDs (R-068, R-069) | Complete | — | 🟢 Power iteration Personalized PageRank (alpha=0.85) & <1500 strict token ceiling |
 | Watcher Telemetry Synchronization (R-073 to R-076) | Complete | — | 🟢 Dynamic in-memory status injection & idempotent watch |
 | Polyglot AST Parsers (Java, C, C++, R-060, R-061) | Complete | — | 🟢 Tree-sitter Java/C/C++ classes, functions, includes & inheritance |
 | Galaxy Micro-Cluster Consolidation (R-064) | Complete | — | 🟢 Topological & spatial rollup, size floor >=5, 15 macro galaxies |

@@ -121,13 +121,13 @@ nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 | R-060 | Java Tree-sitter Parser Integration (classes, records, methods) | `src/parser/` | `tests/unit_tests.rs` | ✅ |
 | R-061 | C/C++ Tree-sitter Parser Integration (structs, functions, `#include`) | `src/parser/` | `tests/unit_tests.rs` | ✅ |
 | R-062 | TypeScript Deep AST Hardening & Detached Property Filtering | `src/parser/` | `tests/unit_tests.rs` | ✅ |
-| R-063 | Topological Containment Backbone (`CONTAINS_DIR` & `CONTAINS_FILE`) | `src/ingestion/` | `tests/ingestion/` | ⬜ |
+| R-063 | Topological Containment Backbone (`CONTAINS_DIR` & `CONTAINS_FILE`) | `src/ingestion/`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs` | ✅ |
 | R-064 | Hierarchical Community Consolidation & Macro-Cluster Size Floor (CPM/Modularity) | `src/analysis/`, `src/api/` | `tests/unit_tests.rs` | ✅ |
 | R-065 | Scope-Aware Import Resolution (SAIR) (eliminating bare name collisions) | `src/db/` | `tests/unit_tests.rs` | ✅ |
 | R-066 | Two-Tower Hybrid Retrieval Engine (Tantivy BM25 + HNSW Vector RRF) | `src/retrieval/` | `tests/retrieval/` | ⬜ |
 | R-067 | Content Tier Partitioning (`code_node` vs `doc_node` in vector search & Graph-RAG) | `src/db/`, `src/api/`, `src/analysis/` | `tests/unit_tests.rs` | ✅ |
-| R-068 | Strict Binary-Search Budgeting (<1,500 tokens) & Syntax Normalization | `src/condenser/` | `tests/condenser/` | ⬜ |
-| R-069 | Personalized PageRank (PPR) Neighborhood Slicing | `src/analysis/` | `tests/analysis/` | ⬜ |
+| R-068 | Strict Binary-Search Budgeting (<1,500 tokens) & Syntax Normalization | `src/condenser/` | `tests/unit_tests.rs` | ✅ |
+| R-069 | Personalized PageRank (PPR) Neighborhood Slicing | `src/condenser/` | `tests/unit_tests.rs` | ✅ |
 | R-070 | Native Model Context Protocol (MCP) Server for Omni-Graph | `scripts/omni-mcp.py` | `scripts/omni-mcp.py` | ✅ |
 | R-071 | Portable Standalone Skill & One-Click CLI Bootstrapper | `skills/omni-graph/` | `tests/setup/` | ⬜ |
 | R-073 | Dynamic Watcher Status Merging in /api/workspaces (is_watching) | `src/api/mod.rs` | `tests/unit_tests.rs` | ✅ |

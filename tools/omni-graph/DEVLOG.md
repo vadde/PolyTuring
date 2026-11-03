@@ -2195,4 +2195,50 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
     - Executed multiple tool invocations: zero `/api/watch/start` calls logged, zero watcher restarts, zero cancellation signals.
     - Modified `tools/omni-graph/STATUS.md`: live delta watcher caught the event and re-indexed in 731ms with zero watcher restart.
 
+---
+
+### Session Log: 2026-11-03 — Topological Backbone & Watcher Syncing State Guardrail (R-063, R-074, R-076)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & ML Scientist  
+**SDLC Phase**: `in-progress` (Watcher State Guardrail & Topological Containment)  
+**Branch**: `feat/omni-graph-nextgen-hardening-v0.3.0`  
+**Duration**: ~15m  
+
+#### Objectives
+1. Implement Topological Containment Backbone (R-063) connecting workspaces $\to$ folders $\to$ files $\to$ symbols into a connected DAG with $|E|/|V| \ge 2.5$.
+2. Formally diagnose Observation 001: Resolve telemetry zeroing where modifying files appeared to report 0 events and 0 reindexed files.
+3. Eliminate the `"syncing"` status race condition in `inject_watcher_status` and `start_watch`.
+
+#### Root Cause Analysis (Observation 001)
+1. **The In-Flight Syncing Telemetry Desync**:
+   - When a file was modified, the watcher legitimately transitioned status from `"watching"` to `"syncing"`.
+   - In `tools/omni-graph/src/api/mod.rs`, `inject_watcher_status` strictly filtered `.filter(|w| w.status == "watching")`. Because status was `"syncing"`, it injected `"is_watching": false` into `/api/workspaces`.
+   - When the agent prompt hook queried `/api/workspaces`, it saw `"is_watching": false` and dispatched `POST /api/watch/start`.
+   - In `tools/omni-graph/src/watcher/mod.rs`, `start_watch` idempotency check evaluated `if paths_match && s.status == "watching"`. Because `s.status` was `"syncing"`, this check failed.
+   - `start_watch` dispatched a cancellation signal (`cancel_tx.send(())`) to the active sync task, aborting the delta re-indexing in mid-flight and instantiating a fresh `WatcherStatus` with `events_processed = 0` and `files_reindexed = 0`.
+2. **Container Rebuild Volatile Reset**:
+   - Container recreation resets volatile in-memory daemon state unless cumulative counters are preserved.
+
+#### What Was Done
+- **Watcher Syncing State Invariant (`src/api/mod.rs`)**:
+  - Updated `inject_watcher_status` to filter `w.status == "watching" || w.status == "syncing"`. An actively syncing watcher is 100% active and reports `"is_watching": true`.
+- **In-Flight Sync Protection & Metric Preservation (`src/watcher/mod.rs`)**:
+  - In `start_watch`, defined `is_active = s.status == "watching" || s.status == "syncing"`. Idempotent return prevents canceling active tasks during sync.
+  - Carried over cumulative counters (`prev_events`, `prev_reindexed`, `prev_deleted`, `prev_last_sync`) across any re-watch.
+- **Topological Containment Backbone (`src/ingestion/mod.rs`, `src/watcher/pipeline.rs`, `src/db/mod.rs`)**:
+  - Synthesized File nodes (`ws:file:<path>`), Directory nodes (`ws:dir:<path>`), and Workspace root (`ws:workspace`).
+  - Emitted `CONTAINS_DIR`, `CONTAINS_FILE`, and `CONTAINS` edges, establishing 100% DAG reachability from root.
+  - Weighted containment edges in `src/analysis/mod.rs`: `CONTAINS_DIR = 0.2`, `CONTAINS_FILE = 0.4`, `CONTAINS = 0.8`.
+
+#### Verification & Live Results
+- Unit Tests: Added `test_topological_containment_dag_reachability` and `test_edge_weights_containment_hierarchy`. All 82/82 tests passing in 0.01s.
+- Container Redeployment: Rebuilt and redeployed `omni-rust-app` via Docker.
+- Live File Modifications:
+  - Modified `DEVLOG.md`: Watcher entered `"syncing"`, re-indexed 198 nodes, 1167 edges, and completed with zero cancellation.
+  - Restored `lib.rs`: Watcher processed delta event and updated metrics.
+  - Live query `curl -s http://localhost:8080/api/watch/status` confirms:
+    `"events_processed": 5`, `"files_reindexed": 4`, `"files_deleted": 1`, `"status": "watching"`, `"cluster_status": "live"`.
+
+
+
 
