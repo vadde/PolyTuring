@@ -157,6 +157,10 @@ TOOLS_SPEC = [
                     "type": "string",
                     "description": "Target workspace name (defaults to current project root)."
                 },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Number of top AST seed hits (default 5)."
+                },
                 "include_docs": {
                     "type": "boolean",
                     "description": "Whether to include documentation in search seeds (default false: code-only)."
@@ -198,21 +202,59 @@ def handle_tool_call(name: str, args: dict) -> dict:
             symbol = args["symbol"]
             params = urllib.parse.urlencode({"symbol": symbol, "workspace": workspace})
             res = make_http_request(f"{API_URL}/api/references?{params}")
-            callers = res.get("callers", [])
-            importers = res.get("importers", [])
-            total = len(callers) + len(importers)
+            raw_refs = res.get("references", [])
+            # Also check legacy callers/importers as fallback if present
+            if not raw_refs and ("callers" in res or "importers" in res):
+                raw_refs = res.get("callers", []) + res.get("importers", [])
+            
+            total = len(raw_refs)
             if total == 0:
                 return {"content": [{"type": "text", "text": f"No incoming references found for '{symbol}' in workspace '{workspace}'."}]}
             
-            lines = [f"Total References for '{symbol}': {total}\n"]
+            lines = [f"Total References for '{symbol}' ({total}):\n"]
+            
+            callers = []
+            containment = []
+            doc_refs = []
+            inheritance = []
+            others = []
+            
+            for ref in raw_refs:
+                edge_type = ref.get("type", "CALLS")
+                label = ref.get("label", ref.get("source_symbol", "unknown"))
+                file_path = ref.get("file_path", ref.get("source_file", ""))
+                line_start = ref.get("line_start", 0)
+                kind = ref.get("kind", "")
+                loc = f"`{file_path}:{line_start}`" if line_start else f"`{file_path}`"
+                entry = f"  ← `{label}` ({kind}) in {loc} [{edge_type}]" if kind else f"  ← `{label}` in {loc} [{edge_type}]"
+                
+                if edge_type == "CALLS":
+                    callers.append(entry)
+                elif edge_type in ("CONTAINS", "CONTAINS_FILE", "CONTAINS_DIR"):
+                    containment.append(entry)
+                elif edge_type == "REFERENCES" or ref.get("language") == "markdown":
+                    doc_refs.append(entry)
+                elif edge_type in ("IMPLEMENTS", "EXTENDS"):
+                    inheritance.append(entry)
+                else:
+                    others.append(entry)
+            
             if callers:
                 lines.append(f"Direct Callers ({len(callers)}):")
-                for c in callers:
-                    lines.append(f"  ← `{c.get('source_symbol')}` in `{c.get('source_file')}` [{c.get('edge_type')}]")
-            if importers:
-                lines.append(f"\nImporting Files ({len(importers)}):")
-                for imp in importers:
-                    lines.append(f"  ← `{imp.get('source_file')}`")
+                lines.extend(callers[:20])
+            if inheritance:
+                lines.append(f"\nInheritance & Interfaces ({len(inheritance)}):")
+                lines.extend(inheritance[:15])
+            if containment:
+                lines.append(f"\nContainment & Hierarchy ({len(containment)}):")
+                lines.extend(containment[:15])
+            if doc_refs:
+                lines.append(f"\nDocument References ({len(doc_refs)}):")
+                lines.extend(doc_refs[:10])
+            if others:
+                lines.append(f"\nOther References ({len(others)}):")
+                lines.extend(others[:15])
+                
             return {"content": [{"type": "text", "text": "\n".join(lines)}]}
 
         elif name == "omni_condense":
@@ -268,7 +310,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
         elif name == "omni_query":
             prompt = args["prompt"]
             include_docs = args.get("include_docs", False)
-            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs}
+            top_k = args.get("top_k", 5)
+            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs, "top_k": top_k}
             res = make_http_request(f"{API_URL}/api/query", data=payload)
             macro = res.get("macroscopic_summary", "")
             subgraph = res.get("expanded_subgraph", "")

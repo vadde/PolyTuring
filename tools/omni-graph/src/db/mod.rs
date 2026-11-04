@@ -68,12 +68,19 @@ pub struct DbClient {
 pub struct DbNode {
     pub id: String,
     pub workspace: Option<String>,
+    #[serde(default)]
     pub label: String,
+    #[serde(default)]
     pub kind: String,
+    #[serde(default)]
     pub file_path: String,
+    #[serde(default)]
     pub language: String,
+    #[serde(default)]
     pub line_start: usize,
+    #[serde(default)]
     pub line_end: usize,
+    #[serde(default)]
     pub text: String,
     pub community: Option<i32>,
     #[serde(default)]
@@ -88,6 +95,7 @@ pub struct DbLink {
     pub target: String,
     #[serde(rename = "type")]
     pub edge_type: String,
+    #[serde(default)]
     pub category: String,
 }
 
@@ -130,15 +138,29 @@ pub struct RelationshipPayload {
     pub metadata: Option<serde_json::Value>,
 }
 
+pub fn deserialize_null_as_zero<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<f32>::deserialize(deserializer)?;
+    Ok(opt.unwrap_or(0.0))
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SearchResult {
     pub id: String,
     pub workspace: Option<String>,
+    #[serde(default)]
     pub label: String,
+    #[serde(default)]
     pub kind: String,
+    #[serde(default)]
     pub file_path: String,
+    #[serde(default)]
     pub language: String,
+    #[serde(default)]
     pub text: String,
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub similarity: f32,
     pub community: Option<i32>,
     #[serde(default)]
@@ -544,9 +566,11 @@ impl DbClient {
                 conditions.push(format!("workspace = '{}'", surql_escape(ws)));
             }
         }
+        conditions.push("kind NOT IN ['workspace', 'directory']".to_string());
         if !include_docs {
             conditions.push("language != 'markdown' AND !string::ends_with(file_path, '.md')".to_string());
         }
+        conditions.push(format!("vector::similarity::cosine(embedding, {}) <= 1.0 AND vector::similarity::cosine(embedding, {}) > 0.0", vec_json, vec_json));
 
         let where_clause = if conditions.is_empty() {
             String::new()
@@ -624,7 +648,7 @@ impl DbClient {
         workspace: Option<&str>,
         _hops: usize,
     ) -> Result<(Vec<DbNode>, Vec<DbLink>), String> {
-        let roots = self.find_symbols(symbol, workspace).await?;
+        let roots = self.find_symbols(symbol, workspace, None).await?;
         if roots.is_empty() {
             return Ok((Vec::new(), Vec::new()));
         }
@@ -1056,18 +1080,24 @@ impl DbClient {
     }
 
     /// Symbolic lookup: Find symbol definitions by name (LSP textDocument/definition equivalent)
-    pub async fn find_symbols(&self, name: &str, workspace: Option<&str>) -> Result<Vec<DbNode>, String> {
+    pub async fn find_symbols(
+        &self,
+        name: &str,
+        workspace: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<DbNode>, String> {
         let escaped = surql_escape(name);
         let ws_filter = match workspace {
             Some(ws) if !ws.is_empty() => format!("AND workspace = '{}'", surql_escape(ws)),
             _ => String::new(),
         };
+        let lim = limit.unwrap_or(25).min(200);
         let q = format!(
             "SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, \
              (label = '{}') AS is_exact \
              FROM node WHERE (label = '{}' OR label CONTAINS '{}' OR file_path = '{}' OR file_path CONTAINS '{}') {} \
-             ORDER BY is_exact DESC, label ASC LIMIT 25;",
-            escaped, escaped, escaped, escaped, escaped, ws_filter
+             ORDER BY is_exact DESC, label ASC LIMIT {};",
+            escaped, escaped, escaped, escaped, escaped, ws_filter, lim
         );
 
         let resp = self.query_sql(&q).await?;
@@ -1098,15 +1128,24 @@ impl DbClient {
     }
 
     /// Symbolic references: Find all callers / references of a symbol (LSP textDocument/references equivalent)
-    pub async fn find_references(&self, symbol_name: &str, workspace: Option<&str>) -> Result<Vec<ReferenceResult>, String> {
+    pub async fn find_references(
+        &self,
+        symbol_name: &str,
+        workspace: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<ReferenceResult>, String> {
         let escaped = surql_escape(symbol_name);
         let ws_filter = match workspace {
             Some(ws) if !ws.is_empty() => format!("AND workspace = '{}'", surql_escape(ws)),
             _ => String::new(),
         };
+        let lim_clause = match limit {
+            Some(l) => format!("LIMIT {}", l.min(500)),
+            None => String::new(),
+        };
         let q = format!(
             "LET $targets = (SELECT id FROM node WHERE (label = '{escaped}' OR string::ends_with(label, '::{escaped}') OR string::ends_with(label, '.{escaped}') OR file_path = '{escaped}' OR string::ends_with(file_path, '/{escaped}') OR string::ends_with(file_path, '{escaped}')) {ws_filter});\n\
-             SELECT in.* AS caller, type, category, metadata FROM linked_to WHERE out IN $targets.id;\n"
+             SELECT in.* AS caller, type, category, metadata FROM linked_to WHERE out IN $targets.id {lim_clause};\n"
         );
 
         let resp = self.query_sql(&q).await?;
@@ -1421,7 +1460,7 @@ impl DbClient {
 
     /// Retrieve symbol architectural boundary contract and cross-galaxy blast radius
     pub async fn get_symbol_boundary(&self, symbol: &str, workspace: Option<&str>) -> Result<Option<SymbolBoundaryInfo>, String> {
-        let symbols = self.find_symbols(symbol, workspace).await?;
+        let symbols = self.find_symbols(symbol, workspace, None).await?;
         let target = match symbols.into_iter().next() {
             Some(s) => s,
             None => return Ok(None),
@@ -1431,7 +1470,7 @@ impl DbClient {
         let target_community = target.community;
 
         // Fetch callers of the target symbol
-        let callers = self.find_references(symbol, Some(&target_ws)).await.unwrap_or_default();
+        let callers = self.find_references(symbol, Some(&target_ws), None).await.unwrap_or_default();
 
         // Fetch galaxy records for context
         let galaxies = self.get_galaxies_records(Some(&target_ws)).await.unwrap_or_default();

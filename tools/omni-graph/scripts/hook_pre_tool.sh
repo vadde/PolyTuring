@@ -158,12 +158,13 @@ try:
             "localhost:8080/api/condense", "127.0.0.1:8080/api/condense",
             "localhost:8080/api/references", "127.0.0.1:8080/api/references",
             "localhost:8080/api/search", "127.0.0.1:8080/api/search",
+            "localhost:8080/api/query", "127.0.0.1:8080/api/query",
             "localhost:8080/api/galaxy", "127.0.0.1:8080/api/galaxy",
             "localhost:8080/api/ast", "127.0.0.1:8080/api/ast",
             "localhost:8080/api/workspaces", "127.0.0.1:8080/api/workspaces",
             "localhost:8080/api/ingest", "127.0.0.1:8080/api/ingest",
             "make graph-", "make search-graph", "make query-graph",
-            "omni.sh", "make workspaces"
+            "omni.sh", "scripts/omni", "make workspaces"
         ]
         if any(p in cmd for p in omni_patterns):
             ws = get_workspace()
@@ -183,9 +184,9 @@ try:
             }))
             sys.exit(0)
 
-    # 4. Intercept view_file
-    elif tool_name == "view_file":
-        target_path = args.get("AbsolutePath", "")
+    # 4. Intercept view_file and read_file (150-line gate & AST recon gate)
+    elif tool_name in ("view_file", "read_file"):
+        target_path = args.get("AbsolutePath", "") or args.get("Path", "")
         ws = get_workspace(target_path)
         if is_source_code(target_path):
             if is_workspace_indexed(ws) and not is_recon_done(ws):

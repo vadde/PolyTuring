@@ -120,7 +120,7 @@
         "summary": "Hybrid vector & keyword semantic search",
         "description": "Performs cosine similarity search using 384-dimensional dense vectors enriched with structured AST headers, with code-first partitioning.",
         "parameters": [
-          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Natural language or code query" },
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Natural language or code query (alias: query)" },
           { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace filter" },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 }, "description": "Maximum search matches" },
           { "name": "threshold", "in": "query", "schema": { "type": "number", "default": 0.5 }, "description": "Minimum similarity score threshold (0.0 to 1.0)" },
@@ -138,8 +138,9 @@
         "summary": "LSP symbol definition lookup",
         "description": "Exact AST symbol definition resolver (textDocument/definition). Prioritizes exact matches, local scope, and file boundaries.",
         "parameters": [
-          { "name": "name", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Exact identifier name" },
-          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" }
+          { "name": "name", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Exact identifier name or file path (alias: symbol)" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 25 }, "description": "Maximum symbols to return (up to 200)" }
         ],
         "responses": {
           "200": { "description": "Matching symbol definitions with line ranges" }
@@ -152,8 +153,9 @@
         "summary": "LSP inbound callers and references lookup",
         "description": "Finds all incoming CALLS, IMPORTS, REFERENCES, and EXTENDS edges pointing to the target symbol across the workspace.",
         "parameters": [
-          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Target symbol name or node ID" },
-          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" }
+          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Target symbol name, node ID, or file path (alias: name)" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 }, "description": "Maximum references to return (up to 500)" }
         ],
         "responses": {
           "200": { "description": "List of callers and referencing nodes" }
@@ -233,6 +235,7 @@
                 "required": ["prompt"],
                 "properties": {
                   "prompt": { "type": "string", "example": "Explain how authentication and session cookies are validated" },
+                  "top_k": { "type": "integer", "default": 5, "description": "Number of top AST seed hits" },
                   "workspace": { "type": "string" },
                   "include_docs": { "type": "boolean", "default": false }
                 }

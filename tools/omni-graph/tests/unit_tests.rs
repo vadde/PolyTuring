@@ -2315,5 +2315,51 @@ mod hybrid_gitignore_tests {
     }
 }
 
+mod search_result_serde_tests {
+    use omni_graph::db::SearchResult;
+
+    #[test]
+    fn test_search_result_handles_null_or_missing_similarity() {
+        let json_with_null = r#"{
+            "id": "node:PolyTuring:workspace",
+            "workspace": "PolyTuring",
+            "label": "PolyTuring",
+            "kind": "workspace",
+            "file_path": "",
+            "language": "",
+            "text": "workspace",
+            "similarity": null,
+            "community": null
+        }"#;
+
+        let res: Result<SearchResult, _> = serde_json::from_str(json_with_null);
+        assert!(res.is_ok(), "SearchResult should deserialize cleanly even if similarity is null");
+        let parsed = res.unwrap();
+        assert_eq!(parsed.similarity, 0.0);
+        assert_eq!(parsed.label, "PolyTuring");
+    }
+
+    #[test]
+    fn test_search_result_handles_valid_float_similarity() {
+        let json_with_val = r#"{
+            "id": "node:PolyTuring:src/lib.rs:foo:1",
+            "workspace": "PolyTuring",
+            "label": "foo",
+            "kind": "function",
+            "file_path": "src/lib.rs",
+            "language": "rust",
+            "text": "fn foo() {}",
+            "similarity": 0.895,
+            "community": 42
+        }"#;
+
+        let res: Result<SearchResult, _> = serde_json::from_str(json_with_val);
+        assert!(res.is_ok());
+        let parsed = res.unwrap();
+        assert_eq!(parsed.similarity, 0.895);
+        assert_eq!(parsed.community, Some(42));
+    }
+}
+
 
 

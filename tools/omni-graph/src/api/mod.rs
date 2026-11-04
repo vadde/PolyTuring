@@ -45,7 +45,9 @@ pub struct GraphParams {
 
 #[derive(Deserialize)]
 pub struct SearchParams {
+    #[serde(alias = "query")]
     pub q: String,
+    #[serde(alias = "limit")]
     pub k: Option<usize>,
     pub workspace: Option<String>,
     pub include_docs: Option<bool>,
@@ -53,14 +55,18 @@ pub struct SearchParams {
 
 #[derive(Deserialize)]
 pub struct SymbolParams {
+    #[serde(alias = "symbol")]
     pub name: String,
     pub workspace: Option<String>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
 pub struct ReferenceParams {
+    #[serde(alias = "name")]
     pub symbol: String,
     pub workspace: Option<String>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +79,7 @@ pub struct GraphRagPayload {
 
 #[derive(Deserialize)]
 pub struct CondenseParams {
+    #[serde(alias = "name")]
     pub symbol: String,
     pub hops: Option<usize>,
     pub workspace: Option<String>,
@@ -792,7 +799,7 @@ async fn symbol_handler(
 ) -> impl IntoResponse {
     let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
-    let res = state.db.find_symbols(&params.name, ws.as_deref()).await;
+    let res = state.db.find_symbols(&params.name, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
     // Record telemetry asynchronously
@@ -836,7 +843,7 @@ async fn references_handler(
 ) -> impl IntoResponse {
     let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
-    let res = state.db.find_references(&params.symbol, ws.as_deref()).await;
+    let res = state.db.find_references(&params.symbol, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
     // Record telemetry asynchronously
