@@ -12,9 +12,9 @@ use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tracing::{error, info, warn};
 use walkdir::WalkDir;
 
@@ -79,7 +79,8 @@ pub struct IngestionJobStatus {
     pub workspace: String,
     pub path: String,
     pub is_refresh: bool,
-    pub phase: String, // "purging", "scanning", "indexing", "clustering", "completed", "failed"
+    pub phase: String, // "queued", "purging", "scanning", "indexing", "clustering", "completed", "failed", "cancelled"
+    pub queue_position: usize,
     pub files_scanned: usize,
     pub files_indexed: usize,
     pub files_skipped: usize,
@@ -93,11 +94,28 @@ pub struct IngestionJobStatus {
     pub error: Option<String>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct IngestTask {
+    pub root_dir: String,
+    pub project: Option<String>,
+    pub refresh: bool,
+    pub auto_watch: bool,
+    pub workspace_name: String,
+    pub is_worktree: bool,
+    pub parent_ws: Option<String>,
+    pub branch: Option<String>,
+    pub response_tx: Option<oneshot::Sender<Result<IngestResult, String>>>,
+}
+
+#[allow(dead_code)]
 pub struct IngestionPipeline {
     db: DbClient,
     embedder: EmbedderClient,
     cache: FileCache,
     jobs: Arc<RwLock<HashMap<String, IngestionJobStatus>>>,
+    queue_tx: mpsc::Sender<IngestTask>,
+    watcher: Arc<RwLock<Option<Arc<crate::watcher::WatchManager>>>>,
 }
 
 #[derive(serde::Serialize, Debug)]
@@ -117,40 +135,142 @@ pub struct IngestResult {
 
 impl IngestionPipeline {
     pub fn new(db: DbClient, embedder: EmbedderClient, cache: FileCache) -> Self {
+        let (queue_tx, mut queue_rx) = mpsc::channel::<IngestTask>(64);
+        let jobs: Arc<RwLock<HashMap<String, IngestionJobStatus>>> = Arc::new(RwLock::new(HashMap::new()));
+        let watcher: Arc<RwLock<Option<Arc<crate::watcher::WatchManager>>>> = Arc::new(RwLock::new(None));
+
+        let worker_jobs = jobs.clone();
+        let worker_db = db.clone();
+        let worker_embedder = embedder.clone();
+        let worker_cache = cache.clone();
+        let worker_watcher = watcher.clone();
+        let worker_queue_tx = queue_tx.clone();
+
+        tokio::spawn(async move {
+            info!("Ingestion task queue worker active (FIFO serialized mode).");
+            while let Some(task) = queue_rx.recv().await {
+                // Check if cancelled before starting
+                let is_cancelled = {
+                    let j_lock = worker_jobs.read().await;
+                    j_lock.get(&task.workspace_name).map(|j| j.phase == "cancelled").unwrap_or(false)
+                };
+                if is_cancelled {
+                    info!("Ingestion task for '{}' was cancelled; skipping execution.", task.workspace_name);
+                    if let Some(tx) = task.response_tx {
+                        let _ = tx.send(Err("Ingestion cancelled by user".to_string()));
+                    }
+                    continue;
+                }
+
+                // Update queue positions
+                {
+                    let mut j_lock = worker_jobs.write().await;
+                    if let Some(j) = j_lock.get_mut(&task.workspace_name) {
+                        j.phase = if task.refresh { "purging".to_string() } else { "scanning".to_string() };
+                        j.queue_position = 0;
+                        j.started_at = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                    }
+                    let mut pos = 1;
+                    for other in j_lock.values_mut() {
+                        if !other.completed && other.workspace != task.workspace_name {
+                            other.queue_position = pos;
+                            pos += 1;
+                        }
+                    }
+                }
+
+                // Execute ingestion
+                execute_ingest(
+                    &worker_db,
+                    &worker_embedder,
+                    &worker_cache,
+                    &worker_jobs,
+                    &worker_watcher,
+                    &worker_queue_tx,
+                    task,
+                ).await;
+            }
+        });
+
         Self {
             db,
             embedder,
             cache,
-            jobs: Arc::new(RwLock::new(HashMap::new())),
+            jobs,
+            queue_tx,
+            watcher,
         }
+    }
+
+    pub async fn set_watcher(&self, watcher: Arc<crate::watcher::WatchManager>) {
+        let mut lock = self.watcher.write().await;
+        *lock = Some(watcher);
     }
 
     /// Retrieve real-time status of all active and recently completed ingestion jobs
     pub async fn get_status(&self) -> Vec<IngestionJobStatus> {
         let jobs = self.jobs.read().await;
         let mut list: Vec<IngestionJobStatus> = jobs.values().cloned().collect();
-        list.sort_by_key(|j| std::cmp::Reverse(j.started_at));
+        list.sort_by(|a, b| {
+            let a_active = !a.completed;
+            let b_active = !b.completed;
+            b_active.cmp(&a_active).then_with(|| b.started_at.cmp(&a.started_at))
+        });
         list
     }
 
     /// Dismiss a completed or failed ingestion job from the tracker
     pub async fn dismiss_job(&self, workspace: &str) {
         let mut jobs = self.jobs.write().await;
+        if let Some(job) = jobs.get_mut(workspace) {
+            if !job.completed {
+                job.phase = "cancelled".to_string();
+                job.completed = true;
+                job.error = Some("Cancelled by user".to_string());
+                return;
+            }
+        }
         jobs.remove(workspace);
     }
 
-    pub async fn ingest_directory(
+    #[allow(clippy::result_large_err)]
+    pub async fn enqueue_ingest(
         &self,
         root_dir: &str,
         project: Option<&str>,
         refresh: bool,
-    ) -> Result<IngestResult, String> {
-        let start_time = std::time::Instant::now();
-        info!("Starting ingestion for directory: {}", root_dir);
-
+        auto_watch: bool,
+        is_async: bool,
+    ) -> Result<oneshot::Receiver<Result<IngestResult, String>>, IngestionJobStatus> {
         let root = Path::new(root_dir);
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
         if !root.exists() || !root.is_dir() {
-            return Err(format!("Directory does not exist or is not a dir: {}", root_dir));
+            let err_status = IngestionJobStatus {
+                workspace: project.unwrap_or("unknown").to_string(),
+                path: root_dir.to_string(),
+                is_refresh: refresh,
+                phase: "failed".to_string(),
+                queue_position: 0,
+                files_scanned: 0,
+                files_indexed: 0,
+                files_skipped: 0,
+                total_files: 0,
+                nodes_created: 0,
+                edges_created: 0,
+                clusters_computed: 0,
+                started_at: now_ms,
+                elapsed_ms: 0,
+                completed: true,
+                error: Some(format!("Directory does not exist or is not a dir: {}", root_dir)),
+            };
+            return Err(err_status);
         }
 
         let worktree_info = detect_git_worktree(root);
@@ -170,79 +290,161 @@ impl IngestionPipeline {
             _ => default_ws,
         };
 
-        info!("Ingestion assigned workspace namespace: '{}' (worktree: {})", workspace_name, is_worktree);
-
         let abs_root = fs::canonicalize(root)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| root_dir.to_string());
 
-        let _ = self.db.record_workspace_meta(
-            &workspace_name,
-            &abs_root,
-            is_worktree,
-            parent_ws.as_deref(),
-            branch.as_deref(),
-            worktree_info.as_ref().map(|w| w.worktree_name.as_str()),
-        ).await;
+        // Check if workspace is already running or queued
+        {
+            let jobs = self.jobs.read().await;
+            if let Some(existing) = jobs.get(&workspace_name) {
+                if !existing.completed {
+                    info!("Workspace '{}' is already in-flight or queued (phase: {})", workspace_name, existing.phase);
+                    return Err(existing.clone());
+                }
+            }
+        }
 
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let queue_pos = {
+            let jobs = self.jobs.read().await;
+            jobs.values().filter(|j| !j.completed).count()
+        };
 
-        // Register initial in-motion ingestion job in tracker
+        let initial_phase = if queue_pos == 0 {
+            if refresh { "purging" } else { "scanning" }
+        } else {
+            "queued"
+        };
+
+        let job_status = IngestionJobStatus {
+            workspace: workspace_name.clone(),
+            path: abs_root.clone(),
+            is_refresh: refresh,
+            phase: initial_phase.to_string(),
+            queue_position: queue_pos,
+            files_scanned: 0,
+            files_indexed: 0,
+            files_skipped: 0,
+            total_files: 0,
+            nodes_created: 0,
+            edges_created: 0,
+            clusters_computed: 0,
+            started_at: now_ms,
+            elapsed_ms: 0,
+            completed: false,
+            error: None,
+        };
+
         {
             let mut jobs = self.jobs.write().await;
-            jobs.insert(
-                workspace_name.clone(),
-                IngestionJobStatus {
-                    workspace: workspace_name.clone(),
-                    path: abs_root.clone(),
-                    is_refresh: refresh,
-                    phase: if refresh { "purging".to_string() } else { "scanning".to_string() },
-                    files_scanned: 0,
-                    files_indexed: 0,
-                    files_skipped: 0,
-                    total_files: 0,
-                    nodes_created: 0,
-                    edges_created: 0,
-                    clusters_computed: 0,
-                    started_at: now_ms,
-                    elapsed_ms: 0,
-                    completed: false,
-                    error: None,
-                },
-            );
+            jobs.insert(workspace_name.clone(), job_status.clone());
         }
 
-        // REFRESH MODE: Purge all existing nodes/edges/galaxies before clean re-scan
-        if refresh {
-            info!("REFRESH mode: purging all existing data for workspace '{}'", workspace_name);
-            match self.db.purge_workspace(&workspace_name).await {
-                Ok(purged) => info!("Purged {} existing nodes from '{}' before fresh re-scan", purged, workspace_name),
-                Err(e) => warn!("Purge warning for '{}': {} — proceeding with ingestion", workspace_name, e),
-            }
-            // Clear the in-memory staleness cache so ALL files get re-indexed
-            self.cache.clear().await;
-            {
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&workspace_name) {
-                    job.phase = "scanning".to_string();
-                    job.elapsed_ms = start_time.elapsed().as_millis() as u64;
-                }
-            }
+        if is_async {
+            let task = IngestTask {
+                root_dir: abs_root,
+                project: project.map(|s| s.to_string()),
+                refresh,
+                auto_watch,
+                workspace_name,
+                is_worktree,
+                parent_ws,
+                branch,
+                response_tx: None,
+            };
+            let _ = self.queue_tx.send(task).await;
+            Err(job_status)
+        } else {
+            let (tx, rx) = oneshot::channel();
+            let task = IngestTask {
+                root_dir: abs_root,
+                project: project.map(|s| s.to_string()),
+                refresh,
+                auto_watch,
+                workspace_name,
+                is_worktree,
+                parent_ws,
+                branch,
+                response_tx: Some(tx),
+            };
+            let _ = self.queue_tx.send(task).await;
+            Ok(rx)
         }
+    }
 
-        // Restore staleness cache from persisted database file hashes (Finding #4)
-        // (Skip if refresh mode — we just purged everything)
-        if !refresh {
-            if let Ok(persisted_hashes) = self.db.get_file_hashes(&workspace_name).await {
-                if !persisted_hashes.is_empty() {
-                    info!("Restored {} persisted file hashes for '{}' from SurrealDB", persisted_hashes.len(), workspace_name);
-                    self.cache.populate(persisted_hashes).await;
-                }
-            }
+    pub async fn ingest_directory(
+        &self,
+        root_dir: &str,
+        project: Option<&str>,
+        refresh: bool,
+    ) -> Result<IngestResult, String> {
+        match self.enqueue_ingest(root_dir, project, refresh, true, false).await {
+            Ok(rx) => match rx.await {
+                Ok(inner) => inner,
+                Err(e) => Err(format!("Ingestion task terminated unexpectedly: {}", e)),
+            },
+            Err(status) => Err(status.error.unwrap_or_else(|| "Failed to enqueue task".to_string())),
         }
+    }
+}
+
+async fn execute_ingest(
+    db: &DbClient,
+    embedder: &EmbedderClient,
+    cache: &FileCache,
+    jobs: &Arc<RwLock<HashMap<String, IngestionJobStatus>>>,
+    watcher_slot: &Arc<RwLock<Option<Arc<crate::watcher::WatchManager>>>>,
+    queue_tx: &mpsc::Sender<IngestTask>,
+    task: IngestTask,
+) {
+    let start_time = std::time::Instant::now();
+    let root_dir = &task.root_dir;
+    let workspace_name = &task.workspace_name;
+    info!("FIFO Worker: Starting ingestion for directory: {} (workspace: '{}')", root_dir, workspace_name);
+
+    let root = Path::new(root_dir);
+    if !root.exists() || !root.is_dir() {
+        let err = format!("Directory does not exist or is not a dir: {}", root_dir);
+        let mut j_map = jobs.write().await;
+        if let Some(j) = j_map.get_mut(workspace_name) {
+            j.phase = "failed".to_string();
+            j.completed = true;
+            j.error = Some(err.clone());
+            j.elapsed_ms = start_time.elapsed().as_millis() as u64;
+        }
+        if let Some(tx) = task.response_tx {
+            let _ = tx.send(Err(err));
+        }
+        return;
+    }
+
+    let abs_root = fs::canonicalize(root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| root_dir.to_string());
+
+    let _ = db.record_workspace_meta(
+        workspace_name,
+        &abs_root,
+        task.is_worktree,
+        task.parent_ws.as_deref(),
+        task.branch.as_deref(),
+        if task.is_worktree { Some(workspace_name.as_str()) } else { None },
+    ).await;
+
+    // Guaranteed Clean Invariant: purge existing workspace data in SurrealDB
+    info!("Running clean purge for workspace '{}' to guarantee zero stale/orphaned nodes", workspace_name);
+    match db.purge_workspace(workspace_name).await {
+        Ok(purged) => info!("Cleanly purged {} prior nodes for workspace '{}'", purged, workspace_name),
+        Err(e) => warn!("Clean purge notice for '{}': {}", workspace_name, e),
+    }
+    cache.clear().await;
+    {
+        let mut j_map = jobs.write().await;
+        if let Some(j) = j_map.get_mut(workspace_name) {
+            j.phase = "scanning".to_string();
+            j.elapsed_ms = start_time.elapsed().as_millis() as u64;
+        }
+    }
 
         let mut files_scanned = 0;
         let mut files_indexed = 0;
@@ -251,34 +453,18 @@ impl IngestionPipeline {
         let mut total_edges = 0;
         let mut discovered_dirs: HashSet<String> = HashSet::new();
 
+        let root_path_buf = PathBuf::from(root);
+        let gitignore = crate::watcher::load_workspace_gitignore(&root_path_buf);
+
         for entry in WalkDir::new(root)
             .into_iter()
             .filter_entry(|e| {
-                let name = e.file_name().to_string_lossy();
-                // Exclude common noise, output, and data directories
-                !name.starts_with('.')
-                    && name != "node_modules"
-                    && name != "target"
-                    && name != "dist"
-                    && name != "build"
-                    && name != "vendor"
-                    && name != "solutions"
-                    && name != "data"
-                    && name != "datasets"
-                    && name != "log"
-                    && name != "logs"
-                    && name != "output"
-                    && name != "outputs"
-                    && name != "coverage"
-                    && name != "tmp"
-                    && name != "temp"
-                    && name != "cache"
-                    && name != ".cache"
-                    && name != "bin"
-                    && name != "obj"
-                    && name != "debug"
-                    && name != "release"
-                    && name != "testdata"
+                if e.depth() == 0 {
+                    return true;
+                }
+                let p = e.path();
+                let is_dir = e.file_type().is_dir();
+                !crate::watcher::is_path_ignored(&root_path_buf, &gitignore, p, is_dir)
             })
             .filter_map(|e| e.ok())
         {
@@ -355,15 +541,15 @@ impl IngestionPipeline {
                 cur_dir = parent.parent();
             }
 
-            if !self.cache.is_stale(&rel_path, &hash).await {
+            if !cache.is_stale(&rel_path, &hash).await {
                 files_skipped += 1;
                 continue;
             }
 
             // Parse AST or structured document, with universal fallback chunker (Guarantees zero dropped files)
-            let parse_res = CodeParser::parse_file(&workspace_name, &rel_path, &content)
+            let parse_res = CodeParser::parse_file(workspace_name, &rel_path, &content)
                 .filter(|pr| !pr.nodes.is_empty())
-                .or_else(|| CodeParser::parse_fallback(&workspace_name, &rel_path, &content));
+                .or_else(|| CodeParser::parse_fallback(workspace_name, &rel_path, &content));
 
             if let Some(parse_res) = parse_res {
                 if parse_res.nodes.is_empty() {
@@ -439,7 +625,7 @@ impl IngestionPipeline {
                     .map(|n| format!("[{}] {} {} in {}\n{}", n.language, n.kind, n.label, n.file_path, n.text))
                     .collect();
                 let text_refs: Vec<&str> = enriched_texts.iter().map(|s| s.as_str()).collect();
-                let embeddings = match self.embedder.embed_batch(&text_refs).await {
+                let embeddings = match embedder.embed_batch(&text_refs).await {
                     Ok(embs) => embs,
                     Err(e) => {
                         warn!("Embedding generation failed for {}: {}", rel_path, e);
@@ -449,11 +635,11 @@ impl IngestionPipeline {
                 };
 
                 // Prune any prior nodes/edges for this file to avoid zombie duplicates across shifted lines (R-047)
-                let _ = self.db.delete_file(&workspace_name, &rel_path).await;
+                let _ = db.delete_file(workspace_name, &rel_path).await;
 
                 let mut stored_nodes_ok = false;
                 // Store nodes with workspace namespace and file hash (R-005, Finding #4)
-                if let Err(e) = self.db.store_nodes(&all_nodes, &embeddings, Some(&hash)).await {
+                if let Err(e) = db.store_nodes(&all_nodes, &embeddings, Some(&hash)).await {
                     error!("Failed to store nodes for {}: {}", rel_path, e);
                 } else {
                     total_nodes += all_nodes.len();
@@ -461,21 +647,21 @@ impl IngestionPipeline {
                 }
 
                 // Store edges with workspace namespace (R-006)
-                if let Err(e) = self.db.store_edges(&all_edges).await {
+                if let Err(e) = db.store_edges(&all_edges).await {
                     error!("Failed to store edges for {}: {}", rel_path, e);
                 } else {
                     total_edges += all_edges.len();
                 }
 
                 if stored_nodes_ok {
-                    self.cache.update(&rel_path, &hash).await;
+                    cache.update(&rel_path, &hash).await;
                 }
 
                 files_indexed += 1;
 
                 if files_scanned % 5 == 0 || files_indexed % 2 == 0 {
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&workspace_name) {
+                    let mut j_map = jobs.write().await;
+                    if let Some(job) = j_map.get_mut(workspace_name) {
                         job.phase = "indexing".to_string();
                         job.files_scanned = files_scanned;
                         job.files_indexed = files_indexed;
@@ -541,12 +727,12 @@ impl IngestionPipeline {
             });
         }
 
-        if let Err(e) = self.db.store_nodes(&dir_nodes, &[], None).await {
+        if let Err(e) = db.store_nodes(&dir_nodes, &[], None).await {
             warn!("Failed to store directory backbone nodes: {}", e);
         } else {
             total_nodes += dir_nodes.len();
         }
-        if let Err(e) = self.db.store_edges(&dir_edges).await {
+        if let Err(e) = db.store_edges(&dir_edges).await {
             warn!("Failed to store directory backbone edges: {}", e);
         } else {
             total_edges += dir_edges.len();
@@ -554,8 +740,8 @@ impl IngestionPipeline {
 
         // Auto-cluster upon ingestion: Compute Louvain/Leiden modularity communities
         {
-            let mut jobs = self.jobs.write().await;
-            if let Some(job) = jobs.get_mut(&workspace_name) {
+            let mut j_map = jobs.write().await;
+            if let Some(job) = j_map.get_mut(workspace_name) {
                 job.phase = "clustering".to_string();
                 job.files_scanned = files_scanned;
                 job.files_indexed = files_indexed;
@@ -568,11 +754,11 @@ impl IngestionPipeline {
 
         let mut clusters_computed = 0;
         if total_nodes > 0 {
-            if let Ok((all_nodes, all_links)) = self.db.get_graph(Some(&workspace_name)).await {
+            if let Ok((all_nodes, all_links)) = db.get_graph(Some(workspace_name)).await {
                 if !all_nodes.is_empty() {
-                    let seeds = if let Some(ref p_ws) = parent_ws {
+                    let seeds = if let Some(ref p_ws) = task.parent_ws {
                         // R-053: Seed-Preserving Galaxy Inheritance
-                        match self.db.get_community_seeds_for_parent(p_ws, &workspace_name).await {
+                        match db.get_community_seeds_for_parent(p_ws, workspace_name).await {
                             Ok(s) if !s.is_empty() => {
                                 info!("Inherited {} community seed priors from parent workspace '{}'", s.len(), p_ws);
                                 Some(s)
@@ -584,12 +770,12 @@ impl IngestionPipeline {
                     };
 
                     let assignments = CommunityDetector::detect_with_seeds(&all_nodes, &all_links, 15, seeds.as_ref());
-                    let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&workspace_name, &all_nodes, &all_links, &assignments);
+                    let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(workspace_name, &all_nodes, &all_links, &assignments);
                     clusters_computed = summaries.len();
-                    if let Err(e) = self.db.update_communities(&assignments).await {
+                    if let Err(e) = db.update_communities(&assignments).await {
                         warn!("Auto-clustering failed after ingestion for '{}': {}", workspace_name, e);
                     } else {
-                        let _ = self.db.store_galaxies(&workspace_name, &galaxy_records).await;
+                        let _ = db.store_galaxies(workspace_name, &galaxy_records).await;
                         info!("Auto-clustered '{}' into {} modular communities", workspace_name, clusters_computed);
                     }
                 }
@@ -603,8 +789,8 @@ impl IngestionPipeline {
         );
 
         {
-            let mut jobs = self.jobs.write().await;
-            if let Some(job) = jobs.get_mut(&workspace_name) {
+            let mut j_map = jobs.write().await;
+            if let Some(job) = j_map.get_mut(workspace_name) {
                 job.phase = "completed".to_string();
                 job.completed = true;
                 job.files_scanned = files_scanned;
@@ -614,11 +800,49 @@ impl IngestionPipeline {
                 job.edges_created = total_edges;
                 job.clusters_computed = clusters_computed;
                 job.elapsed_ms = duration_ms;
+                job.error = None;
             }
         }
 
-        Ok(IngestResult {
-            workspace: workspace_name,
+        // Live watch enrollment
+        if task.auto_watch {
+            let watcher_opt = {
+                let lock = watcher_slot.read().await;
+                lock.clone()
+            };
+            if let Some(watcher) = watcher_opt {
+                match watcher.start_watch(&task.root_dir, workspace_name, None).await {
+                    Ok(_) => info!("Auto-started live watch for workspace '{}'", workspace_name),
+                    Err(e) => warn!("Auto-watch registration returned for '{}': {}", workspace_name, e),
+                }
+            }
+        }
+
+        // Worktree Auto-Cascade: Enqueue discovered worktrees sequentially
+        if !task.is_worktree {
+            let parent_path = std::path::PathBuf::from(&task.root_dir);
+            let discovered_worktrees = discover_parent_worktrees(&parent_path);
+            for wt in discovered_worktrees {
+                if let Some(ref wt_root) = wt.root_path {
+                    info!("Enqueuing child worktree '{}' for sequential cascade...", wt.worktree_name);
+                    let wt_task = IngestTask {
+                        root_dir: wt_root.clone(),
+                        project: Some(wt.worktree_name.clone()),
+                        refresh: true,
+                        auto_watch: task.auto_watch,
+                        workspace_name: wt.worktree_name.clone(),
+                        is_worktree: true,
+                        parent_ws: Some(workspace_name.clone()),
+                        branch: wt.branch.clone(),
+                        response_tx: None,
+                    };
+                    let _ = queue_tx.send(wt_task).await;
+                }
+            }
+        }
+
+        let ingest_res = IngestResult {
+            workspace: workspace_name.clone(),
             files_scanned,
             files_indexed,
             files_skipped,
@@ -626,9 +850,12 @@ impl IngestionPipeline {
             edges_created: total_edges,
             clusters_computed,
             duration_ms,
-            is_worktree,
-            parent_workspace: parent_ws,
-            branch,
-        })
-    }
+            is_worktree: task.is_worktree,
+            parent_workspace: task.parent_ws.clone(),
+            branch: task.branch.clone(),
+        };
+
+        if let Some(tx) = task.response_tx {
+            let _ = tx.send(Ok(ingest_res));
+        }
 }

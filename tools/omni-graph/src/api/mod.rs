@@ -26,7 +26,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -84,6 +84,8 @@ pub struct IngestPayload {
     pub project: Option<String>,
     pub refresh: Option<bool>,
     pub watch: Option<bool>,
+    #[serde(rename = "async", default)]
+    pub is_async: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -211,6 +213,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/worktrees", get(worktrees_handler))
         .route("/api/worktrees/sync", post(worktrees_sync_handler))
         .route("/api/worktree/:name", delete(worktree_delete_handler))
+        .route("/api/openapi.json", get(openapi_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -631,9 +634,13 @@ async fn ingest_handler(
     let start = std::time::Instant::now();
     let path = payload.path;
     let project = payload.project;
-    let refresh = payload.refresh.unwrap_or(false);
+    let refresh = payload.refresh.unwrap_or(true);
     let auto_watch = payload.watch.unwrap_or(true);
-    info!("Ingest request received for path: {}, project: {:?}, refresh: {}, watch: {}", path, project, refresh, auto_watch);
+    let is_async = payload.is_async.unwrap_or(false);
+    info!(
+        "Ingest request received for path: {}, project: {:?}, refresh: {}, watch: {}, async: {}",
+        path, project, refresh, auto_watch, is_async
+    );
 
     // Security: Validate path existence, canonicalize symlinks, and verify root containment (R-051 / AppSec)
     let roots = allowed_browse_roots();
@@ -666,106 +673,88 @@ async fn ingest_handler(
 
     let pipeline = state.pipeline.clone();
     let path_clone = canonical.to_string_lossy().to_string();
-    let project_clone = project.clone();
 
-    // Run ingestion in a spawned task so client aborts/timeouts do not cancel mid-flight
-    let join_handle = tokio::spawn(async move {
-        pipeline.ingest_directory(&path_clone, project_clone.as_deref(), refresh).await
-    });
-
-    let res = match join_handle.await {
-        Ok(inner_res) => inner_res,
-        Err(e) => Err(format!("Ingestion task terminated unexpectedly: {}", e)),
-    };
-    let duration_ms = start.elapsed().as_millis() as i64;
-
-    // Automatically enroll live watch daemon if enabled (R-052)
-    let mut live_watch = false;
-    if let Ok(ref ingest_res) = res {
-        if auto_watch {
-            match state.watcher.start_watch(&path, &ingest_res.workspace, None).await {
-                Ok(_) => {
-                    info!("Auto-started live watch for workspace '{}'", ingest_res.workspace);
-                    live_watch = true;
-                }
-                Err(e) => {
-                    warn!("Auto-watch registration returned for '{}': {}", ingest_res.workspace, e);
-                }
+    if is_async {
+        match pipeline
+            .enqueue_ingest(&path_clone, project.as_deref(), refresh, auto_watch, true)
+            .await
+        {
+            Ok(_) => (
+                StatusCode::ACCEPTED,
+                Json(serde_json::json!({
+                    "status": "queued",
+                    "workspace": project.unwrap_or_else(|| "default".to_string()),
+                })),
+            )
+                .into_response(),
+            Err(job_status) => {
+                let status_label = if job_status.queue_position == 0 {
+                    "running"
+                } else {
+                    "queued"
+                };
+                (
+                    StatusCode::ACCEPTED,
+                    Json(serde_json::json!({
+                        "status": status_label,
+                        "workspace": job_status.workspace,
+                        "queue_position": job_status.queue_position,
+                        "phase": job_status.phase,
+                        "job": job_status,
+                    })),
+                )
+                    .into_response()
             }
         }
+    } else {
+        let res = match pipeline
+            .enqueue_ingest(&path_clone, project.as_deref(), refresh, auto_watch, false)
+            .await
+        {
+            Ok(rx) => match rx.await {
+                Ok(inner) => inner,
+                Err(e) => Err(format!("Ingestion task terminated unexpectedly: {}", e)),
+            },
+            Err(status) => Err(status.error.unwrap_or_else(|| "Failed to enqueue task".to_string())),
+        };
+        let duration_ms = start.elapsed().as_millis() as i64;
 
-        // R-059: Top-Down Worktree Fleet Auto-Cascade
-        // When ingesting a parent trunk repository, automatically discover all child worktrees
-        // from .git/worktrees and cascade their ingestion in the background with auto-watching.
-        if !ingest_res.is_worktree {
-            let parent_path = std::path::PathBuf::from(&path);
-            let discovered_worktrees = crate::ingestion::discover_parent_worktrees(&parent_path);
-            if !discovered_worktrees.is_empty() {
-                info!(
-                    "Discovered {} child git worktrees for parent workspace '{}'; cascading fleet ingestion...",
-                    discovered_worktrees.len(),
-                    ingest_res.workspace
-                );
-                let pipeline_cascade = state.pipeline.clone();
-                let watcher_cascade = state.watcher.clone();
-                tokio::spawn(async move {
-                    for wt in discovered_worktrees {
-                        if let Some(ref wt_root) = wt.root_path {
-                            info!("Auto-cascading ingestion for worktree '{}' at '{}'...", wt.worktree_name, wt_root);
-                            match pipeline_cascade.ingest_directory(wt_root, None, false).await {
-                                Ok(sub_res) => {
-                                    if auto_watch {
-                                        let _ = watcher_cascade.start_watch(wt_root, &sub_res.workspace, None).await;
-                                    }
-                                    info!(
-                                        "Completed auto-cascade for worktree '{}' ({} nodes created)",
-                                        wt.worktree_name, sub_res.nodes_created
-                                    );
-                                }
-                                Err(e) => {
-                                    warn!("Auto-cascade failed for worktree '{}': {}", wt.worktree_name, e);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+        // Record telemetry asynchronously
+        let db = state.db.clone();
+        let ws_log = project.clone().unwrap_or_else(|| "default".to_string());
+        let path_str = path.clone();
+        tokio::spawn(async move {
+            let _ = db
+                .record_agent_api_call(
+                    "/api/ingest",
+                    &ws_log,
+                    "Omni-Graph: Codebase AST Ingestion",
+                    Some(&path_str),
+                    None,
+                    duration_ms,
+                )
+                .await;
+        });
+
+        match res {
+            Ok(res) => (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "success",
+                    "result": res,
+                    "live_watch": auto_watch
+                })),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "status": "error",
+                    "message": e
+                })),
+            )
+                .into_response(),
         }
-    }
-
-    // Record telemetry asynchronously
-    let db = state.db.clone();
-    let ws_log = project.clone().unwrap_or_else(|| "default".to_string());
-    let path_str = path.clone();
-    tokio::spawn(async move {
-        let _ = db.record_agent_api_call(
-            "/api/ingest",
-            &ws_log,
-            "Omni-Graph: Codebase AST Ingestion",
-            Some(&path_str),
-            None,
-            duration_ms,
-        ).await;
-    });
-
-    match res {
-        Ok(res) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "success",
-                "result": res,
-                "live_watch": live_watch
-            })),
-        )
-            .into_response(),
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "status": "error",
-                "message": e
-            })),
-        )
-            .into_response(),
     }
 }
 
@@ -785,6 +774,15 @@ async fn ingest_dismiss_handler(
     let ws = normalize_workspace(Some(&payload.workspace)).unwrap_or(payload.workspace);
     state.pipeline.dismiss_job(&ws).await;
     StatusCode::OK.into_response()
+}
+
+/// GET /api/openapi.json
+async fn openapi_handler() -> impl IntoResponse {
+    let spec = include_str!("openapi.json");
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
+        spec,
+    )
 }
 
 /// GET /api/symbol?name=<sym>&workspace=<ws> (Symbolic definition lookup — LSP textDocument/definition)

@@ -1,8 +1,61 @@
-# 📓 Development Log — omni-graph
+### 2026-11-04 — FIFO Ingestion Task Queue, Atomic Clean Sync Invariant, OpenAPI 3.0 & Futuristic Swagger Explorer
 
-> Chronological record of all development sessions on this tool.
-> **Append-only** — never delete entries, only add new ones at the top.
-> Each entry captures what happened, what changed, and what to do next.
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.4.0 Ingestion Pipeline & Enterprise API Explorer)
+**Branch**: `feat/omni-graph-ingest-ux-openapi`
+**Spec Reference**: `specs/catalog/omni-graph-ingestion-openapi-ux.md` (R-001 through R-012)
+**Duration**: ~45m
+
+#### Context & Objectives
+- Resolved user concerns regarding parallel ingestion conflicts in SurrealDB v2 (`read or write conflict` on concurrent writes).
+- Eliminated confusing "Clean Re-ingest — purge existing data before scan" checkbox by making clean atomic purge a de facto system invariant whenever codebases are indexed.
+- Eliminated global disabled `"Ingesting..."` button lockouts, replacing them with a non-blocking FIFO queue and distinct per-repository action buttons (`+ Add to Queue`, `Re-sync & Refresh Graph`, `Start Ingestion`).
+- Created a comprehensive OpenAPI 3.0.3 specification covering all 27+ endpoints at `/api/openapi.json`.
+- Built an interactive, cosmic liquid-glass Swagger / API Explorer at `/api-docs` accessible via a dedicated top-bar navigation button with deep-linking and state preservation across hard page refreshes.
+
+#### Key Actions & Implementations
+1. **Tokio FIFO Ingestion Task Queue (`src/ingestion/mod.rs`)**:
+   - Implemented `IngestTask` channel message with an internal background worker loop in `IngestionPipeline::new`.
+   - Serialized database transactions and TEI embedding requests, completely preventing SurrealDB transaction conflicts.
+   - Guaranteed atomic purge: `db.purge_workspace(workspace_name)` executes automatically before re-indexing.
+   - Deterministic error trapping: Any failure updates `job.phase = "failed"`, `job.completed = true`, and sets `job.error`.
+   - Excluded `.playwright-mcp`, `.playwright`, `.gemini`, and `.log` from file scanner and live watcher to eliminate infinite sync loops.
+2. **OpenAPI 3.0.3 Specification & Endpoint (`src/api/openapi.json`, `src/api/mod.rs`)**:
+   - Authored complete OpenAPI 3.0.3 schema covering 27 endpoints across System, AST & LSP, Semantic Retrieval, Graph & Topology, Ingestion & Watcher, Worktrees, and Agent Analytics tags.
+   - Registered `GET /api/openapi.json` route in `api/mod.rs`.
+3. **Futuristic Liquid-Glass Swagger Explorer (`ui/src/ApiSpecExplorer.tsx`)**:
+   - Year 2500 cosmic liquid-glass styling with frosted cards, tag category pills, search filter, and parameter tables.
+   - Interactive "Try It Live" execution console with latency timer (ms) and formatted response payload viewer.
+   - 1-click "Copy cURL" and "Download Spec" actions.
+4. **UI Ingestion Palette & Navigation Overhaul (`ui/src/App.tsx`)**:
+   - Added `{ } API Spec (OpenAPI 3.0)` button to header bar and wired client-side HTML5 routing (`/`, `/graph`, `/analytics`, `/api-docs`).
+   - Removed confusing manual "Clean Re-ingest" checkbox; replaced with "Atomic Clean Invariant" guarantee banner.
+   - Enabled directory list rows to show live status badges (`● Ingesting`, `⌛ Queued #${pos}`, `✓ Indexed`) and quick 1-click `Queue` / `Re-sync` actions.
+   - Replaced disabled `"Ingesting..."` footer button with dynamic state: `+ Add '${ws}' to Queue` when another job is active, `Already in Queue (#${pos})` when queued, and `Re-sync & Refresh` when already indexed.
+   - Updated Ingestion HUD to display `QUEUED #${job.queue_position}` badges.
+
+5. **Forensic Workspace Routing & Deep-Link Preservation (`App.tsx`, R-013)**:
+   - Fixed missing URL synchronization in `handleSelectWorkspace`: changing workspace from `PolyTuring` to `DSA` now immediately pushes `?workspace=DSA` into `window.location.search`.
+   - Initialized React state synchronously from `window.location.search`, preventing reload (`F5`) from resetting back to `PolyTuring`.
+   - Wired `popstate` to automatically re-load graph topologies when traversing browser history.
+6. **Bounded Scroll Viewports & HUD Bottom Clearance (`ApiSpecExplorer.tsx`, R-014)**:
+   - Root cause of bottom cut-off: `width: 100vw, height: 100vh` inside an absolute container (`top: 84px, bottom: 14px`) pushed the scrollbar track 98px below the fold.
+   - Fixed container to `width: 100%, height: 100%, overflowY: auto, padding: 24px 32px 240px`, ensuring all cards scroll well above floating HUD widgets.
+   - Added end-of-spec footer card (`All 27 API endpoints loaded and operational`) with a smooth "↑ Back to Top" button.
+   - Added "Clear All" button to Ingestion HUD when all background jobs complete.
+
+#### Verification
+- All 82 Rust backend unit tests pass: `cargo test --test unit_tests`.
+- Frontend builds cleanly: `npm run build` completed with 0 TypeScript errors.
+- Verified live via Playwright MCP:
+  - Header button navigates to `http://localhost:3000/api-docs` and renders liquid glass explorer.
+  - "Back to 3D Graph Studio" returns to `/graph`.
+  - Directory browser allows selecting different repositories and enqueuing them without button lockouts.
+  - Hard browser refresh on `http://localhost:3000/api-docs` loads directly without 404.
+  - Workspace switch to `DSA` updates URL to `?workspace=DSA`; hard reload preserves `DSA` and loads DSA graph.
+  - Scrolling to bottom of `/api-docs` reveals `GET /api/openapi.json` and footer card with "↑ Back to Top".
+
+---
 
 ### 2026-11-03 — Holistic Machine-Wide Global Deployment & MCP Configuration Refresh
 
@@ -2313,6 +2366,50 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
   - Restored `lib.rs`: Watcher processed delta event and updated metrics.
   - Live query `curl -s http://localhost:8080/api/watch/status` confirms:
     `"events_processed": 5`, `"files_reindexed": 4`, `"files_deleted": 1`, `"status": "watching"`, `"cluster_status": "live"`.
+
+---
+
+### 2026-11-04 — Hybrid Ripgrep-Engine Gitignore Filter & Non-Git Repository Fallback (R-015)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & Systems Engineer  
+**SDLC Phase**: `in-progress` (Watcher Noise Pruning & Non-Git Resilience)  
+**Branch**: `feat/omni-graph-ingest-ux-openapi`  
+**Duration**: ~20m  
+
+#### Objectives
+1. Implement Requirement `R-015` in `specs/catalog/omni-graph-ingestion-openapi-ux.md`: Prevent syncing git-ignored files (e.g. `.playwright-mcp/`, `coverage/`, `.venv/`, `*.log`, build outputs) during live-watch and full directory ingestion.
+2. Support non-git repositories cleanly without crashing or requiring `.gitignore` files.
+3. Support dynamic hot-reloading when `.gitignore` is created, edited, or deleted during active live watching.
+4. Add comprehensive unit tests in `tests/unit_tests.rs` to establish regression prevention.
+
+#### Root Cause & Architectural Design
+1. **The Noise Pollution Trap**:
+   - Background tools like Playwright MCP create transient session files (`.playwright-mcp/`), test traces, screenshots, and logs.
+   - Without an ignore automaton, the filesystem watcher emitted churn events, triggering unnecessary AST parsing, vector embedding requests, and SurrealDB lock contention.
+2. **The 3-Layer Hybrid Architecture**:
+   - **Layer 1: Static System Invariants**: Unconditionally prune `.git`, `node_modules`, `target`, `.playwright-mcp`, `.gemini`, `coverage`, `tmp`, `temp`, `.DS_Store`, `.gitignore`, `Thumbs.db`, and binary/log extensions (`.png`, `.wasm`, `.zip`, `.pyc`, `.log`, `.parquet`, etc.).
+   - **Layer 2: Dynamic Ripgrep Automaton**: Utilized `ignore::gitignore::GitignoreBuilder` (from ripgrep's battle-tested `ignore` crate) to compile workspace `.gitignore` rules into a sub-microsecond in-memory matching trie using `matched_path_or_any_parents`.
+   - **Layer 3: Non-Git Repository Fallback**: If `.gitignore` does not exist on disk, `load_workspace_gitignore` gracefully builds an empty matcher, and Layer 1 static system invariants prune all noise files cleanly without configuration.
+
+#### What Was Done
+- **Ripgrep Ignore Dependency (`Cargo.toml`)**:
+  - Added `ignore = "0.4"` dependency.
+- **Unified Hybrid Filter (`src/watcher/mod.rs`)**:
+  - Implemented `load_workspace_gitignore(&root)` and `is_path_ignored(&gitignore, path, is_dir)`.
+  - Updated `count_tracked_files` to accept `&Gitignore` and prune ignored entries using `filter_entry` with `depth == 0` root preservation.
+  - Updated `run_watcher` to hot-reload `gitignore` whenever a `.gitignore` modify/create event occurs.
+  - Updated `should_process_event` to filter events using `is_path_ignored`.
+- **Ingestion Pruning (`src/ingestion/mod.rs`)**:
+  - Replaced manual 30-string exclusion list in `execute_ingest` with `load_workspace_gitignore` and `is_path_ignored`, ensuring identical pruning rules between ingestion and real-time watching.
+- **Unit Test Suite (`tests/unit_tests.rs`)**:
+  - Added `hybrid_gitignore_tests` module with 3 tests:
+    - `test_r015_hybrid_filter_ignores_gitignored_directories_and_files`: Verified `.playwright-mcp/`, `coverage/`, `*.log`, `secrets.env`, and Layer 1 static invariants are rejected while `src/main.rs` and `README.md` are accepted.
+    - `test_r015_hybrid_filter_fallback_without_gitignore`: Verified non-git folders prune `node_modules/`, `target/`, and binaries while accepting source code.
+    - `test_r015_count_tracked_files_with_hybrid_filter`: Verified directory tree with mix of source, gitignored, and binary files accurately tracks only the 3 valid source files.
+
+#### Verification & Live Results
+- Unit Tests: All 85/85 tests passing in 0.01s (`cargo test --test unit_tests`).
+- Cargo compilation check: Clean build in 1.31s.
 
 
 

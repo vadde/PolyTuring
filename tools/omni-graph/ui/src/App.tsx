@@ -31,10 +31,15 @@ import {
   AlertTriangle,
   RotateCcw,
   CheckCircle,
+  CheckCircle2,
   AlertCircle,
   GitBranch,
+  Clock,
+  FileCode,
+  Plus,
 } from 'lucide-react';
 import AgentAnalytics from './AgentAnalytics';
+import ApiSpecExplorer from './ApiSpecExplorer';
 import BoundaryContractCard from './BoundaryContractCard';
 import SubsystemTopologyHub, { GalaxyRecord, GalaxyDependencyEdge } from './SubsystemTopologyHub';
 import { WorktreeFleetModal } from './WorktreeFleetModal';
@@ -126,7 +131,8 @@ export interface IngestionJobStatus {
   workspace: string;
   path: string;
   is_refresh: boolean;
-  phase: 'purging' | 'scanning' | 'indexing' | 'clustering' | 'completed' | 'failed' | string;
+  phase: 'queued' | 'purging' | 'scanning' | 'indexing' | 'clustering' | 'completed' | 'failed' | 'cancelled' | string;
+  queue_position?: number;
   files_scanned: number;
   files_indexed: number;
   files_skipped: number;
@@ -155,9 +161,87 @@ const GALAXY_COLORS = [
   '#4ade80', // Mint
 ];
 
+const getInitialWorkspace = (): string | null => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('workspace') || null;
+  }
+  return null;
+};
+
+const getInitialViewMode = (): 'graph' | 'analytics' | 'api-docs' => {
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/api-docs' || path === '/swagger') return 'api-docs';
+    if (path === '/analytics') return 'analytics';
+  }
+  return 'graph';
+};
+
 export default function App() {
-  // Navigation View Mode: 3D Graph Studio vs Agent Analytics & LSP Telemetry
-  const [viewMode, setViewMode] = useState<'graph' | 'analytics'>('graph');
+  // Navigation View Mode: 3D Graph Studio vs Agent Analytics vs OpenAPI 3.0 Explorer
+  const [viewMode, setViewMode] = useState<'graph' | 'analytics' | 'api-docs'>(getInitialViewMode);
+
+  // URL Routing Sync & Browser History
+  useEffect(() => {
+    const handleUrlRouting = () => {
+      const path = window.location.pathname.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+
+      let targetMode: 'graph' | 'analytics' | 'api-docs' = 'graph';
+      if (path === '/api-docs' || path === '/swagger') {
+        targetMode = 'api-docs';
+      } else if (path === '/analytics') {
+        targetMode = 'analytics';
+      } else if (path === '/ingest') {
+        targetMode = 'graph';
+        setIsBrowserModalOpen(true);
+      } else {
+        targetMode = 'graph';
+      }
+      setViewMode(targetMode);
+
+      const ws = params.get('workspace') || null;
+      if (ws !== selectedWorkspaceRef.current) {
+        setSelectedWorkspace(ws);
+        selectedWorkspaceRef.current = ws;
+        loadGraph(ws);
+        loadGalaxyTopology(ws);
+      }
+
+      const cluster = params.get('cluster');
+      if (cluster) {
+        const cid = parseInt(cluster, 10);
+        if (!isNaN(cid)) setSelectedClusterId(cid);
+      } else {
+        setSelectedClusterId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlRouting);
+    return () => window.removeEventListener('popstate', handleUrlRouting);
+  }, []);
+
+  const navigateTo = (mode: 'graph' | 'analytics' | 'api-docs', ws?: string | null, extraParams?: Record<string, string>) => {
+    setViewMode(mode);
+    const targetWs = ws !== undefined ? ws : selectedWorkspace;
+    const newPath = mode === 'graph' ? '/graph' : `/${mode}`;
+    const params = new URLSearchParams(window.location.search);
+    if (targetWs) {
+      params.set('workspace', targetWs);
+    } else {
+      params.delete('workspace');
+    }
+    if (extraParams) {
+      Object.entries(extraParams).forEach(([k, v]) => {
+        if (v) params.set(k, v);
+        else params.delete(k);
+      });
+    }
+    const searchStr = params.toString();
+    const fullUrl = newPath + (searchStr ? `?${searchStr}` : '');
+    window.history.pushState({ mode, workspace: targetWs }, '', fullUrl);
+  };
 
   // Graph state
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -169,7 +253,7 @@ export default function App() {
 
   // Workspaces state
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(getInitialWorkspace);
   const selectedWorkspaceRef = useRef<string | null>(selectedWorkspace);
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isWorktreeFleetOpen, setIsWorktreeFleetOpen] = useState(false);
@@ -252,7 +336,6 @@ export default function App() {
   const [selectedFolderForIngest, setSelectedFolderForIngest] = useState<string>('/workspace');
   const [customProjectName, setCustomProjectName] = useState('');
   const [isIngesting, setIsIngesting] = useState(false);
-  const [refreshIngest, setRefreshIngest] = useState(false);
   const [ingestToast, setIngestToast] = useState<string | null>(null);
 
   // Context Condenser state (Right Panel)
@@ -434,8 +517,8 @@ export default function App() {
   useEffect(() => {
     loadHealth();
     loadWorkspaces();
-    loadGraph(selectedWorkspace);
-    loadGalaxyTopology(selectedWorkspace);
+    loadGraph(selectedWorkspaceRef.current);
+    loadGalaxyTopology(selectedWorkspaceRef.current);
     fetchWatchers();
     fetchIngestStatus();
 
@@ -514,6 +597,7 @@ export default function App() {
 
   const handleSelectWorkspace = (ws: string | null) => {
     setSelectedWorkspace(ws);
+    selectedWorkspaceRef.current = ws;
     setIsWorkspaceDropdownOpen(false);
     setWorkspaceSearchTerm('');
     setSelectedNode(null);
@@ -521,6 +605,20 @@ export default function App() {
     setSelectedClusterId(null);
     setIsolatedClusterId(null);
     loadGraph(ws);
+    loadGalaxyTopology(ws);
+
+    // Synchronize URL search params and browser history immediately
+    const params = new URLSearchParams(window.location.search);
+    if (ws) {
+      params.set('workspace', ws);
+    } else {
+      params.delete('workspace');
+    }
+    params.delete('cluster');
+    const newPath = viewMode === 'graph' ? '/graph' : `/${viewMode}`;
+    const searchStr = params.toString();
+    const fullUrl = newPath + (searchStr ? `?${searchStr}` : '');
+    window.history.pushState({ mode: viewMode, workspace: ws }, '', fullUrl);
   };
 
   // ─── 2. Community Galaxy Grouping ──────────────────────────────────────────
@@ -795,74 +893,34 @@ export default function App() {
   };
 
   const handleIngestExecution = async (targetPath: string, projectOverride?: string) => {
-    setIsIngesting(true);
-
-    // Immediately close modal — ingestion continues in background via toast
     setIsBrowserModalOpen(false);
 
-    // Animated step-by-step toast
-    const isRefresh = refreshIngest;
-    if (isRefresh) {
-      setIngestToast('🔄 Purging stale data for clean re-scan...');
-    } else {
-      setIngestToast('📂 Scanning AST nodes & generating 384-d vector embeddings...');
-    }
-
-    // If refresh mode, show intermediate step after 2.5s
-    let stepTimer: ReturnType<typeof setTimeout> | null = null;
-    if (isRefresh) {
-      stepTimer = setTimeout(() => {
-        setIngestToast('📂 Scanning AST nodes & generating 384-d vector embeddings...');
-      }, 2500);
-    }
+    const targetWs = projectOverride?.trim() || targetPath.split('/').filter(Boolean).pop() || 'default';
+    setIngestToast(`🚀 Submitting ingestion request for '${targetWs}'...`);
 
     try {
-      const payload: { path: string; project?: string; refresh?: boolean } = { path: targetPath };
-      if (projectOverride?.trim()) {
-        payload.project = projectOverride.trim();
-      }
-      if (isRefresh) {
-        payload.refresh = true;
-      }
-
-      // AbortController with 10-minute timeout for large monorepos (e.g. DSA, Linux kernel)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000);
-
-      // Rehydrate HUD tracker immediately
-      setTimeout(() => fetchIngestStatus(), 150);
+      const payload = {
+        path: targetPath,
+        project: projectOverride?.trim() || undefined,
+        async: true,
+      };
 
       const res = await fetch('/api/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-      if (stepTimer) clearTimeout(stepTimer);
-
-      if (res.ok) {
+      if (res.ok || res.status === 202) {
         const data = await res.json();
-        const r = data.result || {};
-        const targetWs = r.workspace || customProjectName;
-
-        // Backend already auto-clusters — no redundant /api/cluster call needed
-        const durationSec = ((r.duration_ms || 0) / 1000).toFixed(1);
-        const clusterInfo = r.clusters_computed > 0 ? ` → ${r.clusters_computed} galaxy clusters` : '';
-        setIngestToast(
-          `✨ ${isRefresh ? 'Re-ingested' : 'Ingested'} ${r.nodes_created || 0} nodes & ${r.edges_created || 0} edges${clusterInfo} in ${durationSec}s`
-        );
-
-        await loadWorkspaces();
-        setSelectedWorkspace(targetWs);
-        await loadGraph(targetWs);
-        setIsGalaxyDrawerOpen(true);
-
-        // Auto-dismiss success toast after 6s
-        setTimeout(() => {
-          setIngestToast(null);
-        }, 6000);
+        const pos = data.queue_position !== undefined ? data.queue_position : (data.job?.queue_position ?? 0);
+        if (pos > 0) {
+          setIngestToast(`⌛ '${targetWs}' added to Ingestion Queue (#${pos} in line)`);
+        } else {
+          setIngestToast(`⚡ Ingestion running for '${targetWs}' (Scanning AST & vectors)...`);
+        }
+        await fetchIngestStatus();
+        setTimeout(() => setIngestToast(null), 5000);
       } else {
         let errMessage = 'Unknown error';
         try {
@@ -870,26 +928,16 @@ export default function App() {
           errMessage = errJson.message || `Server returned ${res.status}`;
         } catch {
           const text = await res.text().catch(() => '');
-          if (res.status === 504) {
-            errMessage = 'Gateway timeout: Ingestion took longer than 10 minutes.';
-          } else {
-            errMessage = text.slice(0, 120) || `HTTP ${res.status}`;
-          }
+          errMessage = text.slice(0, 120) || `HTTP ${res.status}`;
         }
         setIngestToast(`❌ Ingestion failed: ${errMessage}`);
         setTimeout(() => setIngestToast(null), 8000);
       }
     } catch (err: any) {
-      if (stepTimer) clearTimeout(stepTimer);
-      if (err?.name === 'AbortError') {
-        setIngestToast('❌ Ingestion timed out after 10 minutes. The codebase may be too large for a single pass.');
-      } else {
-        setIngestToast('❌ Connection error: Backend stack may be offline. Run "make omni-graph" to start.');
-      }
+      setIngestToast('❌ Connection error: Backend stack may be offline. Run "make omni-graph" to start.');
       setTimeout(() => setIngestToast(null), 8000);
     } finally {
       setIsIngesting(false);
-      setRefreshIngest(false);
       await fetchIngestStatus();
     }
   };
@@ -1607,7 +1655,7 @@ export default function App() {
         >
           <button
             type="button"
-            onClick={() => setViewMode('graph')}
+            onClick={() => navigateTo('graph')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1632,7 +1680,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setViewMode('analytics')}
+            onClick={() => navigateTo('analytics')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1664,6 +1712,43 @@ export default function App() {
               }}
             >
               Omni-DB
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigateTo('api-docs')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 12px',
+              borderRadius: 6,
+              border: 'none',
+              fontSize: '0.76rem',
+              fontWeight: viewMode === 'api-docs' ? 600 : 400,
+              cursor: 'pointer',
+              background:
+                viewMode === 'api-docs'
+                  ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(56, 189, 248, 0.4))'
+                  : 'transparent',
+              color: viewMode === 'api-docs' ? '#fff' : 'var(--text-secondary)',
+              boxShadow: viewMode === 'api-docs' ? '0 0 10px rgba(168, 85, 247, 0.4)' : 'none',
+            }}
+          >
+            <FileCode size={14} color={viewMode === 'api-docs' ? '#c084fc' : 'var(--text-muted)'} />
+            <span>API Spec</span>
+            <span
+              style={{
+                background: 'rgba(168, 85, 247, 0.25)',
+                color: '#c084fc',
+                borderRadius: 10,
+                padding: '1px 5px',
+                fontSize: '0.62rem',
+                fontWeight: 700,
+              }}
+            >
+              OpenAPI 3.0
             </span>
           </button>
         </div>
@@ -1903,6 +1988,27 @@ export default function App() {
           }}
         >
           <AgentAnalytics />
+        </div>
+      )}
+
+      {/* ─── API SPEC & SWAGGER EXPLORER VIEW ─────────────────────── */}
+      {viewMode === 'api-docs' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 84,
+            left: 14,
+            right: 14,
+            bottom: 14,
+            zIndex: 90,
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <ApiSpecExplorer
+            onBackToGraph={() => navigateTo('graph')}
+            selectedWorkspace={selectedWorkspace || undefined}
+          />
         </div>
       )}
 
@@ -2869,7 +2975,7 @@ export default function App() {
             padding: 20,
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget && !isIngesting) closeBrowserModal();
+            if (e.target === e.currentTarget) closeBrowserModal();
           }}
         >
           <div
@@ -2912,8 +3018,9 @@ export default function App() {
                 </div>
               </div>
               <button
-                onClick={() => !isIngesting && closeBrowserModal()}
+                onClick={closeBrowserModal}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                title="Close"
               >
                 <X size={18} />
               </button>
@@ -3174,89 +3281,186 @@ export default function App() {
                     transition: 'opacity 0.2s ease',
                   }}
                 >
-                  {dirEntries.map((entry) => (
-                    <div
-                      key={entry.path}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: 6,
-                        background: selectedFolderForIngest === entry.path ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                        border: `1px solid ${
-                          selectedFolderForIngest === entry.path
-                            ? 'rgba(56, 189, 248, 0.5)'
-                            : entry.is_codebase
-                            ? 'rgba(168, 85, 247, 0.35)'
-                            : 'transparent'
-                        }`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onClick={() => {
-                        setSelectedFolderForIngest(entry.path);
-                        setCustomProjectName(entry.name);
-                      }}
-                      onDoubleClick={() => fetchDirectory(entry.path)}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                        <Folder
-                          size={17}
-                          color={entry.is_codebase ? 'var(--accent-purple)' : 'var(--accent-cyan)'}
-                          style={{ flexShrink: 0 }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#f8fafc' }}>
-                            {entry.name}
-                          </div>
-                          {entry.is_codebase && (
-                            <div style={{ fontSize: '0.68rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <Code size={11} />
-                              <span>Detected Codebase {entry.languages.length > 0 ? `(${entry.languages.join(', ')})` : ''}</span>
+                  {dirEntries.map((entry) => {
+                    const activeJob = activeIngestions.find(
+                      (j) => !j.completed && (j.workspace === entry.name || j.path === entry.path)
+                    );
+                    const isQueued = activeJob?.phase === 'queued';
+                    const isRunning = activeJob && !isQueued;
+                    const existingWs = workspaces.find(
+                      (w) => w.workspace === entry.name || (w.root_path && w.root_path === entry.path)
+                    );
+                    const isSelected = selectedFolderForIngest === entry.path;
+                    const anyJobActive = activeIngestions.some((j) => !j.completed);
+
+                    return (
+                      <div
+                        key={entry.path}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: 6,
+                          background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                          border: `1px solid ${
+                            isSelected
+                              ? 'rgba(56, 189, 248, 0.5)'
+                              : entry.is_codebase
+                              ? 'rgba(168, 85, 247, 0.35)'
+                              : 'transparent'
+                          }`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => {
+                          setSelectedFolderForIngest(entry.path);
+                          setCustomProjectName(entry.name);
+                        }}
+                        onDoubleClick={() => fetchDirectory(entry.path)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                          <Folder
+                            size={17}
+                            color={entry.is_codebase ? 'var(--accent-purple)' : 'var(--accent-cyan)'}
+                            style={{ flexShrink: 0 }}
+                          />
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 600, fontSize: '0.82rem', color: '#f8fafc' }}>
+                                {entry.name}
+                              </span>
+                              {isRunning && (
+                                <span
+                                  style={{
+                                    background: 'rgba(129, 140, 248, 0.25)',
+                                    color: '#c7d2fe',
+                                    borderRadius: 10,
+                                    padding: '1px 6px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                  className="pulsing-dot"
+                                >
+                                  ● Ingesting ({activeJob.files_indexed} files)
+                                </span>
+                              )}
+                              {isQueued && (
+                                <span
+                                  style={{
+                                    background: 'rgba(245, 158, 11, 0.25)',
+                                    color: '#fbbf24',
+                                    borderRadius: 10,
+                                    padding: '1px 6px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                >
+                                  ⌛ Queued #{activeJob.queue_position ?? 1}
+                                </span>
+                              )}
+                              {!activeJob && existingWs && (
+                                <span
+                                  style={{
+                                    background: 'rgba(52, 211, 153, 0.15)',
+                                    color: '#34d399',
+                                    borderRadius: 10,
+                                    padding: '1px 6px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  ✓ Indexed ({existingWs.total_nodes.toLocaleString()} symbols)
+                                </span>
+                              )}
                             </div>
+                            {entry.is_codebase && (
+                              <div style={{ fontSize: '0.68rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                <Code size={11} />
+                                <span>Detected Codebase {entry.languages.length > 0 ? `(${entry.languages.join(', ')})` : ''}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {/* Quick Ingest / Queue Action if codebase */}
+                          {entry.is_codebase && !activeJob && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleIngestExecution(entry.path, entry.name);
+                              }}
+                              style={{
+                                background: anyJobActive
+                                  ? 'rgba(56, 189, 248, 0.15)'
+                                  : 'rgba(168, 85, 247, 0.15)',
+                                border: anyJobActive
+                                  ? '1px solid rgba(56, 189, 248, 0.4)'
+                                  : '1px solid rgba(168, 85, 247, 0.4)',
+                                borderRadius: 4,
+                                padding: '3px 8px',
+                                color: anyJobActive ? '#38bdf8' : '#c084fc',
+                                fontSize: '0.68rem',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                              title={anyJobActive ? `Add ${entry.name} to FIFO queue` : `Ingest ${entry.name}`}
+                            >
+                              {anyJobActive ? <Plus size={11} /> : <Sparkles size={11} />}
+                              <span>{anyJobActive ? 'Queue' : (existingWs ? 'Re-sync' : 'Ingest')}</span>
+                            </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFolderForIngest(entry.path);
+                              setCustomProjectName(entry.name);
+                            }}
+                            style={{
+                              background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                              borderRadius: 4,
+                              padding: '3px 8px',
+                              color: isSelected ? '#38bdf8' : 'var(--text-secondary)',
+                              fontSize: '0.68rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                            title="Select this codebase as target"
+                          >
+                            {isSelected ? '✓ Selected' : 'Select'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fetchDirectory(entry.path);
+                            }}
+                            className="cyber-button-secondary"
+                            style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                            title="Enter folder"
+                          >
+                            <span>Open</span>
+                            <ChevronRight size={12} />
+                          </button>
                         </div>
                       </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedFolderForIngest(entry.path);
-                            setCustomProjectName(entry.name);
-                          }}
-                          style={{
-                            background: selectedFolderForIngest === entry.path ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            borderRadius: 4,
-                            padding: '3px 8px',
-                            color: selectedFolderForIngest === entry.path ? '#38bdf8' : 'var(--text-secondary)',
-                            fontSize: '0.68rem',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                          title="Select this codebase as target"
-                        >
-                          {selectedFolderForIngest === entry.path ? '✓ Selected' : 'Select'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            fetchDirectory(entry.path);
-                          }}
-                          className="cyber-button-secondary"
-                          style={{ padding: '3px 8px', fontSize: '0.7rem' }}
-                          title="Enter folder"
-                        >
-                          <span>Open</span>
-                          <ChevronRight size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : isLoadingDir ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10, color: 'var(--text-muted)', padding: '28px 0' }}>
@@ -3399,55 +3603,122 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Auto-Cluster Checkbox */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.76rem', color: '#e2e8f0' }}>
-                  <input
-                    type="checkbox"
-                    checked={autoClusterAfterIngest}
-                    onChange={(e) => setAutoClusterAfterIngest(e.target.checked)}
-                    style={{ accentColor: 'var(--accent-purple)', cursor: 'pointer', width: 15, height: 15 }}
-                  />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Sparkles size={13} color="var(--accent-purple)" />
-                    <span>Auto-compute Galaxy Clusters immediately after ingestion (Recommended)</span>
-                  </span>
-                </label>
-              </div>
+              {/* Selected target state computation & Action controls */}
+              {(() => {
+                const selectedTargetWs = customProjectName.trim() || selectedFolderForIngest.split('/').filter(Boolean).pop() || '';
+                const selectedTargetActiveJob = activeIngestions.find(
+                  (j) => !j.completed && (j.workspace === selectedTargetWs || j.path === selectedFolderForIngest)
+                );
+                const isSelectedTargetQueued = selectedTargetActiveJob?.phase === 'queued';
+                const isSelectedTargetRunning = selectedTargetActiveJob && !isSelectedTargetQueued;
+                const isSelectedTargetIndexed = workspaces.some((w) => w.workspace === selectedTargetWs);
+                const isAnyOtherJobActive = activeIngestions.some((j) => !j.completed && j.workspace !== selectedTargetWs);
 
-              {/* Clean Re-ingest Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.76rem', color: '#e2e8f0' }}>
-                  <input
-                    type="checkbox"
-                    checked={refreshIngest}
-                    onChange={(e) => setRefreshIngest(e.target.checked)}
-                    style={{ accentColor: '#ef4444', cursor: 'pointer', width: 15, height: 15 }}
-                  />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <RefreshCw size={13} color="#ef4444" />
-                    <span>Clean Re-ingest — purge existing data before fresh scan</span>
-                  </span>
-                </label>
-              </div>
+                return (
+                  <>
+                    {/* Auto-Cluster Checkbox */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.76rem', color: '#e2e8f0' }}>
+                        <input
+                          type="checkbox"
+                          checked={autoClusterAfterIngest}
+                          onChange={(e) => setAutoClusterAfterIngest(e.target.checked)}
+                          style={{ accentColor: 'var(--accent-purple)', cursor: 'pointer', width: 15, height: 15 }}
+                        />
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Sparkles size={13} color="var(--accent-purple)" />
+                          <span>Auto-compute Galaxy Clusters immediately after ingestion (Recommended)</span>
+                        </span>
+                      </label>
+                    </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-                <button
-                  onClick={closeBrowserModal}
-                  className="cyber-button-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleIngestExecution(selectedFolderForIngest, customProjectName)}
-                  disabled={isIngesting || !selectedFolderForIngest}
-                  className="cyber-button"
-                  style={refreshIngest ? { borderColor: 'rgba(239, 68, 68, 0.5)', boxShadow: '0 0 12px rgba(239, 68, 68, 0.2)' } : {}}
-                >
-                  {isIngesting ? <RefreshCw size={15} className="pulsing-dot" /> : (refreshIngest ? <RefreshCw size={15} /> : <Sparkles size={15} />)}
-                  <span>{isIngesting ? 'Ingesting...' : (refreshIngest ? 'Re-ingest Fresh' : 'Start Ingestion')}</span>
-                </button>
-              </div>
+                    {/* Architectural Clean Invariant Guarantee */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(56, 189, 248, 0.08)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        fontSize: '0.74rem',
+                        color: '#94a3b8',
+                      }}
+                    >
+                      <CheckCircle2 size={15} color="#38bdf8" style={{ flexShrink: 0 }} />
+                      <span>
+                        <strong style={{ color: '#e2e8f0' }}>Atomic Clean Invariant:</strong> Existing graph records and cached embeddings are automatically purged before re-indexing. Zero ghost symbols or duplicated nodes.
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                      <button
+                        type="button"
+                        onClick={closeBrowserModal}
+                        className="cyber-button-secondary"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleIngestExecution(selectedFolderForIngest, customProjectName)}
+                        disabled={!selectedFolderForIngest || isSelectedTargetRunning || isSelectedTargetQueued}
+                        className="cyber-button"
+                        style={
+                          isSelectedTargetQueued
+                            ? { borderColor: 'rgba(245, 158, 11, 0.5)', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', cursor: 'not-allowed' }
+                            : isSelectedTargetRunning
+                            ? { borderColor: 'rgba(129, 140, 248, 0.5)', background: 'rgba(129, 140, 248, 0.15)', color: '#a5b4fc', cursor: 'not-allowed' }
+                            : isAnyOtherJobActive
+                            ? { borderColor: 'rgba(56, 189, 248, 0.5)', boxShadow: '0 0 15px rgba(56, 189, 248, 0.25)' }
+                            : isSelectedTargetIndexed
+                            ? { borderColor: 'rgba(56, 189, 248, 0.4)' }
+                            : {}
+                        }
+                        title={
+                          isSelectedTargetQueued
+                            ? `'${selectedTargetWs}' is already in the FIFO ingestion queue`
+                            : isSelectedTargetRunning
+                            ? `'${selectedTargetWs}' is currently indexing`
+                            : isAnyOtherJobActive
+                            ? `Queue '${selectedTargetWs}' — will process automatically in FIFO order`
+                            : isSelectedTargetIndexed
+                            ? `Re-index and refresh graph for '${selectedTargetWs}'`
+                            : `Start scanning and indexing '${selectedTargetWs}'`
+                        }
+                      >
+                        {isSelectedTargetQueued ? (
+                          <>
+                            <Clock size={15} color="#fbbf24" />
+                            <span>Already in Queue (#{selectedTargetActiveJob?.queue_position ?? 1})</span>
+                          </>
+                        ) : isSelectedTargetRunning ? (
+                          <>
+                            <RefreshCw size={15} className="spinning-icon" />
+                            <span>Ingesting '{selectedTargetWs}' ({selectedTargetActiveJob?.files_indexed ?? 0} files)...</span>
+                          </>
+                        ) : isAnyOtherJobActive ? (
+                          <>
+                            <Plus size={15} color="#38bdf8" />
+                            <span>+ Add '{selectedTargetWs || 'Codebase'}' to Queue</span>
+                          </>
+                        ) : isSelectedTargetIndexed ? (
+                          <>
+                            <RefreshCw size={15} color="#38bdf8" />
+                            <span>Re-sync & Refresh Graph</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={15} color="var(--accent-purple)" />
+                            <span>Start Ingestion</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -3636,7 +3907,9 @@ export default function App() {
                       }}
                     >
                       {/* Workspace icon / spinning indicator */}
-                      {!isDone ? (
+                      {job.phase === 'queued' ? (
+                        <Clock size={12} color="#fbbf24" />
+                      ) : !isDone ? (
                         <RotateCcw
                           size={12}
                           className="spinning-icon"
@@ -3651,8 +3924,24 @@ export default function App() {
                       {/* Workspace Name */}
                       <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{job.workspace}</span>
 
+                      {/* Queued Position Tag */}
+                      {job.phase === 'queued' && (
+                        <span
+                          style={{
+                            background: 'rgba(245, 158, 11, 0.25)',
+                            color: '#fbbf24',
+                            padding: '0 5px',
+                            borderRadius: 4,
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          QUEUED #{job.queue_position !== undefined ? job.queue_position : 1}
+                        </span>
+                      )}
+
                       {/* Clean Re-ingest Tag */}
-                      {job.is_refresh && (
+                      {job.is_refresh && job.phase !== 'queued' && (
                         <span
                           style={{
                             background: 'rgba(239, 68, 68, 0.25)',
@@ -3669,8 +3958,10 @@ export default function App() {
 
                       {/* Live Phase Text */}
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
-                        {job.phase === 'purging'
-                          ? 'Purging DB...'
+                        {job.phase === 'queued'
+                          ? 'In FIFO queue — starting shortly'
+                          : job.phase === 'purging'
+                          ? 'Purging stale records...'
                           : job.phase === 'scanning'
                           ? `Scanning files... (${job.files_scanned})`
                           : job.phase === 'indexing'
@@ -3774,6 +4065,26 @@ export default function App() {
                 >
                   <span>+ Ingest Another</span>
                 </button>
+                {activeIngestions.every((j) => j.completed) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      activeIngestions.forEach((j) => handleDismissIngestJob(j.workspace));
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: 12,
+                      padding: '3px 8px',
+                      color: '#cbd5e1',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer',
+                    }}
+                    title="Dismiss all completed jobs and close this banner"
+                  >
+                    Clear All
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsIngestBarMinimized(true)}
