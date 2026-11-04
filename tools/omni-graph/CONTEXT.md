@@ -34,7 +34,10 @@ blockers: []
 | Spec Requirements (R-XXX) | 78 | 80 | 🟢 97.5% Complete (2 Deferred to v0.3.1: R-066, R-072) |
 | Acceptance Criteria (AC-XXX) | 35 | 37 | 🟢 94.6% Complete (2 Deferred: AC for R-066, R-072) |
 | Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
-| Test Coverage | 82/82 Unit & Integration Tests | 82 | 🟢 100% Verified in Docker |
+| Test Coverage | 85/85 Unit & Integration Tests | 85 | 🟢 100% Verified (0.01s) |
+| Hybrid Ripgrep Gitignore Filter (R-015) | Complete | — | 🟢 3-layer noise pruning with dynamic .gitignore hot-reload and non-git fallback |
+| Workspace Deep-Linking & History Sync (R-013) | Complete | — | 🟢 Bidirectional URL query synchronization preserving workspace on reload |
+| Bounded Viewport Scroll & HUD Clearance (R-014) | Complete | — | 🟢 100% viewport containment, clearance above bottom HUDs, Back to Top FAB |
 | Topological Containment Backbone (R-063) | Complete | — | 🟢 Workspace, Directory & File DAG backbone with zero disconnected vertices |
 | Watcher Syncing Guardrail & Telemetry Parity (R-074, R-076) | Complete | — | 🟢 Included `status == "syncing"` in is_watching, eliminating cancellation in flight |
 | PPR Neighborhood Condenser & Clean Record IDs (R-068, R-069) | Complete | — | 🟢 Power iteration Personalized PageRank (alpha=0.85) & <1500 strict token ceiling |

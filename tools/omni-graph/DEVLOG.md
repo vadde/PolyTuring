@@ -2367,6 +2367,50 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
   - Live query `curl -s http://localhost:8080/api/watch/status` confirms:
     `"events_processed": 5`, `"files_reindexed": 4`, `"files_deleted": 1`, `"status": "watching"`, `"cluster_status": "live"`.
 
+---
+
+### 2026-11-04 — Hybrid Ripgrep-Engine Gitignore Filter & Non-Git Repository Fallback (R-015)
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & Systems Engineer  
+**SDLC Phase**: `in-progress` (Watcher Noise Pruning & Non-Git Resilience)  
+**Branch**: `feat/omni-graph-ingest-ux-openapi`  
+**Duration**: ~20m  
+
+#### Objectives
+1. Implement Requirement `R-015` in `specs/catalog/omni-graph-ingestion-openapi-ux.md`: Prevent syncing git-ignored files (e.g. `.playwright-mcp/`, `coverage/`, `.venv/`, `*.log`, build outputs) during live-watch and full directory ingestion.
+2. Support non-git repositories cleanly without crashing or requiring `.gitignore` files.
+3. Support dynamic hot-reloading when `.gitignore` is created, edited, or deleted during active live watching.
+4. Add comprehensive unit tests in `tests/unit_tests.rs` to establish regression prevention.
+
+#### Root Cause & Architectural Design
+1. **The Noise Pollution Trap**:
+   - Background tools like Playwright MCP create transient session files (`.playwright-mcp/`), test traces, screenshots, and logs.
+   - Without an ignore automaton, the filesystem watcher emitted churn events, triggering unnecessary AST parsing, vector embedding requests, and SurrealDB lock contention.
+2. **The 3-Layer Hybrid Architecture**:
+   - **Layer 1: Static System Invariants**: Unconditionally prune `.git`, `node_modules`, `target`, `.playwright-mcp`, `.gemini`, `coverage`, `tmp`, `temp`, `.DS_Store`, `.gitignore`, `Thumbs.db`, and binary/log extensions (`.png`, `.wasm`, `.zip`, `.pyc`, `.log`, `.parquet`, etc.).
+   - **Layer 2: Dynamic Ripgrep Automaton**: Utilized `ignore::gitignore::GitignoreBuilder` (from ripgrep's battle-tested `ignore` crate) to compile workspace `.gitignore` rules into a sub-microsecond in-memory matching trie using `matched_path_or_any_parents`.
+   - **Layer 3: Non-Git Repository Fallback**: If `.gitignore` does not exist on disk, `load_workspace_gitignore` gracefully builds an empty matcher, and Layer 1 static system invariants prune all noise files cleanly without configuration.
+
+#### What Was Done
+- **Ripgrep Ignore Dependency (`Cargo.toml`)**:
+  - Added `ignore = "0.4"` dependency.
+- **Unified Hybrid Filter (`src/watcher/mod.rs`)**:
+  - Implemented `load_workspace_gitignore(&root)` and `is_path_ignored(&gitignore, path, is_dir)`.
+  - Updated `count_tracked_files` to accept `&Gitignore` and prune ignored entries using `filter_entry` with `depth == 0` root preservation.
+  - Updated `run_watcher` to hot-reload `gitignore` whenever a `.gitignore` modify/create event occurs.
+  - Updated `should_process_event` to filter events using `is_path_ignored`.
+- **Ingestion Pruning (`src/ingestion/mod.rs`)**:
+  - Replaced manual 30-string exclusion list in `execute_ingest` with `load_workspace_gitignore` and `is_path_ignored`, ensuring identical pruning rules between ingestion and real-time watching.
+- **Unit Test Suite (`tests/unit_tests.rs`)**:
+  - Added `hybrid_gitignore_tests` module with 3 tests:
+    - `test_r015_hybrid_filter_ignores_gitignored_directories_and_files`: Verified `.playwright-mcp/`, `coverage/`, `*.log`, `secrets.env`, and Layer 1 static invariants are rejected while `src/main.rs` and `README.md` are accepted.
+    - `test_r015_hybrid_filter_fallback_without_gitignore`: Verified non-git folders prune `node_modules/`, `target/`, and binaries while accepting source code.
+    - `test_r015_count_tracked_files_with_hybrid_filter`: Verified directory tree with mix of source, gitignored, and binary files accurately tracks only the 3 valid source files.
+
+#### Verification & Live Results
+- Unit Tests: All 85/85 tests passing in 0.01s (`cargo test --test unit_tests`).
+- Cargo compilation check: Clean build in 1.31s.
+
 
 
 

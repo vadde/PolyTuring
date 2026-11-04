@@ -75,6 +75,15 @@ flowchart TD
 - **`R-013` (Bidirectional Workspace URL Routing & Synchronous Mount)**: Selecting any workspace in the UI dropdown or worktree switcher shall immediately update `window.location.search` (`?workspace=XYZ`) via HTML5 `history.pushState`. Initial application state shall synchronously read from URL parameters, guaranteeing that page reloads or deep-links never revert to previous workspaces. Browser Back/Forward navigation shall automatically reload graph topologies for the active historical workspace.
 - **`R-014` (Bounded Scroll Viewports & Bottom Clearance)**: Embedded full-screen view panels (API Explorer, Analytics) shall bind their scroll containers to 100% of the visible viewport bounding box rather than `100vh`, preventing off-screen scrollbar clipping. Scroll views shall provide generous bottom clearance (`>=200px`) and end-of-content indicators with "Back to Top" controls so bottom elements are never obscured by floating status widgets or the Ingestion HUD.
 
+### Hybrid Gitignore Resolution Engine (`R-015`)
+- **`R-015` (Ripgrep-Engine Hybrid Gitignore Filtering)**:
+  - **`R-015.1` (Architecture)**: Omni-Graph shall integrate the Rust `ignore` crate (ripgrep engine) to provide sub-microsecond in-memory matching of `.gitignore` rules across both repository ingestion and live filesystem watching.
+  - **`R-015.2` (Multi-Layer Hybrid Defense)**:
+    - *Layer 1 (Static System Invariants)*: Core framework boundaries (`.git/`, `node_modules/`, `target/`, `dist/`, `build/`, `vendor/`, `__pycache__/`, `.next/`, `.cache/`, `.DS_Store`) and binary artifact extensions (`.png`, `.exe`, `.so`, `.zip`, `.log`, etc.) shall always be excluded regardless of gitignore presence.
+    - *Layer 2 (Dynamic Gitignore Resolution)*: If a workspace contains `.gitignore`, compile it into an in-memory `Gitignore` automaton. Files and directories matching gitignore patterns shall be dropped immediately with zero processing, zero AST parsing, and zero vector embedding computation.
+    - *Layer 3 (Non-Git Fallback Invariant)*: If an ingested directory lacks `.gitignore` (e.g. unversioned codebases, scratch directories), Layer 1 static heuristics automatically apply with zero failure, zero warnings, and zero degraded performance.
+    - *Layer 4 (Hot-Reloading Invariant)*: When `.gitignore` itself is created, edited, or deleted during an active live-watch session, the watcher shall dynamically re-compile the in-memory matcher without requiring a server or watcher restart.
+
 ---
 
 ## 4. Test Harness & Acceptance Verification
@@ -90,6 +99,7 @@ flowchart TD
 | `R-011`, `R-012` | Hard browser refresh on `http://localhost:3000/api-docs?workspace=PolyTuring` | Page directly renders API Spec with `PolyTuring` workspace preserved; no 404. |
 | `R-013` | Switch workspace from `PolyTuring` to `DSA` and reload (`F5`) | URL immediately updates to `?workspace=DSA`. Page reload preserves `DSA` and renders DSA graph without reverting to PolyTuring. |
 | `R-014` | Scroll to bottom of `/api-docs` | Last endpoint (`GET /api/openapi.json`) and end-of-spec footer card are 100% visible, fully clear of floating HUD widgets, and "↑ Back to Top" scrolls to top. |
+| `R-015` | Files in `.gitignore` (e.g. `.playwright/`, `tmp/`, custom patterns) are written | Hybrid matcher drops events in <1µs; zero SSE toasts emitted; zero AST or embeddings generated. Non-git repos scan cleanly using Layer 1 invariants. |
 
 ---
 
@@ -106,3 +116,4 @@ flowchart TD
 - [x] Ingestion HUD Queue Badges (`ui/src/App.tsx`)
 - [x] Bidirectional Workspace URL Routing & Deep-Link Preservation (`ui/src/App.tsx`)
 - [x] Bounded Viewport Scroll Containment & HUD Floating Clearance (`ui/src/ApiSpecExplorer.tsx`)
+- [x] Hybrid Ripgrep-Engine Gitignore Filter (`Cargo.toml`, `watcher/mod.rs`, `ingestion/mod.rs`)

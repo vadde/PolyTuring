@@ -12,7 +12,7 @@ use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tracing::{error, info, warn};
@@ -450,34 +450,18 @@ async fn execute_ingest(
         let mut total_edges = 0;
         let mut discovered_dirs: HashSet<String> = HashSet::new();
 
+        let root_path_buf = PathBuf::from(root);
+        let gitignore = crate::watcher::load_workspace_gitignore(&root_path_buf);
+
         for entry in WalkDir::new(root)
             .into_iter()
             .filter_entry(|e| {
-                let name = e.file_name().to_string_lossy();
-                // Exclude common noise, output, and data directories
-                !name.starts_with('.')
-                    && name != "node_modules"
-                    && name != "target"
-                    && name != "dist"
-                    && name != "build"
-                    && name != "vendor"
-                    && name != "solutions"
-                    && name != "data"
-                    && name != "datasets"
-                    && name != "log"
-                    && name != "logs"
-                    && name != "output"
-                    && name != "outputs"
-                    && name != "coverage"
-                    && name != "tmp"
-                    && name != "temp"
-                    && name != "cache"
-                    && name != ".cache"
-                    && name != "bin"
-                    && name != "obj"
-                    && name != "debug"
-                    && name != "release"
-                    && name != "testdata"
+                if e.depth() == 0 {
+                    return true;
+                }
+                let p = e.path();
+                let is_dir = e.file_type().is_dir();
+                !crate::watcher::is_path_ignored(&gitignore, p, is_dir)
             })
             .filter_map(|e| e.ok())
         {

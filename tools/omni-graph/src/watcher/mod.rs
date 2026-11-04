@@ -14,13 +14,14 @@ use crate::db::DbClient;
 use crate::embedder::EmbedderClient;
 use crate::ingestion::FileCache;
 use delta::DeltaKind;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use pipeline::IncrementalPipeline;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
@@ -71,8 +72,8 @@ pub struct WatchManager {
     event_tx: broadcast::Sender<WatchEvent>,
 }
 
-// Directories to exclude from watching
-const EXCLUDED_DIRS: &[&str] = &[
+// Directories to exclude from watching (Layer 1 Static System Invariants)
+pub const EXCLUDED_DIRS: &[&str] = &[
     ".git",
     "node_modules",
     "target",
@@ -91,14 +92,65 @@ const EXCLUDED_DIRS: &[&str] = &[
     ".playwright-mcp",
     ".playwright",
     ".gemini",
+    "coverage",
+    "tmp",
+    "temp",
 ];
 
-// File extensions to exclude (binary artifacts)
-const EXCLUDED_EXTS: &[&str] = &[
+// File extensions to exclude (binary artifacts & raw output logs)
+pub const EXCLUDED_EXTS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "ico", "svg", "pdf", "zip", "tar", "gz", "bz2", "xz",
     "7z", "exe", "bin", "dll", "dylib", "so", "a", "o", "obj", "wasm", "pyc", "pyo", "pyd",
-    "class", "jar", "lock", "map", "rlib", "rmeta", "timestamp", "log",
+    "class", "jar", "lock", "map", "rlib", "rmeta", "timestamp", "log", "out", "parquet",
+    "arrow", "npy", "npz", "h5", "pkl", "pt", "pth",
 ];
+
+/// Load workspace .gitignore into a compiled Ripgrep Gitignore automaton (Layer 2)
+pub fn load_workspace_gitignore(root: &Path) -> Gitignore {
+    let mut builder = GitignoreBuilder::new(root);
+    let gitignore_path = root.join(".gitignore");
+    if gitignore_path.is_file() {
+        let _ = builder.add(&gitignore_path);
+    }
+    builder.build().unwrap_or_else(|_| Gitignore::empty())
+}
+
+/// Unified Hybrid Filter (R-015):
+/// - Layer 1: Static System Invariants (.git, node_modules, target, binary/log extensions)
+/// - Layer 2: Dynamic in-memory Ripgrep Gitignore matching
+/// - Layer 3: Non-git fallback (if no .gitignore, Layer 1 applies cleanly)
+pub fn is_path_ignored(gitignore: &Gitignore, path: &Path, is_dir: bool) -> bool {
+    // Layer 1: Check static directory invariants
+    for comp in path.components() {
+        let name = comp.as_os_str().to_string_lossy();
+        if EXCLUDED_DIRS.iter().any(|d| name.as_ref() == *d) {
+            return true;
+        }
+    }
+
+    // Layer 1: Check static filename invariants (.DS_Store, .gitignore, Thumbs.db)
+    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+        if file_name == ".DS_Store" || file_name == ".gitignore" || file_name == "Thumbs.db" {
+            return true;
+        }
+    }
+
+    // Layer 1: Check static extension invariants
+    if !is_dir {
+        if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+            if EXCLUDED_EXTS.contains(&ext) {
+                return true;
+            }
+        }
+    }
+
+    // Layer 2: Dynamic Gitignore matching (sub-microsecond automaton)
+    match gitignore.matched_path_or_any_parents(path, is_dir) {
+        ignore::Match::Ignore(_) => true,
+        ignore::Match::Whitelist(_) => false,
+        ignore::Match::None => false,
+    }
+}
 
 impl WatchManager {
     pub fn new(db: DbClient, embedder: EmbedderClient) -> Self {
@@ -174,8 +226,9 @@ impl WatchManager {
             debounce_ms: debounce,
         }));
 
-        // Count initial files
-        let initial_count = count_tracked_files(path);
+        // Count initial files using hybrid gitignore matcher
+        let gitignore = load_workspace_gitignore(&root);
+        let initial_count = count_tracked_files(path, &gitignore);
         {
             let mut s = status.write().await;
             s.files_tracked = initial_count;
@@ -268,14 +321,18 @@ impl WatchManager {
     }
 }
 
-/// Count files in a directory (excluding noise)
-fn count_tracked_files(path: &str) -> usize {
+/// Count files in a directory (excluding noise and gitignored files)
+pub fn count_tracked_files(path: &str, gitignore: &Gitignore) -> usize {
     let mut count = 0;
     for entry in walkdir::WalkDir::new(path)
         .into_iter()
         .filter_entry(|e| {
-            let name = e.file_name().to_string_lossy();
-            !EXCLUDED_DIRS.iter().any(|d| name.as_ref() == *d)
+            if e.depth() == 0 {
+                return true;
+            }
+            let p = e.path();
+            let is_dir = e.file_type().is_dir();
+            !is_path_ignored(gitignore, p, is_dir)
         })
         .filter_map(|e| e.ok())
     {
@@ -349,6 +406,7 @@ async fn run_watcher(
     let mut sweep_interval = tokio::time::interval(Duration::from_secs(30));
     sweep_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let root_path = PathBuf::from(&path);
+    let mut gitignore = load_workspace_gitignore(&root_path);
     let mut total_sync_ms: u64 = 0;
     let mut sync_count: u64 = 0;
     let mut files_changed_since_cluster: u64 = 0;
@@ -364,8 +422,17 @@ async fn run_watcher(
 
             // File system event
             Some(event) = rx.recv() => {
+                // Hot-reload .gitignore matcher if .gitignore was created/modified/deleted
+                for p in &event.paths {
+                    if p.file_name().and_then(|f| f.to_str()) == Some(".gitignore") {
+                        info!("Hot-reloading .gitignore matcher for workspace '{}'", workspace);
+                        gitignore = load_workspace_gitignore(&root_path);
+                        break;
+                    }
+                }
+
                 // Filter out noise events
-                if should_process_event(&event, &root_path) {
+                if should_process_event(&event, &root_path, &gitignore) {
                     pending_events.push(event);
                 }
 
@@ -440,7 +507,7 @@ async fn run_watcher(
                                 .filter(|e| matches!(e.kind, DeltaKind::Deleted))
                                 .count() as u64;
                             s.avg_sync_ms = total_sync_ms.checked_div(sync_count).unwrap_or(0);
-                            s.files_tracked = count_tracked_files(&path);
+                            s.files_tracked = count_tracked_files(&path, &gitignore);
 
                             // Mark clusters as stale if enough files changed
                             if files_changed_since_cluster >= 10 {
@@ -524,7 +591,7 @@ async fn run_watcher(
                                 .filter(|e| matches!(e.kind, DeltaKind::Deleted))
                                 .count() as u64;
                             s.avg_sync_ms = total_sync_ms.checked_div(sync_count).unwrap_or(0);
-                            s.files_tracked = count_tracked_files(&path);
+                            s.files_tracked = count_tracked_files(&path, &gitignore);
                             if files_changed_since_cluster >= 10 {
                                 s.cluster_status = "stale".to_string();
                             }
@@ -541,7 +608,7 @@ async fn run_watcher(
             // Periodic sweep for cross-filesystem deletions & tracked files refresh
             _ = sweep_interval.tick() => {
                 let pruned = pipeline.prune_missing_files(&workspace, &path).await;
-                let tracked = count_tracked_files(&path);
+                let tracked = count_tracked_files(&path, &gitignore);
                 {
                     let mut s = status.write().await;
                     s.files_tracked = tracked;
@@ -605,27 +672,17 @@ async fn run_watcher(
     info!("Watcher loop ended for workspace '{}'", workspace);
 }
 
-/// Determine if a notify event should be processed
-fn should_process_event(event: &Event, _root: &PathBuf) -> bool {
+/// Determine if a notify event should be processed (R-015 Hybrid Filter)
+fn should_process_event(event: &Event, _root: &PathBuf, gitignore: &Gitignore) -> bool {
     match event.kind {
         EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {}
         _ => return false,
     }
 
     for path in &event.paths {
-        // Check if any path component is an excluded directory
-        for component in path.components() {
-            let name = component.as_os_str().to_string_lossy();
-            if EXCLUDED_DIRS.iter().any(|d| name.as_ref() == *d) {
-                return false;
-            }
-        }
-
-        // Check file extension
-        if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-            if EXCLUDED_EXTS.contains(&ext) {
-                return false;
-            }
+        let is_dir = path.is_dir();
+        if is_path_ignored(gitignore, path, is_dir) {
+            return false;
         }
     }
 
