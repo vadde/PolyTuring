@@ -157,6 +157,10 @@ TOOLS_SPEC = [
                     "type": "string",
                     "description": "Target workspace name (defaults to current project root)."
                 },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Number of top AST seed hits (default 5)."
+                },
                 "include_docs": {
                     "type": "boolean",
                     "description": "Whether to include documentation in search seeds (default false: code-only)."
@@ -306,7 +310,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
         elif name == "omni_query":
             prompt = args["prompt"]
             include_docs = args.get("include_docs", False)
-            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs}
+            top_k = args.get("top_k", 5)
+            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs, "top_k": top_k}
             res = make_http_request(f"{API_URL}/api/query", data=payload)
             macro = res.get("macroscopic_summary", "")
             subgraph = res.get("expanded_subgraph", "")

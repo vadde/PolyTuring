@@ -1,3 +1,37 @@
+### 2026-11-04 — Deep Forensic Audit: Vector Search Cosine Null Fix, API Parameter Aliasing & Guardrail Hardening
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.4.0 Engine Integrity & Search Hardening)
+**Branch**: `main`
+**Duration**: ~30m
+
+#### Context & Objectives
+- Executed an exhaustive, end-to-end holistic forensic audit of Omni-Graph across database schema, vector retrieval, Graph-RAG synthesis, API parameters, hook guardrails, and MCP server synchronization.
+- Uncovered and resolved a silent, critical failure mode in vector search where structural backbone nodes (`workspace`, `directory`) with all-zero embeddings produced `similarity: null` in SurrealDB, consuming top search result slots and crashing serde deserialization, which caused `/api/search` and `/api/query` to return 0 results.
+
+#### Key Forensic Discoveries & Resolutions
+1. **Critical Vector Search Cosine Null & Serde Deserialization Bug (`src/db/mod.rs`)**:
+   - *Discovery*: Structural nodes (`workspace` and `directory`) initialized with zero-vectors (`[0.0; 384]`) resulted in $\frac{0}{0} = \text{f32::NAN}$ during SurrealDB `vector::similarity::cosine()`. SurrealDB (implemented in Rust) uses a total ordering where `NaN > 1.0 > 0.0`. Consequently, `similarity > 0.0` evaluated to `true` on `NaN`, and `ORDER BY similarity DESC` sorted `NaN` to the very top above all real numbers! In JSON serialization, `serde_json` maps `NaN` to `null`. In Rust, `SearchResult.similarity` was `f32` (non-optional), causing serde deserialization to fail on `null` and silently dropping all results.
+   - *Fix*: In `search_vector`, applied a mathematically impenetrable multi-layer guard:
+     - `vector::similarity::cosine(embedding, ...) <= 1.0 AND vector::similarity::cosine(embedding, ...) > 0.0` (in SurrealDB's total ordering, `NaN <= 1.0` evaluates strictly to `false`, discarding any NaN vectors regardless of node kind).
+     - `kind NOT IN ['workspace', 'directory']` (explicitly skips structural backbone nodes before vector math).
+     - In `SearchResult`, implemented `deserialize_null_as_zero` serde helper so even in edge cases, serde safely maps nulls to `0.0`.
+     - Added `#[serde(default)]` to all fields in `DbNode`, `DbLink`, and `SearchResult` to prevent any missing or malformed fields from dropping result sets.
+   - *Verification*: Added 2 unit tests (`test_search_result_handles_null_or_missing_similarity` and `test_search_result_handles_valid_float_similarity`). Tested live queries on port 8080: `/api/search` now returns top-ranked results with similarity up to 0.732, and `/api/query` (Graph-RAG) returns high-confidence AST seeds, community clusters, and full structural relation traces. Live MCP tools verified with 0 errors.
+2. **Query Parameter Aliasing & Flexibility (`src/api/mod.rs`, `src/db/mod.rs`)**:
+   - *Discovery*: Endpoints had rigid parameter naming mismatches (`/api/symbol?name=` vs `/api/references?symbol=`, `/api/search?q=` vs `query`, `/api/search?k=` vs `limit`), causing 422 Unprocessable Entity errors when callers or agents swapped conventions.
+   - *Fix*: Added serde aliases across all request structs (`#[serde(alias = "symbol")] pub name`, `#[serde(alias = "name")] pub symbol`, `#[serde(alias = "query")] pub q`, `#[serde(alias = "limit")] pub k`). Added optional `limit` parameter to `find_symbols` (default 25, max 200) and `find_references` (max 500).
+3. **Pre-Tool Hook Guardrail Coverage (`hook_pre_tool.sh`)**:
+   - *Discovery*: `hook_pre_tool.sh` previously only checked `tool_name == "view_file"` with `AbsolutePath`, bypassing the 150-line gate when modern agents invoked `read_file` with `Path`. Furthermore, `localhost:8080/api/query` and `scripts/omni` were not recognized as recon events.
+   - *Fix*: Updated `hook_pre_tool.sh` to intercept both `view_file` and `read_file` extracting `args.get("AbsolutePath") or args.get("Path")`, and registered `api/query` and `scripts/omni` in the recon tracker. Synchronized all 3 copies (`.agents/`, `tools/omni-graph/`, and `~/.gemini/config/`).
+4. **MCP Server Synchronization & Query Knob (`scripts/omni-mcp.py`)**:
+   - *Discovery*: `tools/omni-graph/skills/omni-graph/scripts/omni-mcp.py` was lagging behind the v0.4.0 reference schema parser. Also, `omni_query` lacked a `top_k` parameter in its MCP tool schema.
+   - *Fix*: Added `top_k` (integer, default 5) to `omni_query` tool definition and HTTP payload. Synchronized all 4 copies of `omni-mcp.py` to 100% byte-for-byte parity. Tested live execution via native MCP tool.
+5. **OpenAPI 3.0.3 Specification Parity (`src/api/openapi.json`)**:
+   - Updated OpenAPI contract to include `top_k` on `POST /query`, `limit` on `GET /symbol` and `GET /references`, and parameter aliases on `GET /search`.
+
+---
+
 ### 2026-11-04 — Cognitive Intelligence Interpretation Framework for Omni-Graph Skill
 
 **Agent/Author**: Antigravity (Google DeepMind)

@@ -26,6 +26,9 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| Vector Search Cosine Null & Serde Deserialization Fix | Complete | — | 🟢 Excluded zero-vector structural nodes and handled null similarity, unblocking /api/search & /api/query |
+| Query Parameter Aliasing & Flexibility | Complete | — | 🟢 Permissive serde aliases (symbol/name, q/query, k/limit) eliminating 422 errors |
+| Pre-Tool Hook Guardrail Precision | Complete | — | 🟢 Guarded read_file (Path) under 150-line gate and registered api/query & scripts/omni in recon tracker |
 | Path-Based AST Resolution & MCP Parity | Complete | — | 🟢 First-class file and directory path symbol/reference/condense matching + MCP schema parity |
 | Cognitive Intelligence Framework (SKILL.md) | Complete | — | 🟢 Line bounds, blast radius risk matrix, instability index decoding, 5-step reconnaissance ladder |
 | FIFO Ingestion Task Queue & Concurrency Protection | Complete | — | 🟢 Tokio mpsc FIFO queue serializing SurrealDB writes and eliminating write conflicts |
