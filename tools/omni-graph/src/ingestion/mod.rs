@@ -94,6 +94,7 @@ pub struct IngestionJobStatus {
     pub error: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct IngestTask {
     pub root_dir: String,
@@ -107,6 +108,7 @@ pub struct IngestTask {
     pub response_tx: Option<oneshot::Sender<Result<IngestResult, String>>>,
 }
 
+#[allow(dead_code)]
 pub struct IngestionPipeline {
     db: DbClient,
     embedder: EmbedderClient,
@@ -234,6 +236,7 @@ impl IngestionPipeline {
         jobs.remove(workspace);
     }
 
+    #[allow(clippy::result_large_err)]
     pub async fn enqueue_ingest(
         &self,
         root_dir: &str,

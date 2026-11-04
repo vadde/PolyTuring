@@ -26,7 +26,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct AppState {
