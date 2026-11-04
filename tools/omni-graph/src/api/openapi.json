@@ -1,0 +1,526 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Omni-Graph Semantic AST & Vector Knowledge Hub",
+    "description": "Enterprise-grade REST API for polyglot AST code graph extraction, Louvain/Leiden community clustering, hybrid Graph-RAG synthesis (<1500 tokens), real-time file system delta sync, and AI agent telemetry.",
+    "version": "0.3.0",
+    "contact": {
+      "name": "vadde/PolyTuring",
+      "url": "https://vadde.github.io/PolyTuring/"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Local Web Proxy (Port 3000 /api)"
+    },
+    {
+      "url": "http://localhost:8080/api",
+      "description": "Direct Rust Orchestrator Engine (Port 8080)"
+    }
+  ],
+  "tags": [
+    { "name": "System", "description": "Stack health, global statistics, and OpenAPI contract" },
+    { "name": "AST & LSP", "description": "LSP symbol definition, inbound references, and Personalized PageRank context condenser" },
+    { "name": "Graph & Topology", "description": "WebGL force graph, Louvain/Leiden modularity clustering, and architectural boundaries" },
+    { "name": "Semantic Retrieval", "description": "Hybrid vector search and Leiden Graph-RAG synthesis briefs" },
+    { "name": "Ingestion & Watcher", "description": "Filesystem browser, multi-repo FIFO ingestion queue, and live delta sync" },
+    { "name": "Worktrees", "description": "Git worktree fleet discovery and community prior inheritance" },
+    { "name": "Agent Analytics", "description": "AI agent API call telemetry, LSP capabilities, and execution benchmarks" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Check stack component health",
+        "description": "Reports operational health across the Rust orchestrator, SurrealDB v2 graph database, and Hugging Face TEI embedding engine.",
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "healthy" },
+                    "services": {
+                      "type": "object",
+                      "properties": {
+                        "rust_app": { "type": "object", "properties": { "status": { "type": "string" }, "details": { "type": "string" } } },
+                        "surrealdb": { "type": "object", "properties": { "status": { "type": "string" }, "details": { "type": "string", "nullable": true } } },
+                        "tei": { "type": "object", "properties": { "status": { "type": "string" }, "details": { "type": "string" } } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Retrieve global graph statistics",
+        "description": "Returns counts of total AST nodes, edges, indexed workspaces, computed galaxy clusters, and database storage metrics.",
+        "responses": {
+          "200": {
+            "description": "Global statistics payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": { "type": "integer", "example": 13874 },
+                    "edges": { "type": "integer", "example": 52190 },
+                    "workspaces": { "type": "integer", "example": 4 },
+                    "galaxies": { "type": "integer", "example": 763 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces": {
+      "get": {
+        "tags": ["Graph & Topology"],
+        "summary": "List all indexed workspaces",
+        "description": "Enumerates all partitioned workspaces in SurrealDB, including file counts, node counts, branch info, and worktree hierarchies.",
+        "parameters": [
+          { "name": "flat", "in": "query", "schema": { "type": "boolean", "default": false }, "description": "Return flat array without nesting child worktrees under parent trunk" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of indexed workspaces"
+          }
+        }
+      }
+    },
+    "/graph": {
+      "get": {
+        "tags": ["Graph & Topology"],
+        "summary": "Fetch graph dataset for force-directed visualization",
+        "description": "Extracts AST nodes and typed relationship links for WebGL force-directed layout.",
+        "parameters": [
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Filter by target workspace namespace" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20000 }, "description": "Maximum number of nodes to return" },
+          { "name": "community", "in": "query", "schema": { "type": "integer" }, "description": "Filter by specific Louvain/Leiden community ID" }
+        ],
+        "responses": {
+          "200": { "description": "Graph nodes and links JSON" }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "tags": ["Semantic Retrieval"],
+        "summary": "Hybrid vector & keyword semantic search",
+        "description": "Performs cosine similarity search using 384-dimensional dense vectors enriched with structured AST headers, with code-first partitioning.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Natural language or code query" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace filter" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 }, "description": "Maximum search matches" },
+          { "name": "threshold", "in": "query", "schema": { "type": "number", "default": 0.5 }, "description": "Minimum similarity score threshold (0.0 to 1.0)" },
+          { "name": "kind", "in": "query", "schema": { "type": "string" }, "description": "Filter by node kind (function, struct, class, file, etc.)" },
+          { "name": "include_docs", "in": "query", "schema": { "type": "boolean", "default": false }, "description": "Whether to include markdown documents alongside source code" }
+        ],
+        "responses": {
+          "200": { "description": "Matched AST nodes ranked by relevance" }
+        }
+      }
+    },
+    "/symbol": {
+      "get": {
+        "tags": ["AST & LSP"],
+        "summary": "LSP symbol definition lookup",
+        "description": "Exact AST symbol definition resolver (textDocument/definition). Prioritizes exact matches, local scope, and file boundaries.",
+        "parameters": [
+          { "name": "name", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Exact identifier name" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" }
+        ],
+        "responses": {
+          "200": { "description": "Matching symbol definitions with line ranges" }
+        }
+      }
+    },
+    "/references": {
+      "get": {
+        "tags": ["AST & LSP"],
+        "summary": "LSP inbound callers and references lookup",
+        "description": "Finds all incoming CALLS, IMPORTS, REFERENCES, and EXTENDS edges pointing to the target symbol across the workspace.",
+        "parameters": [
+          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Target symbol name or node ID" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace namespace" }
+        ],
+        "responses": {
+          "200": { "description": "List of callers and referencing nodes" }
+        }
+      }
+    },
+    "/relationships": {
+      "post": {
+        "tags": ["AST & LSP"],
+        "summary": "Create dynamic agent-inferred relationship edge",
+        "description": "Augments the graph with inferred runtime dependencies, virtual component synthesis, and cross-boundary links.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["workspace", "source_id", "target_id", "edge_type"],
+                "properties": {
+                  "workspace": { "type": "string" },
+                  "source_id": { "type": "string" },
+                  "target_id": { "type": "string" },
+                  "edge_type": { "type": "string", "example": "DEPENDS_ON" },
+                  "description": { "type": "string" },
+                  "confidence": { "type": "number", "default": 1.0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Relationship stored successfully" }
+        }
+      }
+    },
+    "/condense": {
+      "get": {
+        "tags": ["AST & LSP"],
+        "summary": "Personalized PageRank bounded context condenser",
+        "description": "Extracts a high-density, strictly budgeted AST neighborhood slice (<1500 tokens) using power-iteration Personalized PageRank (alpha=0.85).",
+        "parameters": [
+          { "name": "symbol", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Seed symbol identifier" },
+          { "name": "workspace", "in": "query", "schema": { "type": "string" }, "description": "Target workspace" },
+          { "name": "hops", "in": "query", "schema": { "type": "integer", "default": 2 }, "description": "BFS traversal depth limit" },
+          { "name": "max_tokens", "in": "query", "schema": { "type": "integer", "default": 1400 }, "description": "Strict token ceiling" }
+        ],
+        "responses": {
+          "200": { "description": "Formatted Markdown context slice ready for LLM prompt injection" }
+        }
+      }
+    },
+    "/browse": {
+      "get": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Dynamic directory explorer for local codebases",
+        "description": "Lists subdirectories within allowed security roots (/workspace, /Users) to enable intuitive UI codebase selection.",
+        "parameters": [
+          { "name": "path", "in": "query", "schema": { "type": "string", "default": "/workspace" }, "description": "Absolute filesystem directory to explore" }
+        ],
+        "responses": {
+          "200": { "description": "List of subdirectories and parent path" },
+          "403": { "description": "Path is outside allowed containment roots" }
+        }
+      }
+    },
+    "/query": {
+      "post": {
+        "tags": ["Semantic Retrieval"],
+        "summary": "Hybrid Leiden Graph-RAG synthesis",
+        "description": "Executes multi-hop synthesis combining dense vector retrieval, Leiden community cluster summaries, and AST call traces into an authoritative brief.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["prompt"],
+                "properties": {
+                  "prompt": { "type": "string", "example": "Explain how authentication and session cookies are validated" },
+                  "workspace": { "type": "string" },
+                  "include_docs": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Structured Markdown synthesis brief with citations" }
+        }
+      }
+    },
+    "/cluster": {
+      "post": {
+        "tags": ["Graph & Topology"],
+        "summary": "Recompute Louvain/Leiden modularity galaxy communities",
+        "description": "Runs community detection on the AST graph, optimizing Newman modularity to cluster tightly-coupled modules into macro galaxies.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace": { "type": "string" },
+                  "resolution": { "type": "number", "default": 1.0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Community clustering results" }
+        }
+      }
+    },
+    "/galaxies": {
+      "get": {
+        "tags": ["Graph & Topology"],
+        "summary": "List macro galaxy subsystems",
+        "description": "Returns precomputed galaxy subsystems with Robert C. Martin coupling metrics (Afferent Ca, Efferent Ce, Instability I = Ce/(Ca+Ce)).",
+        "parameters": [
+          { "name": "workspace", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of galaxy subsystems" }
+        }
+      }
+    },
+    "/galaxy/boundary": {
+      "get": {
+        "tags": ["Graph & Topology"],
+        "summary": "Galaxy subsystem boundary contract & coupling analysis",
+        "description": "Detailed architectural analysis of a galaxy cluster, its cross-boundary callers, internal members, and architectural risk assessment.",
+        "parameters": [
+          { "name": "workspace", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "galaxy_id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Subsystem boundary metrics and callers" }
+        }
+      }
+    },
+    "/galaxy/topology": {
+      "get": {
+        "tags": ["Graph & Topology"],
+        "summary": "Full architectural subsystem topology hub",
+        "description": "Returns comprehensive macro topology metrics across all galaxies for the Subsystem Topology Hub.",
+        "parameters": [
+          { "name": "workspace", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Subsystem topology metrics" }
+        }
+      }
+    },
+    "/ingest": {
+      "post": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Ingest codebase into Omni-Graph (FIFO Queued)",
+        "description": "Scans directory, extracts polyglot AST symbols (Rust, Go, TS, Python, Java, C/C++), computes 384-d embeddings, stores graph in SurrealDB, and auto-clusters. Serialized via internal FIFO queue to eliminate SurrealDB write conflicts. Auto-purges old workspace data for guaranteed clean integrity.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                  "path": { "type": "string", "example": "/workspace" },
+                  "project": { "type": "string", "description": "Target workspace namespace override" },
+                  "refresh": { "type": "boolean", "default": true, "description": "Clean re-scan (default true when workspace exists)" },
+                  "watch": { "type": "boolean", "default": true, "description": "Auto-enroll filesystem live-watch daemon upon completion" },
+                  "async": { "type": "boolean", "default": false, "description": "If true, queues job and returns immediately with HTTP 202 Accepted" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ingestion completed synchronously" },
+          "202": { "description": "Ingestion job queued asynchronously" },
+          "400": { "description": "Invalid directory or parse failure" },
+          "403": { "description": "Path outside allowed containment roots" }
+        }
+      }
+    },
+    "/ingest/status": {
+      "get": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Get status of active and queued ingestion jobs",
+        "description": "Polls real-time multi-repo ingestion progress, current phase (queued, purging, scanning, indexing, clustering), files indexed, and elapsed time.",
+        "responses": {
+          "200": { "description": "Array of active and queued ingestion job statuses" }
+        }
+      }
+    },
+    "/ingest/dismiss": {
+      "post": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Dismiss or cancel an ingestion job",
+        "description": "Cancels a queued ingestion job or dismisses a completed/failed job from the tracking HUD.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["workspace"],
+                "properties": {
+                  "workspace": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Job dismissed or marked cancelled" }
+        }
+      }
+    },
+    "/analytics": {
+      "get": {
+        "tags": ["Agent Analytics"],
+        "summary": "AI Agent telemetry & API usage analytics",
+        "description": "Aggregates real-time agent API usage, LSP endpoint capability distributions, and duration percentiles (p50, p95, p99).",
+        "parameters": [
+          { "name": "workspace", "in": "query", "schema": { "type": "string" } },
+          { "name": "time_window_mins", "in": "query", "schema": { "type": "integer", "default": 1440 } }
+        ],
+        "responses": {
+          "200": { "description": "Agent analytics and telemetry metrics" }
+        }
+      }
+    },
+    "/analytics/session/{id}": {
+      "get": {
+        "tags": ["Agent Analytics"],
+        "summary": "Session-specific agent telemetry trajectory",
+        "description": "Fetches AST and LSP tool calls made during a specific IDE/CLI agent conversation session.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Session trajectory telemetry events" }
+        }
+      }
+    },
+    "/watch/start": {
+      "post": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Start live filesystem watcher for workspace",
+        "description": "Registers an inotify/FSEvents live file watcher on the target workspace with debounced delta syncing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["path", "workspace"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "workspace": { "type": "string" },
+                  "debounce_ms": { "type": "integer", "default": 500 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Watcher successfully enrolled" }
+        }
+      }
+    },
+    "/watch/stop": {
+      "post": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Stop live filesystem watcher for workspace",
+        "description": "Terminates the live file watcher daemon for the specified workspace.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["workspace"],
+                "properties": {
+                  "workspace": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Watcher successfully stopped" }
+        }
+      }
+    },
+    "/watch/status": {
+      "get": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Get all active watcher statuses",
+        "description": "Returns status, monitored file count, event metrics, and sync latency for all active watchers.",
+        "responses": {
+          "200": { "description": "List of active watcher states" }
+        }
+      }
+    },
+    "/watch/events": {
+      "get": {
+        "tags": ["Ingestion & Watcher"],
+        "summary": "Server-Sent Events (SSE) live file sync stream",
+        "description": "Real-time SSE event stream broadcasting AST delta indexing events to connected web clients.",
+        "responses": {
+          "200": { "description": "text/event-stream" }
+        }
+      }
+    },
+    "/worktrees": {
+      "get": {
+        "tags": ["Worktrees"],
+        "summary": "List Git worktree fleet",
+        "description": "Discovers sibling worktrees connected to a parent git trunk, with LPA seed inheritance status.",
+        "parameters": [
+          { "name": "workspace", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Discovered git worktree branches" }
+        }
+      }
+    },
+    "/worktrees/sync": {
+      "post": {
+        "tags": ["Worktrees"],
+        "summary": "Cascade fleet sync across all worktrees",
+        "description": "Scans parent git repository worktrees and triggers background cascade sync.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["parent_workspace"],
+                "properties": {
+                  "parent_workspace": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Fleet sync initiated" }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Fetch raw OpenAPI 3.0 specification",
+        "description": "Returns the machine-readable OpenAPI 3.0.3 JSON schema for Omni-Graph.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0.3 specification JSON",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}

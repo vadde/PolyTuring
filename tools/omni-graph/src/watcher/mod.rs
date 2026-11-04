@@ -88,13 +88,16 @@ const EXCLUDED_DIRS: &[&str] = &[
     ".venv",
     "env",
     ".DS_Store",
+    ".playwright-mcp",
+    ".playwright",
+    ".gemini",
 ];
 
 // File extensions to exclude (binary artifacts)
 const EXCLUDED_EXTS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "ico", "svg", "pdf", "zip", "tar", "gz", "bz2", "xz",
     "7z", "exe", "bin", "dll", "dylib", "so", "a", "o", "obj", "wasm", "pyc", "pyo", "pyd",
-    "class", "jar", "lock", "map", "rlib", "rmeta", "timestamp",
+    "class", "jar", "lock", "map", "rlib", "rmeta", "timestamp", "log",
 ];
 
 impl WatchManager {
