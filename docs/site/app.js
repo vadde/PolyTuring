@@ -1604,6 +1604,12 @@
         case 'ingest':
           cmd = `curl -s -X POST http://localhost:8080/api/ingest \\\n  -H "Content-Type: application/json" \\\n  -d '{"path": "/path/to/${ws}", "refresh": true}'`;
           break;
+        case 'openapi':
+          cmd = `curl -s http://localhost:8080/api/openapi.json`;
+          break;
+        case 'api-docs':
+          cmd = `curl -s http://localhost:8080/api-docs`;
+          break;
       }
 
       curlBox.innerText = cmd;

@@ -768,6 +768,24 @@ mod condenser_tests {
     }
 
     #[test]
+    fn condense_finds_root_by_file_path() {
+        let nodes = vec![
+            make_node("node:PolyTuring:file:src/db.rs", "db.rs", "file", "src/db.rs"),
+            make_node("n2", "init_pool", "function", "src/db.rs"),
+            make_node("n3", "other_fn", "function", "src/main.rs"),
+        ];
+        let links = vec![
+            make_link("node:PolyTuring:file:src/db.rs", "n2", "CONTAINS"),
+            make_link("n3", "n2", "CALLS"),
+        ];
+        let result = ContextCondenser::condense("src/db.rs", &nodes, &links, 2);
+
+        assert_eq!(result.root_symbol, "src/db.rs");
+        assert!(result.related_files.contains(&"src/db.rs".to_string()));
+        assert!(result.formatted_markdown.contains("src/db.rs"));
+    }
+
+    #[test]
     fn condense_follows_edges_up_to_max_hops() {
         let nodes = vec![
             make_node("n1", "root_fn", "function", "src/a.rs"),

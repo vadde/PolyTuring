@@ -98,10 +98,15 @@ impl ContextCondenser {
         let mut direct_callees = Vec::new();
         let mut related_files_set = HashSet::new();
 
-        // 1. Locate root node(s) matching symbol or label
+        // 1. Locate root node(s) matching symbol, label, or file path
         let root_nodes: Vec<&DbNode> = nodes
             .iter()
-            .filter(|n| n.label.eq_ignore_ascii_case(target_symbol) || n.id == target_symbol)
+            .filter(|n| {
+                n.label.eq_ignore_ascii_case(target_symbol)
+                    || n.id == target_symbol
+                    || n.file_path.eq_ignore_ascii_case(target_symbol)
+                    || n.file_path.ends_with(target_symbol)
+            })
             .collect();
 
         let mut root_node_ids = HashSet::new();

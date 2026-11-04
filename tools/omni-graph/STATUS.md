@@ -1,11 +1,11 @@
 ---
 tool: omni-graph
 status: in-progress
-version: 0.3.0
+version: 0.4.0
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
 nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
@@ -42,6 +42,7 @@ nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 | 2026-11-03 | `in-progress` | `in-progress` | Holistic multi-disciplinary retrospective & scientific introspection across 5 foundational lenses; author Next-Gen Spec v0.3.0 (R-060 to R-072: Java/C++ AST, Leiden clustering, Two-Tower RRF hybrid search, Content partitioning, PPR context slicing, and native MCP server) |
 | 2026-11-04 | `in-progress` | `in-progress` | Implement FIFO Ingestion Queue, Atomic Clean Invariant (eliminated manual purge toggle), Non-blocking Multi-Repo Actions, OpenAPI 3.0 Specification, and Year 2500 Cosmic Liquid-Glass Swagger Explorer (specs/catalog/omni-graph-ingestion-openapi-ux.md: R-001 to R-012) |
 | 2026-11-04 | `in-progress` | `in-progress` | Implement Workspace Deep-Linking & History sync (R-013), Bounded Viewport Scroll & HUD Clearance (R-014), and Hybrid Ripgrep-Engine Gitignore Filter with non-git fallback (R-015; 85 unit tests pass) |
+| 2026-11-04 | `in-progress` | `in-progress` | Cognitive Intelligence Interpretation Framework for SKILL.md, path-based symbol/reference/condense engine, and MCP server reference schema parity (86 unit tests pass) |
 
 ---
 

@@ -1,3 +1,35 @@
+### 2026-11-04 — Cognitive Intelligence Interpretation Framework for Omni-Graph Skill
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.4.0 Ingestion Pipeline & Enterprise API Explorer)
+**Branch**: `main`
+**Duration**: ~20m
+
+#### Context & Objectives
+- Addressed user inquiry regarding whether the `SKILL.md` provided to AI coding assistants stresses HOW to interpret and attain maximum intelligence from Omni-Graph response payloads.
+- Identified that prior instructions focused primarily on which tools to call, while missing concrete guidance on how to decode returned fields (`line_start`/`line_end`, edge categories, PageRank scores, afferent/efferent coupling, and instability indices).
+- Added a dedicated, authoritative interpretation framework to guide autonomous reasoning loops without token bloat.
+
+#### Key Enhancements Implemented
+1. **Response Decoding Standards (`SKILL.md`)**:
+   - `omni_definition`: Mandated the 150-line gate bounding box (`match.line_start` to `match.line_end`) to prevent loading whole files into context; codified taxonomy interpretation (`function`, `struct`, `file`, `directory`) and disambiguation rules.
+   - `omni_references`: Formulated the Blast-Radius Risk Matrix (`CALLS` vs `IMPORTS` vs `CONTAINMENT` vs `INHERITANCE`) and automated regression test discovery (filtering paths matching `test`, `tests/`, `spec`, `_test.go`).
+   - `omni_condense`: Decoded incoming triggers (`direct_callers`), outbound workers (`direct_callees`), and related file clusters within a strict <1,490 token budget.
+   - `omni_galaxies`: Codified Robert C. Martin's instability metric ($I = \frac{C_e}{C_a + C_e}$) to classify modules as Stable Core ($I < 0.3$), Balanced Domain ($0.3 \le I \le 0.7$), or Volatile Leaf ($I > 0.7$), plus hub-symbol entrypoints.
+   - `omni_search` vs `omni_query`: Established clear decision criteria between code-first symbol pinpointing (`include_docs: false`) and hybrid Graph-RAG architectural synthesis.
+2. **First-Class Path-Based Symbol, Reference & Condensation Engine (`src/db/mod.rs`, `src/condenser/mod.rs`)**:
+   - Upgraded `find_symbols`: Added `file_path = '{escaped}' OR file_path CONTAINS '{escaped}'` to allow querying exact file paths (e.g. `src/watcher/mod.rs`) and directory paths directly, returning the discrete `file` node and all enclosed AST symbols.
+   - Upgraded `find_references`: Added `file_path = '{escaped}' OR string::ends_with(file_path, '/{escaped}')` to allow resolving all incoming/outgoing references, containment hierarchy (`CONTAINS_FILE`), and cross-tool callers for an entire file.
+   - Upgraded `ContextCondenser::condense`: Added `n.file_path.eq_ignore_ascii_case(target_symbol) || n.file_path.ends_with(target_symbol)` to allow condensing entire file neighborhoods into a single <1,490 token AST slice.
+   - Added unit test `condense_finds_root_by_file_path` (86/86 unit tests passing).
+   - Rebuilt Docker container `omni-rust-app` and verified live resolution on port 8080.
+3. **The 5-Step Autonomous Agent Reconnaissance Ladder**:
+   - Formulated a structured 5-step cognitive protocol: *Domain Mapping* (`galaxies`) $\to$ *Symbol Pinpointing* (`definition`) $\to$ *Flow Tracing* (`condense`) $\to$ *Blast-Radius Audit* (`references`) $\to$ *Surgical Action* (`read_file` bounded).
+4. **Multi-Location Synchronization**:
+   - Synchronized all updates across `.agents/skills/omni-graph/SKILL.md`, `tools/omni-graph/skills/omni-graph/SKILL.md`, and `~/.gemini/config/skills/omni-graph/SKILL.md` (verified 0 diff).
+
+---
+
 ### 2026-11-04 — FIFO Ingestion Task Queue, Atomic Clean Sync Invariant, OpenAPI 3.0 & Futuristic Swagger Explorer
 
 **Agent/Author**: Antigravity (Google DeepMind)

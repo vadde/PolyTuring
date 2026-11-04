@@ -1065,9 +1065,9 @@ impl DbClient {
         let q = format!(
             "SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, \
              (label = '{}') AS is_exact \
-             FROM node WHERE (label = '{}' OR label CONTAINS '{}') {} \
-             ORDER BY is_exact DESC, label ASC LIMIT 20;",
-            escaped, escaped, escaped, ws_filter
+             FROM node WHERE (label = '{}' OR label CONTAINS '{}' OR file_path = '{}' OR file_path CONTAINS '{}') {} \
+             ORDER BY is_exact DESC, label ASC LIMIT 25;",
+            escaped, escaped, escaped, escaped, escaped, ws_filter
         );
 
         let resp = self.query_sql(&q).await?;
@@ -1105,7 +1105,7 @@ impl DbClient {
             _ => String::new(),
         };
         let q = format!(
-            "LET $targets = (SELECT id FROM node WHERE (label = '{escaped}' OR string::ends_with(label, '::{escaped}') OR string::ends_with(label, '.{escaped}')) {ws_filter});\n\
+            "LET $targets = (SELECT id FROM node WHERE (label = '{escaped}' OR string::ends_with(label, '::{escaped}') OR string::ends_with(label, '.{escaped}') OR file_path = '{escaped}' OR string::ends_with(file_path, '/{escaped}') OR string::ends_with(file_path, '{escaped}')) {ws_filter});\n\
              SELECT in.* AS caller, type, category, metadata FROM linked_to WHERE out IN $targets.id;\n"
         );
 
