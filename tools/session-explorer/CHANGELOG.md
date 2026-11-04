@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-04
+
+### Added
+- **Bin-Packing Spatial Density & Panoramic Masonry Matrix (R-043)**:
+  - Replaced static CSS Grid horizontal row constraints with an EC2-style greedy shortest-column bin packing engine (`binPackCards`).
+  - Greedily assigns each pallet card to $\arg\min_k \sum_{j \in B_k} h_j$, stacking cards vertically directly under previous cards with zero dead whitespace.
+  - Expanded `#sessionContextModal` and `#agentMatrixModal` viewport width to panoramic widescreen real estate (`min(1560px, 94vw)`), seamlessly displaying 3 fluid columns across desktop viewports.
+  - Built responsive multi-breakpoint column adapter: 3 columns for $\ge 1200\text{px}$, 2 columns for $768\text{px} \dots 1199\text{px}$, and 1 column for mobile viewports $< 768\text{px}$.
+  - Added debounced window `resize` event listener dynamically recalculating column bins and re-laying out cards in real time.
+  - Facelifted session trail navigation header counters next to "Agent Context" and "Files & Artifacts" into Year 2126 holographic glass action capsules (`.holo-header-btn`) with illuminated digital badges (`.holo-btn-counter.context` and `.holo-btn-counter.files`).
+  - Fixed file aggregator in `updateSessionFilesBadge` to support uppercase `args.Path` and `args.FilePath`, correctly discovering all 30 touched files and artifacts in session `20dadec4`.
+
+### Added
+- **Empirical Skill Invocation Telemetry & Standby Decomposition (R-042)**:
+  - Implemented 3-Tier Epistemic Skill Evidence Taxonomy distinguishing Tier 1 (Provable Execution via `read_file`/`view_file` on `SKILL.md` or `skills/.../scripts`), Tier 2 (Standby On-Demand via system prompt mount), and Tier 3 (Cognitive / Semantic Reference).
+  - Enriched Go backend model `AgentSkill` with `last_step_idx`, `step_indices`, and `invocation_triggers`.
+  - Added scope-based skill deduplication (`workspace` > `plugin` > `global` > `builtin`) preventing duplicate skill cards across inherited layers.
+  - Upgraded `#sessionContextModal` with first-class Holographic Skill Cards rendering illuminated `⚡ Nx Active` badges, clickable `#X` step markers, first/last execution jumpers, and invocation trigger tags.
+  - Dynamically labeled filter chip between `Invoked Skills (${activeCount})` in Active lens and `Skills (${activeCount} active / ${totalCount} total)` in Full Context Cascade lens.
+  - Connected 1-click `📖 Inspect` to embedded Native File Viewer and `📋 Copy Path` to clipboard.
+
+- **Command Execution & Tool Sub-Breakdown Spectrum (R-041)**:
+  - Deconstructed generic execution tools (especially `run_command` and filesystem operations `read_file`/`write_file`/`edit_file`) into discrete operational components.
+  - Implemented `parseCommandBinaryAndCategory`: splits chained pipelines (`&&`, `;`, `|`), strips environment assignments, and classifies binaries into 8 operational categories (`VCS`, `Build`, `Test`, `Process`, `Inspect`, `Network`, `Runtime`, `Filesystem`).
+  - Added Year 2126 Holographic Command Spectrum bar (`.command-spectrum-bar`) inside `run_command` cards and Holographic Telemetry & Audit lens.
+  - Built interactive Sub-Command Grid with category badges, execution counts, percentages, and clickable timeline step markers (`#38`, `#113`).
+  - Implemented `parseFileExtensionAndCategory`: decomposes file operations by extension (`.go`, `.js`, `.css`, `.json`, `.md`, `.html`) and tracks top touched files.
+  - Facelifted filter chips (`.session-matrix-filter-chips`) into a fluid, adaptive, non-scrollable flex matrix with color-coded illuminated count pill badges (`.matrix-chip-counter`).
+  - Replaced all legacy `St ` step notation with universal `#X` format (`#38`, `#113`) across cards, pills, buttons, and toasts.
+
+- **Universal Session Agent Brain & MCP Behavioral Matrix (R-040)**:
+  - Extracted empirical MCP tool telemetry from session transcripts (lazy MCP `call_mcp_tool` and eager MCP `mcp_*`).
+  - Auto-discovered ad-hoc and configured MCP servers (`omni-graph`, `playwright`), tracking invocation counts, active vs dormant tools, first/last step indices, and error rates.
+  - Computed GenAI Tool Diversity Index ($D = U/N$) and Reliability Quotient in Session Tool Analytics.
+  - Upgraded Session Context Modal (`#sessionContextModal`) to mirror the Global Agent Matrix with 3 holographic lenses (`Active Runtime Matrix`, `Full Context Cascade`, `Holographic Telemetry & Audit`), live multi-field search, and GenAI bloat telemetry ribbon.
+  - Implemented 1-click step jumping with cyan neon pulse highlights in the conversation timeline.
+
 ### Fixed
 - **Genesis Workspace Invariant & Command Touch Sanitization (R-028)**:
   - Fixed false-positive repository classification where a session started in the user home directory `~` (`/Users/aparv`) was claimed by `DSA` due to inline command string literals (`python3 -c "repos = ['.../DSA']"`).

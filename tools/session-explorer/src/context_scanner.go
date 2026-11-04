@@ -8,6 +8,8 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -800,9 +802,268 @@ func (idx *SessionIndex) DiscoverWorkspaceAgentContext(workspaceTarget string) W
 	return wctx
 }
 
+// cleanStringArg cleans up an argument interface removing outer quotes and excess whitespace.
+func cleanStringArg(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	var s string
+	switch val := v.(type) {
+	case string:
+		s = val
+	case fmt.Stringer:
+		s = val.String()
+	default:
+		s = fmt.Sprintf("%v", val)
+	}
+	s = strings.TrimSpace(s)
+	for (strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"")) || (strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'")) {
+		if len(s) >= 2 {
+			s = strings.TrimSpace(s[1 : len(s)-1])
+		} else {
+			break
+		}
+	}
+	return s
+}
+
+// categorizeNativeTool maps a native tool name to an intuitive operational category.
+func categorizeNativeTool(name string) string {
+	switch name {
+	case "read_file", "write_file", "edit_file", "view_file":
+		return "Filesystem"
+	case "run_command", "bash", "exec", "terminal":
+		return "Terminal"
+	case "invoke_subagent", "define_subagent", "manage_subagents", "send_message":
+		return "Subagent"
+	case "search_web", "ask_question", "list_resources", "read_resource":
+		return "Search"
+	case "schedule", "manage_task":
+		return "Automation"
+	default:
+		if strings.HasPrefix(name, "browser_") {
+			return "Browser"
+		}
+		return "Agentic"
+	}
+}
+
+// extractToolArgSummary extracts a clean, human-readable summary of the most prominent argument.
+func extractToolArgSummary(tc ToolCallDisplay) string {
+	if tc.Name == "call_mcp_tool" {
+		if rawArgs, ok := tc.Args["Arguments"]; ok {
+			str := cleanStringArg(rawArgs)
+			if str != "" && str != "{}" {
+				var parsed map[string]interface{}
+				if err := json.Unmarshal([]byte(str), &parsed); err == nil {
+					for _, k := range []string{"query", "url", "symbol", "name", "path", "command", "function", "prompt"} {
+						if v, exists := parsed[k]; exists {
+							valStr := cleanStringArg(v)
+							if len(valStr) > 60 {
+								valStr = valStr[:60] + "..."
+							}
+							return fmt.Sprintf("%s=%s", k, valStr)
+						}
+					}
+				}
+				if len(str) > 60 {
+					return str[:60] + "..."
+				}
+				return str
+			}
+		}
+	}
+
+	for _, k := range []string{"Path", "CommandLine", "query", "url", "symbol", "TypeName", "Role", "Prompt"} {
+		if v, exists := tc.Args[k]; exists {
+			s := cleanStringArg(v)
+			if len(s) > 60 {
+				s = s[:60] + "..."
+			}
+			return fmt.Sprintf("%s=%s", k, s)
+		}
+	}
+	return ""
+}
+
+// parseCommandBinaryAndCategory decomposes a raw command line and tool summary into a binary name, category, and display summary.
+// Implements: R-041
+func parseCommandBinaryAndCategory(commandLine, toolSummary string) (binary string, category string, cleanSummary string) {
+	cmd := strings.TrimSpace(commandLine)
+	cleanSummary = strings.TrimSpace(toolSummary)
+	if cleanSummary == "" {
+		if len(cmd) > 60 {
+			cleanSummary = cmd[:60] + "..."
+		} else {
+			cleanSummary = cmd
+		}
+	}
+
+	// Split by chained operators (&&, ;, ||, |) to find the primary executable
+	parts := strings.FieldsFunc(cmd, func(r rune) bool {
+		return r == ';' || r == '|' || r == '&'
+	})
+
+	var primarySub string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed == "" {
+			continue
+		}
+		// Skip cd, export, set, env if another command follows
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
+			continue
+		}
+		first := fields[0]
+		if first == "cd" || first == "export" || first == "set" || first == "env" {
+			continue
+		}
+		primarySub = trimmed
+		break
+	}
+
+	if primarySub == "" && len(parts) > 0 {
+		primarySub = strings.TrimSpace(parts[0])
+	}
+	if primarySub == "" {
+		primarySub = cmd
+	}
+
+	fields := strings.Fields(primarySub)
+	if len(fields) == 0 {
+		return "unknown", "System", cleanSummary
+	}
+
+	rawBin := fields[0]
+	// Handle environment variable assignments before command (e.g. PORT=9876 go run)
+	for strings.Contains(rawBin, "=") && len(fields) > 1 {
+		fields = fields[1:]
+		rawBin = fields[0]
+	}
+
+	binBase := filepath.Base(rawBin)
+	binBase = strings.ToLower(binBase)
+
+	// Sub-command refinement
+	secondArg := ""
+	if len(fields) > 1 {
+		secondArg = strings.ToLower(fields[1])
+	}
+
+	switch binBase {
+	case "git", "gh", "svn", "hg":
+		if secondArg != "" && !strings.HasPrefix(secondArg, "-") {
+			return binBase + " " + secondArg, "VCS", cleanSummary
+		}
+		return binBase, "VCS", cleanSummary
+
+	case "go":
+		if secondArg == "test" {
+			return "go test", "Test", cleanSummary
+		} else if secondArg == "build" {
+			return "go build", "Build", cleanSummary
+		} else if secondArg == "run" {
+			return "go run", "Runtime", cleanSummary
+		}
+		return "go", "Build", cleanSummary
+
+	case "make":
+		if secondArg != "" && !strings.HasPrefix(secondArg, "-") {
+			return "make " + secondArg, "Build", cleanSummary
+		}
+		return "make", "Build", cleanSummary
+
+	case "bun", "npm", "pnpm", "yarn":
+		if secondArg == "test" {
+			return binBase + " test", "Test", cleanSummary
+		} else if secondArg == "run" && len(fields) > 2 {
+			sub := strings.ToLower(fields[2])
+			if sub == "build" {
+				return binBase + " build", "Build", cleanSummary
+			}
+			return binBase + " " + sub, "Build", cleanSummary
+		} else if secondArg == "build" {
+			return binBase + " build", "Build", cleanSummary
+		}
+		return binBase, "Runtime", cleanSummary
+
+	case "pytest", "jest", "vitest", "mocha":
+		return binBase, "Test", cleanSummary
+
+	case "cargo", "cmake", "gradle", "mvn", "webpack", "tsc":
+		return binBase, "Build", cleanSummary
+
+	case "lsof", "kill", "pkill", "ps", "top":
+		return binBase, "Process", cleanSummary
+
+	case "curl", "wget", "nc", "ping", "ssh":
+		return binBase, "Network", cleanSummary
+
+	case "grep", "cat", "jq", "find", "ls", "head", "tail", "wc", "diff", "file", "awk", "sed":
+		return binBase, "Inspect", cleanSummary
+
+	case "node", "python", "python3", "ruby", "bash", "zsh", "sh":
+		return binBase, "Runtime", cleanSummary
+
+	case "mkdir", "rm", "cp", "mv", "touch", "chmod", "chown":
+		return binBase, "Filesystem", cleanSummary
+
+	default:
+		return binBase, "System", cleanSummary
+	}
+}
+
+// parseFileExtensionAndCategory decomposes a file path into its extension and operational language/type.
+// Implements: R-041
+func parseFileExtensionAndCategory(filePath string) (ext string, category string, baseName string) {
+	cleanPath := strings.TrimSpace(filePath)
+	baseName = filepath.Base(cleanPath)
+	ext = strings.ToLower(filepath.Ext(cleanPath))
+	if ext == "" {
+		if strings.EqualFold(baseName, "Makefile") {
+			return "Makefile", "Build", baseName
+		}
+		if strings.EqualFold(baseName, "Dockerfile") {
+			return "Dockerfile", "Container", baseName
+		}
+		return "no-ext", "Text", baseName
+	}
+
+	switch ext {
+	case ".go":
+		return ".go", "Go Source", baseName
+	case ".js", ".mjs", ".cjs":
+		return ".js", "JavaScript", baseName
+	case ".ts", ".mts":
+		return ".ts", "TypeScript", baseName
+	case ".css":
+		return ".css", "CSS Stylesheet", baseName
+	case ".html", ".htm":
+		return ".html", "HTML Document", baseName
+	case ".json":
+		return ".json", "JSON Data", baseName
+	case ".md", ".markdown":
+		return ".md", "Markdown Doc", baseName
+	case ".sh", ".bash", ".zsh":
+		return ".sh", "Shell Script", baseName
+	case ".yaml", ".yml":
+		return ".yaml", "YAML Config", baseName
+	case ".py":
+		return ".py", "Python", baseName
+	case ".rs":
+		return ".rs", "Rust", baseName
+	case ".sql":
+		return ".sql", "SQL", baseName
+	default:
+		return ext, "Source/Config", baseName
+	}
+}
+
 // ExtractSessionAgentContext analyzes a specific conversation session's transcript and events
-// to extract active rules, skills actually invoked vs available on-demand, and tools used.
-// Implements: R-039, AC-042, AC-043
+// to extract active rules, skills actually invoked vs available on-demand, MCP servers & tools,
+// native tools, and analytical execution telemetry.
+// Implements: R-039, R-040, R-041, AC-042, AC-046, AC-047, AC-048, AC-053, AC-054
 func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAgentContext, error) {
 	detail, err := idx.GetSessionDetail(sessionID)
 	if err != nil {
@@ -816,7 +1077,8 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 		ActiveRules:     make([]AgentRule, 0),
 		ActiveSkills:    make([]AgentSkill, 0),
 		AvailableSkills: make([]AgentSkill, 0),
-		MCPServers:      make([]MCPServerInfo, 0),
+		MCPServers:      make([]SessionMCPServer, 0),
+		NativeTools:     make([]SessionNativeTool, 0),
 		Subagents:       make([]string, 0),
 		SlashCommands:   make([]string, 0),
 	}
@@ -827,22 +1089,105 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 		wsCtx = idx.DiscoverWorkspaceAgentContext(detail.Session.Workspace)
 	}
 
-	// Track skill mentions and invocations across the session timeline
-	skillInvocationMap := make(map[string]int)  // skillName -> call count
-	skillFirstStepMap := make(map[string]int)   // skillName -> first step_index
+	// Track skill mentions and invocations across the session timeline (R-039, R-042)
+	skillInvocationMap := make(map[string]int)       // skillName -> call count
+	skillFirstStepMap := make(map[string]int)        // skillName -> first step_index
+	skillLastStepMap := make(map[string]int)         // skillName -> last step_index (R-042)
+	skillStepsMap := make(map[string][]int)          // skillName -> step indices slice (R-042)
+	skillTriggersMap := make(map[string][]string)    // skillName -> trigger action descriptions (R-042)
 	seenSubagents := make(map[string]bool)
 	seenSlashCommands := make(map[string]bool)
 	injectedRulePaths := make(map[string]bool)
 
-	// Map of available skills by name
+	// Precedence helper for skill deduplication (workspace > plugin > global > builtin)
+	scopePrecedence := func(s AgentContextScope) int {
+		switch s {
+		case ScopeWorkspace:
+			return 4
+		case ScopePlugin:
+			return 3
+		case ScopeGlobal:
+			return 2
+		case ScopeBuiltin:
+			return 1
+		default:
+			return 0
+		}
+	}
+
+	// Map of deduplicated available skills by name (R-042)
 	availableSkillIndex := make(map[string]AgentSkill)
 	for _, sk := range wsCtx.Skills {
-		availableSkillIndex[sk.Name] = sk
+		existing, exists := availableSkillIndex[sk.Name]
+		if !exists || scopePrecedence(sk.Scope) > scopePrecedence(existing.Scope) {
+			availableSkillIndex[sk.Name] = sk
+		}
+	}
+
+	// MCP and Tool tracking
+	type mcpKey struct {
+		server string
+		tool   string
+	}
+	mcpToolStats := make(map[mcpKey]*SessionMCPTool)
+	serverInvokedCounts := make(map[string]int)
+	nativeToolStats := make(map[string]*SessionNativeTool)
+	uniqueToolsMap := make(map[string]bool)
+	totalToolCalls := 0
+	totalMCPCalls := 0
+	totalNativeCalls := 0
+	totalErrors := 0
+
+	// Sub-breakdown tracking (R-041)
+	type subBreakdownEntry struct {
+		key         string
+		label       string
+		category    string
+		count       int
+		steps       []int
+		recentItems []string
+	}
+	toolSubBreakdowns := make(map[string]map[string]*subBreakdownEntry)
+	globalCommandBreakdown := make(map[string]*subBreakdownEntry)
+	globalFileBreakdown := make(map[string]*subBreakdownEntry)
+	totalCommandsCount := 0
+	totalFilesCount := 0
+
+	recordSubItem := func(toolName, key, label, category string, stepIdx int, summary string) {
+		if toolSubBreakdowns[toolName] == nil {
+			toolSubBreakdowns[toolName] = make(map[string]*subBreakdownEntry)
+		}
+		entry := toolSubBreakdowns[toolName][key]
+		if entry == nil {
+			entry = &subBreakdownEntry{
+				key:         key,
+				label:       label,
+				category:    category,
+				steps:       make([]int, 0),
+				recentItems: make([]string, 0),
+			}
+			toolSubBreakdowns[toolName][key] = entry
+		}
+		entry.count++
+		entry.steps = append(entry.steps, stepIdx)
+		if summary != "" && len(entry.recentItems) < 3 {
+			isDup := false
+			for _, prev := range entry.recentItems {
+				if prev == summary {
+					isDup = true
+					break
+				}
+			}
+			if !isDup {
+				entry.recentItems = append(entry.recentItems, summary)
+			}
+		}
 	}
 
 	// Scan transcript entries
 	for _, m := range detail.Messages {
 		contentLower := strings.ToLower(m.Content)
+		isError := m.Status == "ERROR"
 
 		// 1. Detect injected rule tags in prompt if present (<RULE[...]>)
 		if strings.Contains(m.Content, "<RULE[") {
@@ -895,8 +1240,10 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 			}
 		}
 
-		// 4. Detect tool calls that invoke or read skills
+		// 4. Detect tool calls
 		for _, tc := range m.ToolCalls {
+			totalToolCalls++
+
 			if tc.Name == "invoke_subagent" {
 				if typeName, ok := tc.Args["TypeName"].(string); ok && typeName != "" {
 					if !seenSubagents[typeName] {
@@ -912,21 +1259,260 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 				}
 			}
 
-			// Check tool calls referencing SKILL.md or skill names in args
+			// Check tool calls referencing SKILL.md or skill names in args (R-042: Tier 1 Evidence)
+			matchedSkillsInStep := make(map[string]bool)
 			for _, val := range tc.Args {
-				if strVal, ok := val.(string); ok {
-					strLower := strings.ToLower(strVal)
-					for skName, sk := range availableSkillIndex {
-						// Matches skill file path or skill directory
-						if strings.Contains(strLower, strings.ToLower(sk.FilePath)) ||
-							strings.Contains(strLower, "/skills/"+strings.ToLower(skName)+"/") ||
-							strings.Contains(strLower, "/"+strings.ToLower(skName)+"/skill.md") {
-							skillInvocationMap[skName]++
-							if _, exists := skillFirstStepMap[skName]; !exists {
-								skillFirstStepMap[skName] = m.StepIndex
+				strVal := cleanStringArg(val)
+				if strVal == "" {
+					continue
+				}
+				strLower := strings.ToLower(strVal)
+				for skName, sk := range availableSkillIndex {
+					skLower := strings.ToLower(skName)
+					isMatch := false
+					triggerDesc := ""
+
+					// Match by skill file path or skill directory
+					if sk.FilePath != "" && strings.Contains(strLower, strings.ToLower(sk.FilePath)) {
+						isMatch = true
+						triggerDesc = fmt.Sprintf("%s: %s", tc.Name, filepath.Base(sk.FilePath))
+					} else if strings.Contains(strLower, "/skills/"+skLower+"/") ||
+						strings.Contains(strLower, "/skills/"+skLower+"/skill.md") ||
+						strings.Contains(strLower, "/"+skLower+"/skill.md") ||
+						strings.Contains(strLower, "skills/"+skLower+"/skill.md") {
+						isMatch = true
+						triggerDesc = fmt.Sprintf("%s: %s", tc.Name, "SKILL.md")
+					} else if (tc.Name == "run_command" || tc.Name == "bash" || tc.Name == "exec") &&
+						(strings.Contains(strLower, "skills/"+skLower) || strings.Contains(strLower, "setup-"+skLower)) {
+						isMatch = true
+						cmdPreview := strVal
+						if len(cmdPreview) > 40 {
+							cmdPreview = cmdPreview[:40] + "..."
+						}
+						triggerDesc = fmt.Sprintf("run_command: %s", cmdPreview)
+					}
+
+					if isMatch && !matchedSkillsInStep[skName] {
+						matchedSkillsInStep[skName] = true
+						skillInvocationMap[skName]++
+						skillLastStepMap[skName] = m.StepIndex
+						if _, exists := skillFirstStepMap[skName]; !exists {
+							skillFirstStepMap[skName] = m.StepIndex
+						}
+						skillStepsMap[skName] = append(skillStepsMap[skName], m.StepIndex)
+
+						if triggerDesc != "" {
+							alreadyHave := false
+							for _, prevTrig := range skillTriggersMap[skName] {
+								if prevTrig == triggerDesc {
+									alreadyHave = true
+									break
+								}
+							}
+							if !alreadyHave && len(skillTriggersMap[skName]) < 4 {
+								skillTriggersMap[skName] = append(skillTriggersMap[skName], triggerDesc)
 							}
 						}
 					}
+				}
+			}
+
+			// Categorize tool: Lazy MCP vs Eager MCP vs Native Tool
+			if tc.Name == "call_mcp_tool" {
+				serverName := cleanStringArg(tc.Args["ServerName"])
+				if serverName == "" {
+					serverName = cleanStringArg(tc.Args["server_name"])
+				}
+				if serverName == "" {
+					serverName = "unknown-mcp"
+				}
+				toolName := cleanStringArg(tc.Args["ToolName"])
+				if toolName == "" {
+					toolName = cleanStringArg(tc.Args["tool_name"])
+				}
+				if toolName == "" {
+					toolName = "call_mcp_tool"
+				}
+
+				totalMCPCalls++
+				uniqueToolsMap[toolName] = true
+				serverInvokedCounts[serverName]++
+
+				key := mcpKey{server: serverName, tool: toolName}
+				entry, exists := mcpToolStats[key]
+				if !exists {
+					entry = &SessionMCPTool{
+						Name:              toolName,
+						ServerName:        serverName,
+						FirstStepIdx:      m.StepIndex,
+						LastStepIdx:       m.StepIndex,
+						StepIndices:       make([]int, 0),
+						RecentArgsSummary: extractToolArgSummary(tc),
+					}
+					mcpToolStats[key] = entry
+				}
+				entry.InvokedCount++
+				entry.LastStepIdx = m.StepIndex
+				entry.StepIndices = append(entry.StepIndices, m.StepIndex)
+				if isError {
+					entry.ErrorCount++
+					totalErrors++
+				}
+			} else if strings.HasPrefix(tc.Name, "mcp_") {
+				parts := strings.SplitN(tc.Name, "_", 3)
+				serverName := "mcp"
+				toolName := tc.Name
+				if len(parts) >= 3 {
+					serverName = parts[1]
+					toolName = parts[2]
+				}
+
+				totalMCPCalls++
+				uniqueToolsMap[toolName] = true
+				serverInvokedCounts[serverName]++
+
+				key := mcpKey{server: serverName, tool: toolName}
+				entry, exists := mcpToolStats[key]
+				if !exists {
+					entry = &SessionMCPTool{
+						Name:              toolName,
+						ServerName:        serverName,
+						FirstStepIdx:      m.StepIndex,
+						LastStepIdx:       m.StepIndex,
+						StepIndices:       make([]int, 0),
+						RecentArgsSummary: extractToolArgSummary(tc),
+					}
+					mcpToolStats[key] = entry
+				}
+				entry.InvokedCount++
+				entry.LastStepIdx = m.StepIndex
+				entry.StepIndices = append(entry.StepIndices, m.StepIndex)
+				if isError {
+					entry.ErrorCount++
+					totalErrors++
+				}
+			} else {
+				// Native agent tool
+				totalNativeCalls++
+				uniqueToolsMap[tc.Name] = true
+
+				entry, exists := nativeToolStats[tc.Name]
+				if !exists {
+					entry = &SessionNativeTool{
+						Name:         tc.Name,
+						Category:     categorizeNativeTool(tc.Name),
+						FirstStepIdx: m.StepIndex,
+						LastStepIdx:  m.StepIndex,
+						StepIndices:  make([]int, 0),
+					}
+					nativeToolStats[tc.Name] = entry
+				}
+				entry.InvokedCount++
+				entry.LastStepIdx = m.StepIndex
+				entry.StepIndices = append(entry.StepIndices, m.StepIndex)
+				if isError {
+					entry.ErrorCount++
+					totalErrors++
+				}
+
+				// Decompose generic commands and file operations (R-041)
+				if tc.Name == "run_command" || tc.Name == "bash" || tc.Name == "exec" || tc.Name == "terminal" {
+					cmdLine := cleanStringArg(tc.Args["CommandLine"])
+					if cmdLine == "" {
+						cmdLine = cleanStringArg(tc.Args["command"])
+					}
+					if cmdLine == "" {
+						cmdLine = cleanStringArg(tc.Args["cmd"])
+					}
+					summary := cleanStringArg(tc.Args["toolSummary"])
+					if summary == "" {
+						summary = cleanStringArg(tc.Args["summary"])
+					}
+					bin, cat, cleanSumm := parseCommandBinaryAndCategory(cmdLine, summary)
+					recordSubItem(tc.Name, bin, bin, cat, m.StepIndex, cleanSumm)
+
+					totalCommandsCount++
+					gEntry := globalCommandBreakdown[bin]
+					if gEntry == nil {
+						gEntry = &subBreakdownEntry{
+							key:         bin,
+							label:       bin,
+							category:    cat,
+							steps:       make([]int, 0),
+							recentItems: make([]string, 0),
+						}
+						globalCommandBreakdown[bin] = gEntry
+					}
+					gEntry.count++
+					gEntry.steps = append(gEntry.steps, m.StepIndex)
+					if cleanSumm != "" && len(gEntry.recentItems) < 3 {
+						isDup := false
+						for _, prev := range gEntry.recentItems {
+							if prev == cleanSumm {
+								isDup = true
+								break
+							}
+						}
+						if !isDup {
+							gEntry.recentItems = append(gEntry.recentItems, cleanSumm)
+						}
+					}
+				} else if tc.Name == "read_file" || tc.Name == "write_file" || tc.Name == "edit_file" || tc.Name == "view_file" {
+					filePath := cleanStringArg(tc.Args["Path"])
+					if filePath == "" {
+						filePath = cleanStringArg(tc.Args["path"])
+					}
+					if filePath == "" {
+						filePath = cleanStringArg(tc.Args["TargetFile"])
+					}
+					if filePath == "" {
+						filePath = cleanStringArg(tc.Args["target_file"])
+					}
+					ext, cat, base := parseFileExtensionAndCategory(filePath)
+					lbl := fmt.Sprintf("%s (%s)", ext, cat)
+					recordSubItem(tc.Name, ext, lbl, cat, m.StepIndex, base)
+
+					totalFilesCount++
+					gEntry := globalFileBreakdown[ext]
+					if gEntry == nil {
+						gEntry = &subBreakdownEntry{
+							key:         ext,
+							label:       lbl,
+							category:    cat,
+							steps:       make([]int, 0),
+							recentItems: make([]string, 0),
+						}
+						globalFileBreakdown[ext] = gEntry
+					}
+					gEntry.count++
+					gEntry.steps = append(gEntry.steps, m.StepIndex)
+					if base != "" && len(gEntry.recentItems) < 3 {
+						isDup := false
+						for _, prev := range gEntry.recentItems {
+							if prev == base {
+								isDup = true
+								break
+							}
+						}
+						if !isDup {
+							gEntry.recentItems = append(gEntry.recentItems, base)
+						}
+					}
+				} else if tc.Name == "invoke_subagent" {
+					tName := cleanStringArg(tc.Args["TypeName"])
+					role := cleanStringArg(tc.Args["Role"])
+					key := tName
+					if key == "" {
+						key = role
+					}
+					if key == "" {
+						key = "subagent"
+					}
+					prompt := cleanStringArg(tc.Args["Prompt"])
+					if len(prompt) > 60 {
+						prompt = prompt[:60] + "..."
+					}
+					recordSubItem(tc.Name, key, key, role, m.StepIndex, prompt)
 				}
 			}
 		}
@@ -945,24 +1531,192 @@ func (idx *SessionIndex) ExtractSessionAgentContext(sessionID string) (SessionAg
 		sctx.ActiveRules = wsCtx.Rules
 	}
 
-	// Populate ActiveSkills vs AvailableSkills
-	for _, sk := range wsCtx.Skills {
+	// Populate ActiveSkills vs AvailableSkills (deduplicated by name, R-042)
+	uniqueSkills := make([]AgentSkill, 0, len(availableSkillIndex))
+	for _, sk := range availableSkillIndex {
+		uniqueSkills = append(uniqueSkills, sk)
+	}
+	sort.Slice(uniqueSkills, func(i, j int) bool {
+		return uniqueSkills[i].Name < uniqueSkills[j].Name
+	})
+
+	for _, sk := range uniqueSkills {
 		invokedCount := skillInvocationMap[sk.Name]
 		if invokedCount > 0 {
 			sk.InvokedCount = invokedCount
 			sk.FirstStepIdx = skillFirstStepMap[sk.Name]
+			sk.LastStepIdx = skillLastStepMap[sk.Name]
+			sk.StepIndices = skillStepsMap[sk.Name]
+			sk.InvocationTriggers = skillTriggersMap[sk.Name]
 			sctx.ActiveSkills = append(sctx.ActiveSkills, sk)
 		} else {
 			sctx.AvailableSkills = append(sctx.AvailableSkills, sk)
 		}
 	}
 
-	// Sort active skills by invocation count descending
+	// Sort active skills by invocation count descending, then by name
 	sort.Slice(sctx.ActiveSkills, func(i, j int) bool {
-		return sctx.ActiveSkills[i].InvokedCount > sctx.ActiveSkills[j].InvokedCount
+		if sctx.ActiveSkills[i].InvokedCount != sctx.ActiveSkills[j].InvokedCount {
+			return sctx.ActiveSkills[i].InvokedCount > sctx.ActiveSkills[j].InvokedCount
+		}
+		return sctx.ActiveSkills[i].Name < sctx.ActiveSkills[j].Name
 	})
 
-	sctx.MCPServers = wsCtx.MCPServers
+	// Synthesize SessionMCPServer items
+	seenServers := make(map[string]bool)
+
+	// 1. Process configured MCP servers from workspace context
+	for _, srv := range wsCtx.MCPServers {
+		seenServers[srv.Name] = true
+		sessSrv := SessionMCPServer{
+			Name:            srv.Name,
+			Command:         srv.Command,
+			Args:            srv.Args,
+			Scope:           srv.Scope,
+			ConfiguredTools: srv.Tools,
+			ActiveTools:     make([]SessionMCPTool, 0),
+			DormantTools:    make([]string, 0),
+		}
+
+		activeToolNames := make(map[string]bool)
+		for key, tStat := range mcpToolStats {
+			if key.server == srv.Name {
+				sessSrv.ActiveTools = append(sessSrv.ActiveTools, *tStat)
+				sessSrv.InvokedCount += tStat.InvokedCount
+				activeToolNames[tStat.Name] = true
+			}
+		}
+
+		// Identify dormant tools from configured list
+		for _, cfgTool := range srv.Tools {
+			if !activeToolNames[cfgTool] {
+				sessSrv.DormantTools = append(sessSrv.DormantTools, cfgTool)
+			}
+		}
+
+		// Sort active tools by invoked count descending
+		sort.Slice(sessSrv.ActiveTools, func(i, j int) bool {
+			return sessSrv.ActiveTools[i].InvokedCount > sessSrv.ActiveTools[j].InvokedCount
+		})
+
+		sctx.MCPServers = append(sctx.MCPServers, sessSrv)
+	}
+
+	// 2. Discover ad-hoc or dynamic MCP servers from transcript not in static config
+	for srvName, count := range serverInvokedCounts {
+		if !seenServers[srvName] {
+			seenServers[srvName] = true
+			sessSrv := SessionMCPServer{
+				Name:         srvName,
+				Command:      "runtime dynamic",
+				Scope:        ScopeSession,
+				InvokedCount: count,
+				ActiveTools:  make([]SessionMCPTool, 0),
+				DormantTools: make([]string, 0),
+			}
+			for key, tStat := range mcpToolStats {
+				if key.server == srvName {
+					sessSrv.ActiveTools = append(sessSrv.ActiveTools, *tStat)
+				}
+			}
+			sort.Slice(sessSrv.ActiveTools, func(i, j int) bool {
+				return sessSrv.ActiveTools[i].InvokedCount > sessSrv.ActiveTools[j].InvokedCount
+			})
+			sctx.MCPServers = append(sctx.MCPServers, sessSrv)
+		}
+	}
+
+	// Sort MCP servers: active servers first (descending by invoked count), then by name
+	sort.Slice(sctx.MCPServers, func(i, j int) bool {
+		if sctx.MCPServers[i].InvokedCount != sctx.MCPServers[j].InvokedCount {
+			return sctx.MCPServers[i].InvokedCount > sctx.MCPServers[j].InvokedCount
+		}
+		return sctx.MCPServers[i].Name < sctx.MCPServers[j].Name
+	})
+
+	// Synthesize NativeTools slice with sub-breakdown (R-041)
+	for _, nt := range nativeToolStats {
+		if subMap, ok := toolSubBreakdowns[nt.Name]; ok && len(subMap) > 0 {
+			nt.SubBreakdown = make([]ToolSubBreakdown, 0, len(subMap))
+			for _, entry := range subMap {
+				pct := 0.0
+				if nt.InvokedCount > 0 {
+					pct = math.Round((float64(entry.count)/float64(nt.InvokedCount))*1000) / 10.0
+				}
+				nt.SubBreakdown = append(nt.SubBreakdown, ToolSubBreakdown{
+					Key:         entry.key,
+					Label:       entry.label,
+					Category:    entry.category,
+					Count:       entry.count,
+					Percentage:  pct,
+					StepIndices: entry.steps,
+					RecentItems: entry.recentItems,
+				})
+			}
+			sort.Slice(nt.SubBreakdown, func(i, j int) bool {
+				return nt.SubBreakdown[i].Count > nt.SubBreakdown[j].Count
+			})
+		}
+		sctx.NativeTools = append(sctx.NativeTools, *nt)
+	}
+	sort.Slice(sctx.NativeTools, func(i, j int) bool {
+		return sctx.NativeTools[i].InvokedCount > sctx.NativeTools[j].InvokedCount
+	})
+
+	// Assemble global command & file breakdowns (R-041)
+	cmdBreakdown := make([]ToolSubBreakdown, 0, len(globalCommandBreakdown))
+	for _, entry := range globalCommandBreakdown {
+		pct := 0.0
+		if totalCommandsCount > 0 {
+			pct = math.Round((float64(entry.count)/float64(totalCommandsCount))*1000) / 10.0
+		}
+		cmdBreakdown = append(cmdBreakdown, ToolSubBreakdown{
+			Key:         entry.key,
+			Label:       entry.label,
+			Category:    entry.category,
+			Count:       entry.count,
+			Percentage:  pct,
+			StepIndices: entry.steps,
+			RecentItems: entry.recentItems,
+		})
+	}
+	sort.Slice(cmdBreakdown, func(i, j int) bool {
+		return cmdBreakdown[i].Count > cmdBreakdown[j].Count
+	})
+
+	fileBreakdown := make([]ToolSubBreakdown, 0, len(globalFileBreakdown))
+	for _, entry := range globalFileBreakdown {
+		pct := 0.0
+		if totalFilesCount > 0 {
+			pct = math.Round((float64(entry.count)/float64(totalFilesCount))*1000) / 10.0
+		}
+		fileBreakdown = append(fileBreakdown, ToolSubBreakdown{
+			Key:         entry.key,
+			Label:       entry.label,
+			Category:    entry.category,
+			Count:       entry.count,
+			Percentage:  pct,
+			StepIndices: entry.steps,
+			RecentItems: entry.recentItems,
+		})
+	}
+	sort.Slice(fileBreakdown, func(i, j int) bool {
+		return fileBreakdown[i].Count > fileBreakdown[j].Count
+	})
+
+	// Assemble ToolAnalytics
+	sctx.ToolAnalytics = SessionToolAnalytics{
+		TotalToolCalls:   totalToolCalls,
+		TotalMCPCalls:    totalMCPCalls,
+		TotalNativeCalls: totalNativeCalls,
+		UniqueToolsUsed:  len(uniqueToolsMap),
+		TotalErrors:      totalErrors,
+		CommandBreakdown: cmdBreakdown,
+		FileBreakdown:    fileBreakdown,
+	}
+	if totalToolCalls > 0 {
+		sctx.ToolAnalytics.ToolDiversityIndex = math.Round((float64(len(uniqueToolsMap))/float64(totalToolCalls))*1000) / 1000
+	}
 
 	// Compute session-level token bloat and word metrics
 	for _, r := range sctx.ActiveRules {

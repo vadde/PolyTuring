@@ -274,6 +274,13 @@ const state = {
     globalContext: null,
     workspaceContext: null
   },
+  sessionMatrix: {
+    lens: 'active', // 'active' | 'cascade' | 'telemetry'
+    type: 'ALL',    // 'ALL' | 'SKILLS' | 'MCP' | 'NATIVE' | 'RULES' | 'ORCHESTRATION'
+    search: '',
+    context: null,
+    sessionId: null
+  },
   sessionContextData: null
 };
 
@@ -407,6 +414,23 @@ const el = {
   closeSessionContextModalBtn: document.getElementById('closeSessionContextModalBtn'),
   sessionContextIdBadge: document.getElementById('sessionContextIdBadge'),
   sessionContextContent: document.getElementById('sessionContextContent'),
+  // Session Matrix Holographic Elements (R-040)
+  sessionMatrixTotalCountBadge: document.getElementById('sessionMatrixTotalCountBadge'),
+  sessionMatrixLensControl: document.getElementById('sessionMatrixLensControl'),
+  sessionMatrixSearchInput: document.getElementById('sessionMatrixSearchInput'),
+  clearSessionMatrixSearchBtn: document.getElementById('clearSessionMatrixSearchBtn'),
+  sessionMatrixChipAll: document.getElementById('sessionMatrixChipAll'),
+  sessionMatrixChipSkills: document.getElementById('sessionMatrixChipSkills'),
+  sessionMatrixChipSkillsLabel: document.getElementById('sessionMatrixChipSkillsLabel'),
+  sessionMatrixChipMCP: document.getElementById('sessionMatrixChipMCP'),
+  sessionMatrixChipNative: document.getElementById('sessionMatrixChipNative'),
+  sessionMatrixChipRules: document.getElementById('sessionMatrixChipRules'),
+  sessionMatrixChipOrch: document.getElementById('sessionMatrixChipOrch'),
+  sessionMatrixInjectedVal: document.getElementById('sessionMatrixInjectedVal'),
+  sessionMatrixMCPVal: document.getElementById('sessionMatrixMCPVal'),
+  sessionMatrixDiversityVal: document.getElementById('sessionMatrixDiversityVal'),
+  sessionMatrixOndemandVal: document.getElementById('sessionMatrixOndemandVal'),
+  sessionMatrixReliabilityVal: document.getElementById('sessionMatrixReliabilityVal'),
   toast: document.getElementById('toastNotification')
 };
 
@@ -828,6 +852,20 @@ function initEventListeners() {
     }
   }, { passive: true });
 
+  // Window resize debouncer for EC2-Style Bin-Packing Dynamic Re-Pack (R-043)
+  let matrixResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(matrixResizeTimer);
+    matrixResizeTimer = setTimeout(() => {
+      if (el.sessionContextModal && el.sessionContextModal.classList.contains('active')) {
+        renderSessionMatrix();
+      }
+      if (el.agentMatrixModal && el.agentMatrixModal.classList.contains('active')) {
+        renderAgentMatrix();
+      }
+    }, 120);
+  }, { passive: true });
+
   // Brand button resets drilldown and returns to main view
   const brandBtn = document.getElementById('brandBtn');
   if (brandBtn) {
@@ -1134,7 +1172,17 @@ async function loadSessionDetail(sessionId) {
         if (el.detailAgentContextCount) {
           const activeRules = ctx.active_rules ? ctx.active_rules.length : 0;
           const activeSkills = ctx.active_skills ? ctx.active_skills.length : 0;
-          el.detailAgentContextCount.textContent = (activeRules + activeSkills).toString();
+          let activeMCP = 0;
+          (ctx.mcp_servers || []).forEach(srv => {
+            activeMCP += (srv.active_tools || []).length;
+          });
+          const nativeTools = ctx.native_tools ? ctx.native_tools.length : 0;
+          const subagents = ctx.subagents ? ctx.subagents.length : 0;
+          const totalActive = activeRules + activeSkills + activeMCP + nativeTools + subagents;
+          el.detailAgentContextCount.textContent = totalActive.toString();
+          if (el.detailAgentContextBtn) {
+            el.detailAgentContextBtn.title = `${totalActive} active agent elements (${activeRules} rules • ${activeSkills} skills • ${activeMCP} MCP tools • ${nativeTools} native tools • ${subagents} subagents)`;
+          }
         }
       })
       .catch(e => console.warn('Context fetch error:', e));
@@ -2284,6 +2332,9 @@ function renderTimelineMessages() {
       state.renderedStepMap.set(msg.step_index, node);
       attachStepInteractivity(node);
     }
+    if (node) {
+      node.id = `step-${msg.step_index}`;
+    }
     fragment.appendChild(node);
   }
 
@@ -2405,7 +2456,7 @@ function buildStepHtml(msg) {
   const formattedStep = typeof msg.step_index === 'number' ? msg.step_index.toLocaleString() : (msg.step_index ?? '0');
 
   return `
-    <div class="message-item ${isUser ? 'user' : isAgent ? 'agent' : 'tool-result'}" data-step="${msg.step_index}" data-status="${escapeHtml(msg.status || '')}">
+    <div class="message-item ${isUser ? 'user' : isAgent ? 'agent' : 'tool-result'}" id="step-${msg.step_index}" data-step="${msg.step_index}" data-status="${escapeHtml(msg.status || '')}">
       <div class="timeline-node" title="Step ${formattedStep}">${formattedStep}</div>
       <div class="message-card">
         <div class="message-header">
@@ -3554,25 +3605,30 @@ function updateSessionFilesBadge(detail) {
     if (msg.tool_calls) {
       msg.tool_calls.forEach(tc => {
         const args = tc.args || {};
-        const p = args.AbsolutePath || args.TargetFile || args.path || args.file_path;
+        let p = args.Path || args.path || args.AbsolutePath || args.TargetFile || args.file_path || args.FilePath;
         if (p && typeof p === 'string') {
+          p = p.trim().replace(/^["']|["']$/g, '');
           const cleanP = p.replace(/^file:\/\//, '');
-          const name = cleanP.split('/').pop() || cleanP;
-          let fileType = 'read';
-          if (tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
-            fileType = 'modified';
-          }
-          if (args.ArtifactMetadata || cleanP.includes('/brain/')) {
-            fileType = 'artifact';
-          }
-          if (!state.sessionFilesMap.has(cleanP) || fileType === 'artifact') {
-            state.sessionFilesMap.set(cleanP, {
-              path: cleanP,
-              name: name,
-              type: fileType,
-              tool: tc.name,
-              stepIndex: msg.step_index
-            });
+          if (cleanP && !cleanP.startsWith('{')) {
+            const name = cleanP.split('/').pop() || cleanP;
+            let fileType = 'read';
+            if (tc.name === 'write_file' || tc.name === 'edit_file' || tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
+              fileType = 'modified';
+            }
+            if (args.ArtifactMetadata || cleanP.includes('/brain/') || cleanP.endsWith('.md')) {
+              if (args.ArtifactMetadata || cleanP.includes('/brain/')) {
+                fileType = 'artifact';
+              }
+            }
+            if (!state.sessionFilesMap.has(cleanP) || fileType === 'artifact') {
+              state.sessionFilesMap.set(cleanP, {
+                path: cleanP,
+                name: name,
+                type: fileType,
+                tool: tc.name,
+                stepIndex: msg.step_index
+              });
+            }
           }
         }
       });
@@ -3601,7 +3657,11 @@ function updateSessionFilesBadge(detail) {
   });
 
   if (el.detailFilesCountBadge) {
-    el.detailFilesCountBadge.textContent = state.sessionFilesMap.size.toString();
+    const count = state.sessionFilesMap.size;
+    el.detailFilesCountBadge.textContent = count.toString();
+    if (el.detailFilesBtn) {
+      el.detailFilesBtn.title = `${count} files and artifacts touched in this session (click to inspect drawer)`;
+    }
   }
 }
 
@@ -3706,6 +3766,49 @@ function initAgentMatrixListeners() {
     el.closeSessionContextModalBtn.addEventListener('click', closeSessionContextModal);
   }
 
+  // Session Matrix Lens Switcher (R-040)
+  if (el.sessionMatrixLensControl) {
+    el.sessionMatrixLensControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.sessionMatrixLensControl.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.sessionMatrix.lens = btn.dataset.lens;
+        renderSessionMatrix();
+      });
+    });
+  }
+
+  // Session Matrix Filter Chips (R-040)
+  const sessionTypeChips = document.querySelectorAll('.session-matrix-filter-chips .matrix-filter-chip, .session-matrix-filter-chips .chip');
+  sessionTypeChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      sessionTypeChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.sessionMatrix.type = chip.dataset.type;
+      renderSessionMatrix();
+    });
+  });
+
+  // Session Matrix Search Input (R-040)
+  if (el.sessionMatrixSearchInput) {
+    el.sessionMatrixSearchInput.addEventListener('input', (e) => {
+      state.sessionMatrix.search = e.target.value.trim().toLowerCase();
+      if (el.clearSessionMatrixSearchBtn) {
+        el.clearSessionMatrixSearchBtn.style.display = state.sessionMatrix.search ? 'inline-flex' : 'none';
+      }
+      renderSessionMatrix();
+    });
+  }
+
+  if (el.clearSessionMatrixSearchBtn) {
+    el.clearSessionMatrixSearchBtn.addEventListener('click', () => {
+      state.sessionMatrix.search = '';
+      if (el.sessionMatrixSearchInput) el.sessionMatrixSearchInput.value = '';
+      el.clearSessionMatrixSearchBtn.style.display = 'none';
+      renderSessionMatrix();
+    });
+  }
+
   // Scope switcher
   if (el.agentMatrixScopeControl) {
     el.agentMatrixScopeControl.querySelectorAll('.segment-btn').forEach(btn => {
@@ -3719,7 +3822,7 @@ function initAgentMatrixListeners() {
   }
 
   // Type filter chips
-  const typeChips = document.querySelectorAll('.agent-matrix-filter-chips .chip');
+  const typeChips = document.querySelectorAll('.agent-matrix-filter-chips .matrix-filter-chip, .agent-matrix-filter-chips .chip');
   typeChips.forEach(chip => {
     chip.addEventListener('click', () => {
       typeChips.forEach(c => c.classList.remove('active'));
@@ -3804,6 +3907,41 @@ async function openAgentBrainModal(targetWorkspace) {
 
 function closeAgentMatrixModal() {
   if (el.agentMatrixModal) el.agentMatrixModal.classList.remove('active');
+}
+
+// ============================================================================
+//  EC2-Style Greedy Bin-Packing Spatial Placement Engine (R-043)
+// ============================================================================
+function binPackCards(cardItems, containerWidth) {
+  let numCols = 3;
+  if (containerWidth < 768) {
+    numCols = 1;
+  } else if (containerWidth < 1200) {
+    numCols = 2;
+  }
+
+  const columns = Array.from({ length: numCols }, () => []);
+  const heights = new Array(numCols).fill(0);
+
+  cardItems.forEach(item => {
+    // Greedy placement: find the column bin with minimal total weight/height load
+    let target = 0;
+    let minH = heights[0];
+    for (let c = 1; c < numCols; c++) {
+      if (heights[c] < minH) {
+        minH = heights[c];
+        target = c;
+      }
+    }
+    columns[target].push(item.html);
+    heights[target] += (item.weight || 150);
+  });
+
+  return `
+    <div class="agent-matrix-binpack" data-columns="${numCols}">
+      ${columns.map(col => `<div class="binpack-column">${col.join('')}</div>`).join('')}
+    </div>
+  `;
 }
 
 function renderAgentMatrix() {
@@ -3906,12 +4044,16 @@ function renderAgentMatrix() {
     return;
   }
 
-  let html = '<div class="agent-matrix-grid">';
+  const renderedCards = [];
   items.forEach(it => {
+    let cardHtml = '';
+    let weight = 160;
+
     if (it.kind === 'rule') {
       const r = it.data;
       const isConst = (r.priority || '').includes('Constitutional') || r.name.includes('constitution') || r.name.includes('101');
-      html += `
+      weight = 160;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
@@ -3943,7 +4085,8 @@ function renderAgentMatrix() {
       `;
     } else if (it.kind === 'skill') {
       const s = it.data;
-      html += `
+      weight = 165;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
@@ -3977,7 +4120,8 @@ function renderAgentMatrix() {
       `;
     } else if (it.kind === 'plugin') {
       const p = it.data;
-      html += `
+      weight = 140;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
@@ -3999,7 +4143,8 @@ function renderAgentMatrix() {
       `;
     } else if (it.kind === 'mcp') {
       const m = it.data;
-      html += `
+      weight = 130;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
@@ -4015,7 +4160,8 @@ function renderAgentMatrix() {
       `;
     } else if (it.kind === 'hook') {
       const h = it.data;
-      html += `
+      weight = 130;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
@@ -4031,10 +4177,14 @@ function renderAgentMatrix() {
         </div>
       `;
     }
-  });
-  html += '</div>';
 
-  el.agentMatrixContent.innerHTML = html;
+    if (cardHtml) {
+      renderedCards.push({ html: cardHtml, weight });
+    }
+  });
+
+  const containerW = el.agentMatrixContent.clientWidth || window.innerWidth;
+  el.agentMatrixContent.innerHTML = binPackCards(renderedCards, containerW);
 
   // Attach 1-click Inspect to openFileViewer
   el.agentMatrixContent.querySelectorAll('.inspect-agent-file-btn').forEach(btn => {
@@ -4053,24 +4203,30 @@ function renderAgentMatrix() {
   });
 }
 
-// In-Session Agent Context Modal
+// In-Session Holographic Agent Matrix Modal (R-039, R-040)
 async function openSessionContextModal(sessionId) {
   if (!el.sessionContextModal || !el.sessionContextContent) return;
 
+  const sid = sessionId || state.activeTimelineSessionId || state.sessionMatrix.sessionId;
+  if (!sid) return;
+
+  state.sessionMatrix.sessionId = sid;
   if (el.sessionContextIdBadge) {
-    el.sessionContextIdBadge.textContent = sessionId;
+    el.sessionContextIdBadge.textContent = sid.length > 8 ? sid.slice(0, 8) : sid;
+    el.sessionContextIdBadge.title = `Full Session UUID: ${sid}`;
   }
   el.sessionContextModal.classList.add('active');
-  el.sessionContextContent.innerHTML = '<div class="file-viewer-loading"><div class="loading-spinner"></div><span>Analyzing session rules, skills, and tools...</span></div>';
+  el.sessionContextContent.innerHTML = '<div class="file-viewer-loading"><div class="loading-spinner"></div><span>Synthesizing holographic session matrix &amp; tool telemetry...</span></div>';
 
   try {
-    const res = await fetch(`/api/sessions/${sessionId}/context`);
+    const res = await fetch(`/api/sessions/${sid}/context`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const ctx = await res.json();
-    renderSessionContext(ctx);
+    state.sessionMatrix.context = ctx;
+    renderSessionMatrix();
   } catch (err) {
     console.error('Failed to load session context:', err);
-    el.sessionContextContent.innerHTML = `<div class="file-viewer-error">Error loading session context: ${escapeHtml(err.message)}</div>`;
+    el.sessionContextContent.innerHTML = `<div class="file-viewer-error">Error loading session matrix: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -4078,13 +4234,101 @@ function closeSessionContextModal() {
   if (el.sessionContextModal) el.sessionContextModal.classList.remove('active');
 }
 
-function renderSessionContext(ctx) {
-  if (!el.sessionContextContent) return;
+function jumpToTimelineStep(stepIndex) {
+  closeSessionContextModal();
 
+  let targetNode = document.getElementById(`step-${stepIndex}`) || document.querySelector(`.message-item[data-step="${stepIndex}"]`);
+
+  // If node is currently hidden by step filter or search, reset them to reveal the turn
+  if (!targetNode) {
+    if (el.sessionStepSearchInput && el.sessionStepSearchInput.value) {
+      el.sessionStepSearchInput.value = '';
+      state.sessionStepSearch = '';
+    }
+    if (state.messageFilter !== 'ALL') {
+      state.messageFilter = 'ALL';
+      if (el.msgFilterChips) {
+        el.msgFilterChips.forEach(c => {
+          c.classList.toggle('active', c.dataset.type === 'ALL');
+        });
+      }
+    }
+    if (typeof renderTimelineMessages === 'function') {
+      renderTimelineMessages();
+    }
+    targetNode = document.getElementById(`step-${stepIndex}`) || document.querySelector(`.message-item[data-step="${stepIndex}"]`);
+  }
+
+  if (targetNode) {
+    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetNode.classList.remove('step-target-highlight');
+    const card = targetNode.querySelector('.message-card');
+    if (card) card.classList.remove('step-target-highlight');
+
+    // Force reflow for smooth re-triggering of animation
+    void targetNode.offsetWidth;
+    targetNode.classList.add('step-target-highlight');
+    if (card) card.classList.add('step-target-highlight');
+
+    setTimeout(() => {
+      targetNode.classList.remove('step-target-highlight');
+      if (card) card.classList.remove('step-target-highlight');
+    }, 2800);
+
+    showToast(`⚡ Navigated to Step #${stepIndex}`);
+  } else {
+    showToast(`Step #${stepIndex} recorded in session telemetry`);
+  }
+}
+
+// Category color and icon helpers for Holographic UI (R-041)
+function getCategoryColor(cat) {
+  switch ((cat || '').toLowerCase()) {
+    case 'vcs': return '#a855f7'; // Neon Violet
+    case 'build': return '#06b6d4'; // Cyber Cyan
+    case 'test': return '#f59e0b'; // Solar Amber
+    case 'process': return '#ec4899'; // Hot Magenta
+    case 'inspect': return '#10b981'; // Electric Emerald
+    case 'network': return '#38bdf8'; // Ice Blue
+    case 'runtime': return '#6366f1'; // Indigo Neon
+    case 'filesystem': return '#14b8a6'; // Teal
+    default: return '#94a3b8'; // Slate
+  }
+}
+
+function getCategoryIcon(cat) {
+  switch ((cat || '').toLowerCase()) {
+    case 'vcs': return '🌿';
+    case 'build': return '⚙️';
+    case 'test': return '🧪';
+    case 'process': return '⚡';
+    case 'inspect': return '🔍';
+    case 'network': return '🌐';
+    case 'runtime': return '💻';
+    case 'filesystem': return '📁';
+    default: return '🛠️';
+  }
+}
+
+function renderSessionMatrix() {
+  if (!el.sessionContextContent || !state.sessionMatrix.context) return;
+
+  const ctx = state.sessionMatrix.context;
+  const { lens, type, search } = state.sessionMatrix;
+
+  const activeRules = ctx.active_rules || [];
   const activeSkills = ctx.active_skills || [];
   const availableSkills = ctx.available_skills || [];
-  const activeRules = ctx.active_rules || [];
   const mcpServers = ctx.mcp_servers || [];
+  const nativeTools = ctx.native_tools || [];
+  const analytics = ctx.tool_analytics || {
+    total_tool_calls: 0,
+    total_mcp_calls: 0,
+    total_native_calls: 0,
+    unique_tools_used: 0,
+    tool_diversity_index: 0,
+    total_errors: 0
+  };
   const subagents = ctx.subagents || [];
   const slashCommands = ctx.slash_commands || [];
 
@@ -4092,84 +4336,679 @@ function renderSessionContext(ctx) {
   const ondemandTokens = ctx.on_demand_tokens_est || 0;
   const totalWordsInj = ctx.total_words_injected || 0;
 
-  let html = `
-    <div class="session-context-summary-bar">
-      <div class="session-context-stat-box">
-        <div class="session-context-stat-num">${activeRules.length}</div>
-        <div class="session-context-stat-lbl">Active Rules</div>
-      </div>
-      <div class="session-context-stat-box" style="border-color: rgba(16, 185, 129, 0.4);">
-        <div class="session-context-stat-num" style="color: #34d399;">${activeSkills.length}</div>
-        <div class="session-context-stat-lbl">Skills Invoked</div>
-      </div>
-      <div class="session-context-stat-box" style="border-color: rgba(56, 189, 248, 0.4);">
-        <div class="session-context-stat-num" style="color: #38bdf8;">~${activeTokens.toLocaleString()}</div>
-        <div class="session-context-stat-lbl">Injected Tokens</div>
-      </div>
-      <div class="session-context-stat-box">
-        <div class="session-context-stat-num">${totalWordsInj.toLocaleString()}</div>
-        <div class="session-context-stat-lbl">Injected Words</div>
-      </div>
-      <div class="session-context-stat-box">
-        <div class="session-context-stat-num">~${ondemandTokens.toLocaleString()}</div>
-        <div class="session-context-stat-lbl">On-Demand Capacity</div>
-      </div>
-    </div>
-  `;
+  // Compute active vs dormant MCP tools
+  let activeMCPTools = [];
+  let dormantMCPTools = [];
+  let activeMCPServers = 0;
 
-  // 1. Actively Invoked Skills
-  if (activeSkills.length > 0) {
-    html += `
-      <div class="session-context-section">
-        <div class="session-context-section-title">
-          <span>⚡ Actively Invoked Skills (${activeSkills.length})</span>
-          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Triggered by tool calls during the session</span>
-        </div>
-        <div class="agent-matrix-grid">
-    `;
-    activeSkills.forEach(s => {
-      html += `
-        <div class="agent-card" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
-          <div class="agent-card-header">
-            <div class="agent-card-title-group">
-              <span class="agent-card-title">⚡ ${escapeHtml(s.name)}</span>
-              <span class="session-invoked-skill-pill">⚡ Invoked ${s.invoked_count}x • Step ${s.first_step_idx}</span>
+  mcpServers.forEach(srv => {
+    if (srv.invoked_count > 0 || (srv.active_tools && srv.active_tools.length > 0)) {
+      activeMCPServers++;
+    }
+    (srv.active_tools || []).forEach(t => activeMCPTools.push(t));
+    (srv.dormant_tools || []).forEach(dtName => {
+      dormantMCPTools.push({
+        name: dtName,
+        server_name: srv.name,
+        invoked_count: 0
+      });
+    });
+  });
+
+  const totalToolCalls = analytics.total_tool_calls || 0;
+  const totalErrors = analytics.total_errors || 0;
+  const reliabilityPct = totalToolCalls > 0
+    ? Math.max(0, Math.round(((totalToolCalls - totalErrors) / totalToolCalls) * 100))
+    : 100;
+  const diversityPct = (analytics.tool_diversity_index * 100).toFixed(1);
+
+  // Update Holographic Telemetry Ribbon
+  if (el.sessionMatrixInjectedVal) el.sessionMatrixInjectedVal.textContent = `~${activeTokens.toLocaleString()} tok`;
+  if (el.sessionMatrixMCPVal) el.sessionMatrixMCPVal.textContent = `${analytics.total_mcp_calls} calls (${activeMCPTools.length} tools)`;
+  if (el.sessionMatrixDiversityVal) el.sessionMatrixDiversityVal.textContent = `${diversityPct}% (${analytics.unique_tools_used} distinct)`;
+  if (el.sessionMatrixOndemandVal) el.sessionMatrixOndemandVal.textContent = `~${ondemandTokens.toLocaleString()} tok`;
+  if (el.sessionMatrixReliabilityVal) el.sessionMatrixReliabilityVal.textContent = `${reliabilityPct}% (${totalErrors} err)`;
+
+  // Calculate element counts for filter chips
+  const countSkills = activeSkills.length + (lens === 'cascade' ? availableSkills.length : 0);
+  const countMCP = activeMCPTools.length + (lens === 'cascade' ? dormantMCPTools.length : 0);
+  const countNative = nativeTools.length;
+  const countRules = activeRules.length;
+  const countOrch = subagents.length + slashCommands.length;
+  const countTotal = countSkills + countMCP + countNative + countRules + countOrch;
+
+  if (el.sessionMatrixChipSkillsLabel) {
+    el.sessionMatrixChipSkillsLabel.textContent = lens === 'cascade' ? 'Skills (Active & Standby)' : 'Invoked Skills';
+  }
+  if (el.sessionMatrixChipAll) el.sessionMatrixChipAll.textContent = countTotal;
+  if (el.sessionMatrixChipSkills) {
+    el.sessionMatrixChipSkills.textContent = lens === 'cascade' && activeSkills.length > 0
+      ? `${activeSkills.length} / ${countSkills}`
+      : countSkills;
+  }
+  if (el.sessionMatrixChipMCP) el.sessionMatrixChipMCP.textContent = countMCP;
+  if (el.sessionMatrixChipNative) el.sessionMatrixChipNative.textContent = countNative;
+  if (el.sessionMatrixChipRules) el.sessionMatrixChipRules.textContent = countRules;
+  if (el.sessionMatrixChipOrch) el.sessionMatrixChipOrch.textContent = countOrch;
+
+  // LENS 3: Holographic Telemetry & Execution Audit Dashboard
+  if (lens === 'telemetry') {
+    if (el.sessionMatrixTotalCountBadge) el.sessionMatrixTotalCountBadge.textContent = 'Telemetry Mode';
+
+    let html = `
+      <div class="holo-audit-dashboard">
+        <!-- High-Precision Metric Cards -->
+        <div class="holo-metrics-grid">
+          <div class="holo-metric-card" style="border-color: rgba(56, 189, 248, 0.4);">
+            <div class="holo-metric-lbl">Total Tool Invocations</div>
+            <div class="holo-metric-num" style="color: #38bdf8;">${totalToolCalls.toLocaleString()}</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">
+              <span>🔌 ${analytics.total_mcp_calls} MCP</span> • <span>🛠️ ${analytics.total_native_calls} Native</span>
             </div>
-            <span class="agent-card-scope-badge ${s.scope}">${s.scope}</span>
           </div>
-          <p class="agent-card-desc">${escapeHtml(s.description || 'Procedural skill runbook.')}</p>
-          <div class="agent-card-meta">
-            <span class="agent-token-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3);">⚡ ~${(s.tokens_est || 0).toLocaleString()} tok</span>
-            <span class="agent-word-badge">🔤 ${(s.word_count || 0).toLocaleString()} words</span>
-            <span>📏 ${s.line_count || 0} lines</span>
+
+          <div class="holo-metric-card" style="border-color: rgba(168, 85, 247, 0.4);">
+            <div class="holo-metric-lbl">Tool Diversity Index</div>
+            <div class="holo-metric-num" style="color: #c084fc;">${diversityPct}%</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">${analytics.unique_tools_used} distinct tools utilized</div>
+            <div class="holo-meter-wrapper">
+              <div class="holo-meter-fill diversity" style="width: ${Math.min(100, Math.max(8, analytics.tool_diversity_index * 100))}%;"></div>
+            </div>
           </div>
-          <div class="agent-card-actions">
-            <span class="agent-card-path" title="${escapeHtml(s.file_path)}">${escapeHtml(s.file_path)}</span>
-            <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(s.file_path)}" title="Open skill in File Viewer">📖 Inspect</button>
+
+          <div class="holo-metric-card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="holo-metric-lbl">Reliability Quotient</div>
+            <div class="holo-metric-num" style="color: #34d399;">${reliabilityPct}%</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">${totalErrors} execution error${totalErrors === 1 ? '' : 's'} recorded</div>
+            <div class="holo-meter-wrapper">
+              <div class="holo-meter-fill reliability" style="width: ${reliabilityPct}%;"></div>
+            </div>
+          </div>
+
+          <div class="holo-metric-card">
+            <div class="holo-metric-lbl">Active Injected Context</div>
+            <div class="holo-metric-num" style="color: #7dd3fc;">~${activeTokens.toLocaleString()}</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">${totalWordsInj.toLocaleString()} words injected across turns</div>
+          </div>
+
+          <div class="holo-metric-card">
+            <div class="holo-metric-lbl">Dormant Bloat Capacity</div>
+            <div class="holo-metric-num" style="color: #fbbf24;">~${ondemandTokens.toLocaleString()}</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">${availableSkills.length} skills on standby</div>
+          </div>
+
+          <div class="holo-metric-card">
+            <div class="holo-metric-lbl">Active Tool Ecosystem</div>
+            <div class="holo-metric-num" style="color: #a5b4fc;">${activeMCPServers} / ${mcpServers.length}</div>
+            <div style="font-size: 0.76rem; color: var(--text-dim);">${activeMCPServers} active MCP servers • ${nativeTools.length} native tools</div>
+          </div>
+        </div>
+
+        <!-- Tool Invocations Heatmap Timeline -->
+        <div class="holo-timeline-heatmap">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">⚡ Execution Velocity &amp; Distribution</span>
+            <span style="font-size: 0.74rem; color: var(--text-muted); font-family: var(--font-mono, monospace);">
+              Trajectory: ${activeMCPTools.length} MCP tools • ${nativeTools.length} Native tools
+            </span>
+          </div>
+
+          <div class="holo-heatmap-bar">
+            ${analytics.total_mcp_calls > 0 ? `<div class="holo-heatmap-segment" style="width: ${(analytics.total_mcp_calls / totalToolCalls) * 100}%; background: linear-gradient(90deg, #0284c7, #06b6d4);" title="MCP Tools: ${analytics.total_mcp_calls} calls">🔌 MCP (${analytics.total_mcp_calls})</div>` : ''}
+            ${analytics.total_native_calls > 0 ? `<div class="holo-heatmap-segment" style="width: ${(analytics.total_native_calls / totalToolCalls) * 100}%; background: linear-gradient(90deg, #7c3aed, #a855f7);" title="Native Tools: ${analytics.total_native_calls} calls">🛠️ Native (${analytics.total_native_calls})</div>` : ''}
+          </div>
+        </div>
+
+        <!-- Tool Invocations Leaderboard -->
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.25rem;">
+          <div style="font-size: 0.86rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏆 Tool Frequency Leaderboard</span>
+            <span style="font-size: 0.74rem; color: var(--text-muted);">Click any step pill to jump straight to that turn</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+    `;
+
+    // Combine all tools into ranked list
+    const allRankedTools = [
+      ...activeMCPTools.map(t => ({ ...t, kind: 'mcp' })),
+      ...nativeTools.map(t => ({ ...t, kind: 'native' }))
+    ].sort((a, b) => b.invoked_count - a.invoked_count);
+
+    if (allRankedTools.length === 0) {
+      html += `<div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No tool calls recorded in this session.</div>`;
+    } else {
+      allRankedTools.forEach(t => {
+        const isMCP = t.kind === 'mcp';
+        const steps = t.step_indices || [];
+        const displaySteps = steps.slice(0, 6);
+        const hasMore = steps.length > 6;
+
+        html += `
+          <div class="mcp-tool-row" style="background: rgba(15, 23, 42, 0.45);">
+            <div class="mcp-tool-row-header">
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="${isMCP ? 'mcp-tool-name' : 'tool-name'}" style="font-size: 0.86rem;">${isMCP ? '🔌' : '🛠️'} ${escapeHtml(t.name)}</span>
+                ${isMCP ? `<span class="agent-card-scope-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.68rem;">${escapeHtml(t.server_name)}</span>` : `<span class="native-category-badge ${t.category || 'Agentic'}">${escapeHtml(t.category || 'Agentic')}</span>`}
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <span class="mcp-tool-count-badge">${t.invoked_count}x</span>
+                ${t.error_count > 0 ? `<span class="mcp-tool-count-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">${t.error_count} err</span>` : ''}
+              </div>
+            </div>
+            <div class="steps-row" style="margin-top: 2px;">
+              <span class="steps-label" style="margin-right: 2px;">Steps:</span>
+              ${displaySteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+              ${hasMore ? `<span class="step-marker-pill more" title="${steps.length} total executions">+${steps.length - 6} more</span>` : ''}
+              ${t.recent_args_summary ? `<span class="mcp-tool-args-preview" title="${escapeHtml(t.recent_args_summary)}">${escapeHtml(t.recent_args_summary)}</span>` : ''}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    html += `</div></div>`;
+
+    // Global Terminal Command Execution Spectrum (R-041)
+    const cmdBreakdown = analytics.command_breakdown || [];
+    if (cmdBreakdown.length > 0) {
+      html += `
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.25rem;">
+          <div style="font-size: 0.86rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <span>⚡ Terminal Command Execution Spectrum (${cmdBreakdown.length} binaries)</span>
+            <span style="font-size: 0.74rem; color: var(--text-muted);">Decomposed by binary &amp; operational category</span>
+          </div>
+
+          <div class="command-spectrum-bar" style="height: 16px; margin-bottom: 1rem;">
+            ${cmdBreakdown.map(cb => `
+              <div class="spectrum-segment" style="width: ${cb.percentage}%; background-color: ${getCategoryColor(cb.category)};" title="${escapeHtml(cb.label)}: ${cb.count}x (${cb.percentage}%)"></div>
+            `).join('')}
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
+            ${cmdBreakdown.map(cb => {
+              const cbSteps = cb.step_indices || [];
+              const dispSteps = cbSteps.slice(0, 5);
+              const hasMoreSteps = cbSteps.length > 5;
+              const catColor = getCategoryColor(cb.category);
+              return `
+                <div class="sub-command-row">
+                  <div class="sub-command-header">
+                    <div class="sub-command-label-group">
+                      <span class="sub-command-icon">${getCategoryIcon(cb.category)}</span>
+                      <span class="sub-command-key">${escapeHtml(cb.label || cb.key)}</span>
+                      <span class="native-category-badge" style="background: ${catColor}20; color: ${catColor}; border: 1px solid ${catColor}40; font-size: 0.64rem;">${escapeHtml(cb.category || 'System')}</span>
+                    </div>
+                    <div class="sub-command-stats">
+                      <span class="sub-command-count">${cb.count}x</span>
+                      <span class="sub-command-pct">(${cb.percentage}%)</span>
+                    </div>
+                  </div>
+                  ${cb.recent_items && cb.recent_items.length ? `
+                    <div class="sub-command-recent" title="Recent: ${escapeHtml(cb.recent_items.join(' • '))}">
+                      <span class="recent-tag">Recent:</span> ${escapeHtml(cb.recent_items[0])}
+                    </div>
+                  ` : ''}
+                  <div class="sub-command-steps">
+                    <span class="sub-steps-label">Steps:</span>
+                    ${dispSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                    ${hasMoreSteps ? `<span class="step-marker-pill more" title="${cbSteps.length} total calls">+${cbSteps.length - 5}</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       `;
+    }
+
+    // Global Filesystem Operations Breakdown (R-041)
+    const fileBreakdown = analytics.file_breakdown || [];
+    if (fileBreakdown.length > 0) {
+      html += `
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.25rem;">
+          <div style="font-size: 0.86rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <span>📁 Filesystem Operations &amp; Extensions (${fileBreakdown.length} types)</span>
+            <span style="font-size: 0.74rem; color: var(--text-muted);">Decomposed by target file extension &amp; language</span>
+          </div>
+          <div class="file-ext-matrix">
+            ${fileBreakdown.map(fb => {
+              const fbSteps = fb.step_indices || [];
+              const dispSteps = fbSteps.slice(0, 4);
+              return `
+                <div class="file-ext-chip">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
+                    <span class="ext-name">${escapeHtml(fb.key)}</span>
+                    <span class="ext-count">${fb.count}x (${fb.percentage}%)</span>
+                  </div>
+                  ${fb.recent_items && fb.recent_items.length ? `
+                    <div class="ext-recent" title="${escapeHtml(fb.recent_items.join(', '))}">
+                      ${escapeHtml(fb.recent_items[0])}
+                    </div>
+                  ` : ''}
+                  <div class="steps-row" style="margin-top: 0.25rem;">
+                    <span class="steps-label" style="font-size: 0.65rem;">Steps:</span>
+                    ${dispSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                    ${fbSteps.length > 4 ? `<span class="step-marker-pill more" title="${fbSteps.length} total calls">+${fbSteps.length - 4}</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+    el.sessionContextContent.innerHTML = html;
+
+    // Attach step click jump handlers
+    el.sessionContextContent.querySelectorAll('.step-marker-pill[data-step]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        jumpToTimelineStep(parseInt(btn.dataset.step, 10));
+      };
     });
-    html += `</div></div>`;
+    return;
   }
 
-  // 2. Active Rules & Guidelines
-  if (activeRules.length > 0) {
-    html += `
-      <div class="session-context-section">
-        <div class="session-context-section-title">
-          <span>📜 Active Rules &amp; Guidelines (${activeRules.length})</span>
-        </div>
-        <div class="agent-matrix-grid">
+  // LENS 1 & 2: Active Runtime Matrix or Full Context Cascade
+  let items = [];
+
+  // 1. SKILLS
+  if (type === 'ALL' || type === 'SKILLS') {
+    activeSkills.forEach(s => items.push({ kind: 'skill_active', data: s }));
+    if (lens === 'cascade') {
+      availableSkills.forEach(s => items.push({ kind: 'skill_dormant', data: s }));
+    }
+  }
+
+  // 2. MCP SERVERS & TOOLS
+  if (type === 'ALL' || type === 'MCP') {
+    mcpServers.forEach(srv => {
+      // In active lens, only show servers that had tool calls
+      if (lens === 'active') {
+        if (srv.invoked_count > 0 || (srv.active_tools && srv.active_tools.length > 0)) {
+          items.push({ kind: 'mcp_server', data: srv });
+        }
+      } else {
+        // In cascade lens, show all configured servers
+        items.push({ kind: 'mcp_server', data: srv });
+      }
+    });
+  }
+
+  // 3. NATIVE TOOLS
+  if (type === 'ALL' || type === 'NATIVE') {
+    nativeTools.forEach(nt => items.push({ kind: 'native_tool', data: nt }));
+  }
+
+  // 4. RULES
+  if (type === 'ALL' || type === 'RULES') {
+    activeRules.forEach(r => items.push({ kind: 'rule', data: r }));
+  }
+
+  // 5. ORCHESTRATION (Subagents & Slash Commands)
+  if (type === 'ALL' || type === 'ORCHESTRATION') {
+    subagents.forEach(sa => items.push({ kind: 'subagent', data: sa }));
+    slashCommands.forEach(cmd => items.push({ kind: 'command', data: cmd }));
+  }
+
+  // Apply search query filter
+  if (search) {
+    items = items.filter(it => {
+      const d = it.data;
+      let text = '';
+      if (typeof d === 'string') {
+        text = d;
+      } else if (it.kind === 'mcp_server') {
+        const activeNames = (d.active_tools || []).map(t => `${t.name} ${t.recent_args_summary || ''}`).join(' ');
+        const dormantNames = (d.dormant_tools || []).join(' ');
+        text = `${d.name} ${d.command || ''} ${(d.args || []).join(' ')} ${activeNames} ${dormantNames}`;
+      } else {
+        text = [
+          d.name,
+          d.title,
+          d.description,
+          d.file_path || d.path || d.command,
+          d.category,
+          d.recent_args_summary
+        ].filter(Boolean).join(' ');
+      }
+      return text.toLowerCase().includes(search);
+    });
+  }
+
+  if (el.sessionMatrixTotalCountBadge) {
+    el.sessionMatrixTotalCountBadge.textContent = `${items.length} item${items.length === 1 ? '' : 's'}`;
+  }
+
+  if (items.length === 0) {
+    el.sessionContextContent.innerHTML = `
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
+        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🧠</div>
+        <p style="color: var(--text-muted);">No session elements matching "${escapeHtml(search || type)}".</p>
+      </div>
     `;
-    activeRules.forEach(r => {
+    return;
+  }
+
+  const renderedCards = [];
+
+  items.forEach(it => {
+    let cardHtml = '';
+    let weight = 160;
+
+    // ─── CARD: Skill (Active or Standby / Dormant) (R-042) ───
+    if (it.kind === 'skill_active' || it.kind === 'skill_dormant') {
+      const s = it.data;
+      const isActive = it.kind === 'skill_active';
+      const steps = s.step_indices || [];
+      const dispSteps = steps.slice(0, 6);
+      const hasMoreSteps = steps.length > 6;
+      const triggers = s.invocation_triggers || [];
+      weight = isActive ? (210 + (steps.length > 0 ? 55 : 0) + (triggers.length > 0 ? 45 : 0)) : 145;
+
+      cardHtml = `
+        <div class="agent-card ${isActive ? 'agent-card-highlight' : ''}" style="${isActive ? 'border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.04);' : 'opacity: 0.88;'}">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">⚡ ${escapeHtml(s.name)}</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                <span class="agent-card-scope-badge ${s.scope}">${s.scope}</span>
+                ${s.category ? `<span class="agent-card-priority-pill">${escapeHtml(s.category)}</span>` : ''}
+                ${s.plugin_name ? `<span class="agent-card-priority-pill" style="color: #facc15;">🧩 ${escapeHtml(s.plugin_name)}</span>` : ''}
+                ${isActive
+                  ? `<span class="session-invoked-skill-pill" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.35);">⚡ ${s.invoked_count}x Active</span>`
+                  : `<span class="agent-card-priority-pill" style="opacity: 0.65;">💤 Standby</span>`}
+              </div>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase;">${escapeHtml(s.provider || 'antigravity')}</span>
+          </div>
+          <p class="agent-card-desc">${escapeHtml(s.description || 'On-demand procedural runbook for agentic execution.')}</p>
+          <div class="agent-card-meta">
+            <span class="agent-token-badge" style="color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08);">⚡ ~${(s.tokens_est || 0).toLocaleString()} tok</span>
+            <span class="agent-word-badge">🔤 ${(s.word_count || 0).toLocaleString()} words</span>
+            <span>📏 ${s.line_count || 0} lines</span>
+            ${s.has_scripts ? '<span>🛠️ Scripts</span>' : ''}
+            ${s.has_examples ? '<span>💡 Examples</span>' : ''}
+            ${s.has_references ? '<span>📚 References</span>' : ''}
+            ${s.workspace ? `<span>📁 ${escapeHtml(s.workspace)}</span>` : ''}
+          </div>
+
+          <!-- Active Invocation Steps Timeline (R-042) -->
+          ${isActive && steps.length > 0 ? `
+            <div style="margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.35rem;">
+              <div style="font-size: 0.72rem; color: #34d399; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+                <span>⚡ Execution Steps (${steps.length})</span>
+                <span style="color: var(--text-dim); font-size: 0.7rem; font-family: var(--font-mono, monospace);">Span: #${s.first_step_idx} ➔ #${s.last_step_idx}</span>
+              </div>
+              <div class="steps-row">
+                <span class="steps-label">Steps:</span>
+                ${dispSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                ${hasMoreSteps ? `<span class="step-marker-pill more" title="${steps.length} total executions">+${steps.length - 6} more</span>` : ''}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Invocation Triggers Breakdown (R-042) -->
+          ${isActive && triggers.length > 0 ? `
+            <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;">
+              <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">
+                🎯 Invocation Triggers
+              </div>
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                ${triggers.map(tr => `<span class="sub-command-recent" style="margin: 0; font-size: 0.7rem; padding: 2px 8px;">${escapeHtml(tr)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="agent-card-actions" style="margin-top: 0.8rem;">
+            <span class="agent-card-path" title="${escapeHtml(s.file_path)}">${escapeHtml(s.file_path)}</span>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(s.file_path)}" title="Open skill in embedded File Viewer">📖 Inspect</button>
+              <button class="btn-icon copy-agent-path-btn" style="width: 26px; height: 26px; font-size: 0.75rem;" data-path="${escapeHtml(s.file_path)}" title="Copy Path">📋</button>
+              ${isActive ? `
+                <button class="btn-ghost-sm step-marker-pill" data-step="${s.first_step_idx}" title="Jump to First Execution">⏮ #${s.first_step_idx}</button>
+                <button class="btn-ghost-sm step-marker-pill" data-step="${s.last_step_idx}" title="Jump to Last Execution">⏭ #${s.last_step_idx}</button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ─── CARD: MCP Server & Tools ───
+    else if (it.kind === 'mcp_server') {
+      const srv = it.data;
+      const isActive = srv.invoked_count > 0;
+      const tools = srv.active_tools || [];
+      const dormant = srv.dormant_tools || [];
+      weight = 170 + (tools.length * 75) + (lens === 'cascade' && dormant.length > 0 ? 50 : 0);
+
+      cardHtml = `
+        <div class="agent-card" style="border-color: ${isActive ? 'rgba(56, 189, 248, 0.45)' : 'rgba(255, 255, 255, 0.08)'}; background: ${isActive ? 'rgba(56, 189, 248, 0.04)' : 'rgba(15, 23, 42, 0.45)'};">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">🔌 ${escapeHtml(srv.name)}</span>
+              <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                <span class="agent-card-scope-badge ${srv.scope}">${srv.scope}</span>
+                ${isActive
+                  ? `<span class="session-invoked-skill-pill" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);">⚡ ${srv.invoked_count} calls</span>`
+                  : `<span class="agent-card-priority-pill" style="opacity: 0.65;">💤 Dormant</span>`}
+              </div>
+            </div>
+            <span style="font-size: 0.72rem; color: #7dd3fc; font-family: var(--font-mono, monospace);">${tools.length} active tool${tools.length === 1 ? '' : 's'}</span>
+          </div>
+          <p class="agent-card-desc" style="font-family: monospace; font-size: 0.75rem;">
+            Command: ${escapeHtml(srv.command || 'runtime dynamic')} ${(srv.args || []).map(a => escapeHtml(a)).join(' ')}
+          </p>
+
+          <!-- Active Tools Section -->
+          ${tools.length > 0 ? `
+            <div style="margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                ⚡ Active Tools (${tools.length})
+              </div>
+              ${tools.map(t => {
+                const steps = t.step_indices || [];
+                const displaySteps = steps.slice(0, 5);
+                const hasMore = steps.length > 5;
+                return `
+                  <div class="mcp-tool-row">
+                    <div class="mcp-tool-row-header">
+                      <span class="mcp-tool-name">⚡ ${escapeHtml(t.name)}</span>
+                      <span class="mcp-tool-count-badge">${t.invoked_count}x</span>
+                    </div>
+                    <div class="steps-row">
+                      <span class="steps-label">Steps:</span>
+                      ${displaySteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                      ${hasMore ? `<span class="step-marker-pill more" title="${steps.length} total calls">+${steps.length - 5}</span>` : ''}
+                    </div>
+                    ${t.recent_args_summary ? `<div class="mcp-tool-args-preview" title="${escapeHtml(t.recent_args_summary)}">args: ${escapeHtml(t.recent_args_summary)}</div>` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+
+          <!-- Dormant Tools Section (Cascade mode) -->
+          ${lens === 'cascade' && dormant.length > 0 ? `
+            <div style="margin-top: 0.6rem;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem;">💤 Available Uncalled Tools (${dormant.length}):</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                ${dormant.map(dName => `<span class="tool-file-pill" style="opacity: 0.6; font-size: 0.72rem;">${escapeHtml(dName)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // ─── CARD: Native Agentic Tool (R-040, R-041) ───
+    else if (it.kind === 'native_tool') {
+      const nt = it.data;
+      const steps = nt.step_indices || [];
+      const displaySteps = steps.slice(0, 6);
+      const hasMore = steps.length > 6;
+      const subBreakdown = nt.sub_breakdown || [];
+      const isRunCmd = nt.name === 'run_command' || nt.name === 'bash' || nt.name === 'exec' || nt.name === 'terminal';
+      const isFileOp = nt.name === 'read_file' || nt.name === 'write_file' || nt.name === 'edit_file' || nt.name === 'view_file';
+
+      if (isRunCmd) {
+        weight = 240 + (Math.min(subBreakdown.length, 5) * 75);
+      } else if (isFileOp) {
+        weight = 180 + (subBreakdown.length * 50);
+      } else {
+        weight = 160 + (steps.length > 0 ? 40 : 0);
+      }
+
+      cardHtml = `
+        <div class="agent-card ${isRunCmd ? 'agent-card-highlight' : ''}" style="${isRunCmd ? 'border-color: rgba(6, 182, 212, 0.45); background: rgba(6, 182, 212, 0.03);' : ''}">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">${isRunCmd ? '💻' : (isFileOp ? '📁' : '🛠️')} ${escapeHtml(nt.name)}</span>
+              <span class="native-category-badge ${nt.category || 'Agentic'}">${escapeHtml(nt.category || 'Agentic')}</span>
+            </div>
+            <span class="mcp-tool-count-badge">${nt.invoked_count}x</span>
+          </div>
+          <p class="agent-card-desc" style="font-size: 0.8rem; color: var(--text-muted);">
+            Native agent capability executing across ${steps.length} turns in the session timeline.
+          </p>
+      `;
+
+      // Year 2126 Holographic Command Spectrum Bar for run_command
+      if (isRunCmd && subBreakdown.length > 0) {
+        const primaryBreakdown = subBreakdown.slice(0, 5);
+        const overflowBreakdown = subBreakdown.slice(5);
+
+        const renderCommandRow = (sb) => {
+          const sbSteps = sb.step_indices || [];
+          const dispSbSteps = sbSteps.slice(0, 5);
+          const sbMore = sbSteps.length > 5;
+          const catColor = getCategoryColor(sb.category);
+          return `
+            <div class="sub-command-row">
+              <div class="sub-command-header">
+                <div class="sub-command-label-group">
+                  <span class="sub-command-icon">${getCategoryIcon(sb.category)}</span>
+                  <span class="sub-command-key" title="${escapeHtml(sb.label)}">${escapeHtml(sb.label)}</span>
+                  <span class="native-category-badge" style="background: ${catColor}20; color: ${catColor}; border: 1px solid ${catColor}40; font-size: 0.64rem;">${escapeHtml(sb.category || 'System')}</span>
+                </div>
+                <div class="sub-command-stats">
+                  <span class="sub-command-count">${sb.count}x</span>
+                  <span class="sub-command-pct">(${sb.percentage}%)</span>
+                </div>
+              </div>
+              ${sb.recent_items && sb.recent_items.length ? `
+                <div class="sub-command-recent" title="Recent: ${escapeHtml(sb.recent_items.join(' • '))}">
+                  <span class="recent-tag">Recent:</span> ${escapeHtml(sb.recent_items[0])}
+                </div>
+              ` : ''}
+              <div class="sub-command-steps">
+                <span class="sub-steps-label">Steps:</span>
+                ${dispSbSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                ${sbMore ? `<span class="step-marker-pill more" title="${sbSteps.length} total calls">+${sbSteps.length - 5}</span>` : ''}
+              </div>
+            </div>
+          `;
+        };
+
+        cardHtml += `
+          <div style="margin-top: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">
+                ⚡ Command Spectrum (${subBreakdown.length} types)
+              </span>
+              <span style="font-size: 0.7rem; color: var(--text-dim); font-family: var(--font-mono, monospace);">
+                ${nt.invoked_count} total executions
+              </span>
+            </div>
+            <div class="command-spectrum-bar" title="Execution distribution across ${subBreakdown.length} command types">
+              ${subBreakdown.map(sb => `
+                <div class="spectrum-segment" style="width: ${sb.percentage}%; background-color: ${getCategoryColor(sb.category)};" title="${escapeHtml(sb.label)}: ${sb.count}x (${sb.percentage}%)"></div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Dynamic Adaptive Sub-Command Grid -->
+          <div class="sub-command-matrix">
+            ${primaryBreakdown.map(renderCommandRow).join('')}
+            ${overflowBreakdown.length > 0 ? `
+              <div class="sub-command-overflow" style="display: none; flex-direction: column; gap: 0.5rem;">
+                ${overflowBreakdown.map(renderCommandRow).join('')}
+              </div>
+              <button class="sub-command-toggle-btn" data-count="${subBreakdown.length}" data-overflow="${overflowBreakdown.length}">
+                <span>✨ Show all ${subBreakdown.length} command types (+${overflowBreakdown.length} more)</span>
+              </button>
+            ` : ''}
+          </div>
+        `;
+      } else if (isFileOp && subBreakdown.length > 0) {
+        // Filesystem tools: extension breakdown
+        cardHtml += `
+          <div style="margin-top: 0.75rem;">
+            <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #34d399; margin-bottom: 0.4rem;">
+              📁 File Types Touched (${subBreakdown.length})
+            </div>
+            <div class="file-ext-matrix">
+              ${subBreakdown.map(sb => {
+                const sbSteps = sb.step_indices || [];
+                const dispSbSteps = sbSteps.slice(0, 3);
+                return `
+                  <div class="file-ext-chip">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
+                      <span class="ext-name">${escapeHtml(sb.key)}</span>
+                      <span class="ext-count">${sb.count}x (${sb.percentage}%)</span>
+                    </div>
+                    ${sb.recent_items && sb.recent_items.length ? `
+                      <div class="ext-recent" title="${escapeHtml(sb.recent_items.join(', '))}">
+                        ${escapeHtml(sb.recent_items[0])}
+                      </div>
+                    ` : ''}
+                    <div class="steps-row" style="margin-top: 0.25rem;">
+                      <span class="steps-label" style="font-size: 0.65rem;">Steps:</span>
+                      ${dispSbSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                      ${sbSteps.length > 3 ? `<span class="step-marker-pill more" title="${sbSteps.length} total calls">+${sbSteps.length - 3}</span>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        // Default timeline steps list
+        cardHtml += `
+          <div class="steps-row" style="margin-top: 0.4rem;">
+            <span class="steps-label">Steps:</span>
+            ${displaySteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+            ${hasMore ? `<span class="step-marker-pill more" title="${steps.length} total calls">+${steps.length - 6} more</span>` : ''}
+          </div>
+        `;
+      }
+
+      cardHtml += `
+          <div class="agent-card-actions" style="margin-top: 0.8rem;">
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn-ghost-sm step-marker-pill" data-step="${nt.first_step_idx}" title="Jump to First Execution">⏮ #${nt.first_step_idx}</button>
+              <button class="btn-ghost-sm step-marker-pill" data-step="${nt.last_step_idx}" title="Jump to Last Execution">⏭ #${nt.last_step_idx}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ─── CARD: Active Rule ───
+    else if (it.kind === 'rule') {
+      const r = it.data;
       const isConst = (r.priority || '').includes('Constitutional') || r.name.includes('constitution') || r.name.includes('101');
-      html += `
+      weight = 165;
+      cardHtml = `
         <div class="agent-card">
           <div class="agent-card-header">
             <div class="agent-card-title-group">
               <span class="agent-card-title">📜 ${escapeHtml(r.title || r.name)}</span>
-              <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                 <span class="agent-card-scope-badge ${r.scope}">${r.scope}</span>
                 <span class="agent-card-priority-pill ${isConst ? 'constitutional' : ''}">${escapeHtml(r.priority || 'Standard')}</span>
               </div>
@@ -4183,57 +5022,106 @@ function renderSessionContext(ctx) {
           </div>
           <div class="agent-card-actions">
             <span class="agent-card-path" title="${escapeHtml(r.file_path)}">${escapeHtml(r.file_path)}</span>
-            <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(r.file_path)}" title="Open rule in File Viewer">📖 Inspect</button>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn-ghost-sm inspect-agent-file-btn" data-path="${escapeHtml(r.file_path)}" title="Open rule in File Viewer">📖 Inspect</button>
+              <button class="btn-icon copy-agent-path-btn" style="width: 26px; height: 26px; font-size: 0.75rem;" data-path="${escapeHtml(r.file_path)}" title="Copy Path">📋</button>
+            </div>
           </div>
         </div>
       `;
-    });
-    html += `</div></div>`;
-  }
+    }
 
-  // 3. Available On-Demand Skills
-  if (availableSkills.length > 0) {
-    html += `
-      <div class="session-context-section">
-        <div class="session-context-section-title">
-          <span>💤 Available Skills (${availableSkills.length})</span>
-          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Mounted in system prompt via progressive disclosure</span>
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-    `;
-    availableSkills.forEach(s => {
-      html += `
-        <div class="tool-file-pill inspect-agent-file-btn" style="cursor: pointer;" data-path="${escapeHtml(s.file_path)}" title="${escapeHtml(s.description)} (${(s.word_count || 0).toLocaleString()} words, ~${(s.tokens_est || 0).toLocaleString()} tokens)">
-          <span>⚡ ${escapeHtml(s.name)}</span>
-          <span style="font-size: 0.7rem; color: #34d399; margin-left: 4px;">~${(s.tokens_est || 0).toLocaleString()} tok</span>
+    // ─── CARD: Subagent ───
+    else if (it.kind === 'subagent') {
+      const sa = it.data;
+      weight = 130;
+      cardHtml = `
+        <div class="agent-card" style="border-color: rgba(99, 102, 241, 0.4);">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">🤖 Subagent Persona</span>
+              <span class="agent-card-scope-badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;">DELEGATE</span>
+            </div>
+          </div>
+          <p class="agent-card-desc" style="font-size: 0.95rem; font-weight: 600; color: #e0e7ff;">
+            ${escapeHtml(sa)}
+          </p>
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem;">
+            Autonomous worker thread spawned with specialized instructions.
+          </div>
         </div>
       `;
-    });
-    html += `</div></div>`;
-  }
+    }
 
-  // 4. Subagents, MCP & Slash Commands
-  if (subagents.length > 0 || slashCommands.length > 0) {
-    html += `
-      <div class="session-context-section">
-        <div class="session-context-section-title">
-          <span>🤖 Subagents &amp; Commands</span>
+    // ─── CARD: Slash Command ───
+    else if (it.kind === 'command') {
+      const cmd = it.data;
+      weight = 130;
+      cardHtml = `
+        <div class="agent-card" style="border-color: rgba(6, 182, 212, 0.4);">
+          <div class="agent-card-header">
+            <div class="agent-card-title-group">
+              <span class="agent-card-title">⚡ Slash Command</span>
+              <span class="agent-card-scope-badge" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">WORKFLOW</span>
+            </div>
+          </div>
+          <p class="agent-card-desc" style="font-size: 1.05rem; font-family: var(--font-mono, monospace); font-weight: 700; color: #67e8f9;">
+            ${escapeHtml(cmd)}
+          </p>
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem;">
+            Interactive slash workflow shortcut executed during session.
+          </div>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem;">
-          ${subagents.map(sa => `<span class="chip" style="color: #a5b4fc;">🤖 ${escapeHtml(sa)}</span>`).join('')}
-          ${slashCommands.map(cmd => `<span class="chip" style="color: #67e8f9;">⚡ ${escapeHtml(cmd)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  }
+      `;
+    }
 
-  el.sessionContextContent.innerHTML = html;
+    if (cardHtml) {
+      renderedCards.push({ html: cardHtml, weight });
+    }
+  });
+
+  const containerW = el.sessionContextContent.clientWidth || window.innerWidth;
+  el.sessionContextContent.innerHTML = binPackCards(renderedCards, containerW);
+
+  // Attach Step Jump Navigation to all step marker pills
+  el.sessionContextContent.querySelectorAll('.step-marker-pill[data-step]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      jumpToTimelineStep(parseInt(btn.dataset.step, 10));
+    };
+  });
 
   // Attach 1-click Inspect to openFileViewer
   el.sessionContextContent.querySelectorAll('.inspect-agent-file-btn').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
       openFileViewer(btn.dataset.path);
+    };
+  });
+
+  // Attach Copy Path
+  el.sessionContextContent.querySelectorAll('.copy-agent-path-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.path, 'Path copied to clipboard!');
+    };
+  });
+
+  // Attach Sub-Command Overflow Toggle (R-041 Dynamic Density)
+  el.sessionContextContent.querySelectorAll('.sub-command-toggle-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const parent = btn.closest('.sub-command-matrix');
+      const overflow = parent?.querySelector('.sub-command-overflow');
+      if (overflow) {
+        const isHidden = overflow.style.display === 'none';
+        overflow.style.display = isHidden ? 'flex' : 'none';
+        const total = btn.dataset.count;
+        const extra = btn.dataset.overflow;
+        btn.innerHTML = isHidden
+          ? `<span>🔼 Collapse to top 5 commands</span>`
+          : `<span>✨ Show all ${total} command types (+${extra} more)</span>`;
+      }
     };
   });
 }
@@ -4254,5 +5142,8 @@ window.openAgentBrainModal = openAgentBrainModal;
 window.closeAgentMatrixModal = closeAgentMatrixModal;
 window.openSessionContextModal = openSessionContextModal;
 window.closeSessionContextModal = closeSessionContextModal;
+window.renderSessionMatrix = renderSessionMatrix;
+window.jumpToTimelineStep = jumpToTimelineStep;
+window.loadSessionDetail = loadSessionDetail;
 
 

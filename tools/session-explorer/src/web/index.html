@@ -172,19 +172,25 @@
             <span class="session-time" id="detailTime"></span>
           </div>
 
-          <!-- Relocated Export Actions and Artifacts in Top Section for Optimal Real Estate Usage -->
+          <!-- Relocated Export Actions and Artifacts in Top Section with Year 2126 Holographic Aero-Mica Capsules -->
           <div class="detail-actions-group">
-            <button class="btn-pill" id="detailAgentContextBtn" title="Inspect active rules, invoked skills, and tools governing this session">
-              🧠 Agent Context (<span id="detailAgentContextCount">0</span>)
+            <button class="holo-header-btn context-btn" id="detailAgentContextBtn" title="Inspect active rules, invoked skills, and tools governing this session">
+              <span class="holo-btn-icon">🧠</span>
+              <span class="holo-btn-label">Agent Context</span>
+              <span class="holo-btn-counter context" id="detailAgentContextCount">0</span>
             </button>
-            <button class="btn-pill" id="detailFilesBtn" title="Inspect files and artifacts touched in this session">
-              📁 Files &amp; Artifacts (<span id="detailFilesCountBadge">0</span>)
+            <button class="holo-header-btn files-btn" id="detailFilesBtn" title="Inspect files and artifacts touched in this session">
+              <span class="holo-btn-icon">📁</span>
+              <span class="holo-btn-label">Files &amp; Artifacts</span>
+              <span class="holo-btn-counter files" id="detailFilesCountBadge">0</span>
             </button>
-            <button class="btn-pill" id="exportMdBtn" title="Export conversation to Markdown">
-              📄 Export MD
+            <button class="holo-header-btn export-btn export-md" id="exportMdBtn" title="Export conversation to Markdown">
+              <span class="holo-btn-icon">📄</span>
+              <span class="holo-btn-label">Export MD</span>
             </button>
-            <button class="btn-pill" id="exportJsonBtn" title="Export conversation to JSON">
-              📦 Export JSON
+            <button class="holo-header-btn export-btn export-json" id="exportJsonBtn" title="Export conversation to JSON">
+              <span class="holo-btn-icon">📦</span>
+              <span class="holo-btn-label">Export JSON</span>
             </button>
           </div>
         </div>
@@ -456,7 +462,7 @@
 
   <!-- AGENT BRAIN & CONTEXT MATRIX MODAL (R-039) -->
   <div class="modal-overlay" id="agentMatrixModal" aria-label="Agent Brain & Context Matrix" role="dialog">
-    <div class="modal-box" style="max-width: 960px; max-height: 88vh; display: flex; flex-direction: column;">
+    <div class="modal-box" style="width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh; display: flex; flex-direction: column;">
       <div class="modal-header">
         <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem;">
           <span>🧠</span>
@@ -478,11 +484,30 @@
         </div>
       </div>
       <div class="agent-matrix-filter-chips">
-        <button class="chip active" data-type="ALL">All Items</button>
-        <button class="chip" data-type="RULES">📜 Rules &amp; Constitutions (<span id="agentMatrixRulesCount">0</span>)</button>
-        <button class="chip" data-type="SKILLS">⚡ Skills &amp; Runbooks (<span id="agentMatrixSkillsCount">0</span>)</button>
-        <button class="chip" data-type="PLUGINS">🔌 Plugins &amp; MCP (<span id="agentMatrixPluginsCount">0</span>)</button>
-        <button class="chip" data-type="HOOKS">🪝 Lifecycle Hooks (<span id="agentMatrixHooksCount">0</span>)</button>
+        <button class="matrix-filter-chip active" data-type="ALL">
+          <span class="matrix-chip-icon">🌐</span>
+          <span class="matrix-chip-label">All Items</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="RULES">
+          <span class="matrix-chip-icon">📜</span>
+          <span class="matrix-chip-label">Rules &amp; Constitutions</span>
+          <span class="matrix-chip-counter rules" id="agentMatrixRulesCount">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="SKILLS">
+          <span class="matrix-chip-icon">⚡</span>
+          <span class="matrix-chip-label">Skills &amp; Runbooks</span>
+          <span class="matrix-chip-counter skills" id="agentMatrixSkillsCount">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="PLUGINS">
+          <span class="matrix-chip-icon">🔌</span>
+          <span class="matrix-chip-label">Plugins &amp; MCP</span>
+          <span class="matrix-chip-counter mcp" id="agentMatrixPluginsCount">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="HOOKS">
+          <span class="matrix-chip-icon">🪝</span>
+          <span class="matrix-chip-label">Lifecycle Hooks</span>
+          <span class="matrix-chip-counter native" id="agentMatrixHooksCount">0</span>
+        </button>
       </div>
       <div class="agent-matrix-telemetry-ribbon" id="agentMatrixTelemetryRibbon">
         <div class="telemetry-pill preloaded" id="agentMatrixPreloadedPill" title="Estimated tokens injected into turns by default (Always-on rules &amp; constitutions)">
@@ -506,21 +531,92 @@
     </div>
   </div>
 
-  <!-- IN-SESSION AGENT CONTEXT DRAWER (R-039) -->
-  <div class="modal-overlay" id="sessionContextModal" aria-label="Session Agent Context" role="dialog">
-    <div class="modal-box" style="max-width: 900px; max-height: 85vh; display: flex; flex-direction: column;">
+  <!-- IN-SESSION AGENT BRAIN & BEHAVIORAL MATRIX (R-039, R-040) -->
+  <div class="modal-overlay" id="sessionContextModal" aria-label="Session Agent Brain & Behavioral Matrix" role="dialog">
+    <div class="modal-box session-matrix-box" style="width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh; display: flex; flex-direction: column;">
       <div class="modal-header">
-        <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem;">
-          <span>🧠</span>
-          <span>Active Session Agent Context</span>
-          <span class="badge" id="sessionContextIdBadge" style="font-family: monospace; font-size: 0.78rem;"></span>
+        <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+          <span class="holo-brain-pulse">🧠</span>
+          <span>Session Agent Brain &amp; Behavioral Matrix</span>
+          <span class="badge" id="sessionContextIdBadge" style="font-family: monospace; font-size: 0.78rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);"></span>
+          <span class="badge" id="sessionMatrixTotalCountBadge" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4); color: var(--accent-indigo); font-size: 0.78rem;">0 items</span>
         </div>
         <button class="btn-icon" id="closeSessionContextModalBtn" title="Close (Esc)">✕</button>
       </div>
+
+      <!-- Holographic Mica Controls & Toolbar -->
+      <div class="agent-matrix-toolbar session-matrix-toolbar">
+        <div class="segmented-control" id="sessionMatrixLensControl" role="group" aria-label="Session Behavioral Lenses">
+          <button class="segment-btn active" data-lens="active">⚡ Active Runtime Matrix</button>
+          <button class="segment-btn" data-lens="cascade">🌐 Full Context Cascade</button>
+          <button class="segment-btn" data-lens="telemetry">📊 Holographic Telemetry &amp; Audit</button>
+        </div>
+        <div class="agent-matrix-search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="sessionMatrixSearchInput" placeholder="Filter session rules, skills, MCP servers, tools, or args..." autocomplete="off">
+          <button class="clear-search-btn" id="clearSessionMatrixSearchBtn" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <!-- Multi-Spectrum Fluid Adaptive Filter Chips -->
+      <div class="agent-matrix-filter-chips session-matrix-filter-chips">
+        <button class="matrix-filter-chip active" data-type="ALL">
+          <span class="matrix-chip-icon">🌐</span>
+          <span class="matrix-chip-label">All Elements</span>
+          <span class="matrix-chip-counter all" id="sessionMatrixChipAll">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="SKILLS">
+          <span class="matrix-chip-icon">⚡</span>
+          <span class="matrix-chip-label" id="sessionMatrixChipSkillsLabel">Invoked Skills</span>
+          <span class="matrix-chip-counter skills" id="sessionMatrixChipSkills">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="MCP">
+          <span class="matrix-chip-icon">🔌</span>
+          <span class="matrix-chip-label">MCP Servers &amp; Tools</span>
+          <span class="matrix-chip-counter mcp" id="sessionMatrixChipMCP">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="NATIVE">
+          <span class="matrix-chip-icon">🛠️</span>
+          <span class="matrix-chip-label">Native Agentic Tools</span>
+          <span class="matrix-chip-counter native" id="sessionMatrixChipNative">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="RULES">
+          <span class="matrix-chip-icon">📜</span>
+          <span class="matrix-chip-label">Active Rules</span>
+          <span class="matrix-chip-counter rules" id="sessionMatrixChipRules">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="ORCHESTRATION">
+          <span class="matrix-chip-icon">🤖</span>
+          <span class="matrix-chip-label">Subagents &amp; Commands</span>
+          <span class="matrix-chip-counter orch" id="sessionMatrixChipOrch">0</span>
+        </button>
+      </div>
+
+      <!-- Holographic Telemetry Ribbon -->
+      <div class="agent-matrix-telemetry-ribbon session-matrix-telemetry-ribbon" id="sessionMatrixTelemetryRibbon">
+        <div class="telemetry-pill preloaded" id="sessionMatrixInjectedPill" title="Tokens actually injected into active prompt turns (Active Rules + Executed Skills)">
+          <span class="telemetry-lbl">📌 Injected Context:</span>
+          <span class="telemetry-val" id="sessionMatrixInjectedVal">~0 tokens</span>
+        </div>
+        <div class="telemetry-pill mcp" id="sessionMatrixMCPPill" title="Empirical MCP tool calls across active servers">
+          <span class="telemetry-lbl">🔌 MCP Invocations:</span>
+          <span class="telemetry-val" id="sessionMatrixMCPVal">0 calls</span>
+        </div>
+        <div class="telemetry-pill diversity" id="sessionMatrixDiversityPill" title="Tool Diversity Index (Unique tools / Total calls)">
+          <span class="telemetry-lbl">🛠️ Diversity Index:</span>
+          <span class="telemetry-val" id="sessionMatrixDiversityVal">0.0 (0 tools)</span>
+        </div>
+        <div class="telemetry-pill ondemand" id="sessionMatrixOndemandPill" title="Dormant bloat across uninvoked on-demand skills &amp; tools">
+          <span class="telemetry-lbl">💤 Dormant Bloat:</span>
+          <span class="telemetry-val" id="sessionMatrixOndemandVal">~0 tokens</span>
+        </div>
+        <div class="telemetry-pill reliability" id="sessionMatrixReliabilityPill" title="Execution reliability quotient (Success vs Tool Errors)">
+          <span class="telemetry-lbl">⚡ Reliability:</span>
+          <span class="telemetry-val" id="sessionMatrixReliabilityVal">100%</span>
+        </div>
+      </div>
+
       <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-          The active rules, constitutions, invoked skills, and tool integrations that governed the agent's behavior during this session.
-        </p>
         <div id="sessionContextContent">
           <!-- Injected dynamically by app.js -->
         </div>

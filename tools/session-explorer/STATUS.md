@@ -1,18 +1,18 @@
 ---
 tool: session-explorer
-status: review
-version: 0.3.1
+status: released
+version: 0.3.5
 language: go
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---
 
 # SDLC Status
 
-## Current Phase: `review`
+## Current Phase: `released`
 
 ### Status Definitions
 
@@ -35,6 +35,9 @@ spec: ../../specs/catalog/session-explorer.md
 | 2026-09-18 | `spec-review` | `in-progress` | Spec approved; Go backend and Bun frontend developed |
 | 2026-09-18 | `in-progress` | `testing` | All code complete; unit test suite and demo verified |
 | 2026-09-18 | `testing` | `review` | All 27 requirements and 9 NFRs verified; ready for human review |
+| 2026-11-04 | `review` | `review` | R-040 (Session Agent Brain & MCP Behavioral Matrix), R-041 (Command & Tool Sub-Breakdown Spectrum), and R-042 (Empirical Skill Invocation Telemetry & Standby Decomposition) verified |
+| 2026-11-04 | `review` | `review` | R-043 (EC2-Style Greedy Bin-Packing Spatial Placement & Panoramic Masonry Matrix, Holographic Header Capsules) verified |
+| 2026-11-04 | `review` | `released` | User approved release v0.3.5 (R-040..R-043 verified and shipped) |
 
 ---
 
@@ -42,8 +45,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 39 | 39 | 100% |
-| Acceptance Criteria (AC-XXX) | 45 | 45 | 100% |
+| Requirements (R-XXX) | 43 | 43 | 100% |
+| Acceptance Criteria (AC-XXX) | 70 | 70 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -91,6 +94,10 @@ spec: ../../specs/catalog/session-explorer.md
 | R-037 | Bounded diagram viewports & fullscreen theater mode | `src/web/src/styles.css`, `src/web/src/app.js` | headless browser | 🧪 |
 | R-038 | Native in-browser file & artifact viewer with syntax highlighting | `src/api.go`, `src/web/src/app.js`, `src/web/index.html` | `src/api_test.go`, headless browser | 🧪 |
 | R-039 | Universal Agent Context & Behavioral Matrix (Global & Workspace Rules, Skills, Instructions & In-Session Influence) | `src/context_scanner.go`, `src/api.go`, `src/web/src/app.js` | `src/context_test.go`, headless browser | 🧪 |
+| R-040 | Universal Session Agent Brain & MCP Behavioral Matrix (Empirical MCP & Native Tools Telemetry, Step Timelines, Diversity Index) | `src/context_scanner.go`, `src/types.go`, `src/web/src/app.js` | `src/context_test.go`, headless browser | 🧪 |
+| R-041 | Command Execution & Tool Sub-Breakdown Spectrum (Deconstruct run_command & Filesystem Tools, Binary Spectrum Bar, Step Jumps) | `src/context_scanner.go`, `src/types.go`, `src/web/src/app.js`, `src/web/src/styles.css` | `src/context_test.go`, headless browser | 🧪 |
+| R-042 | Empirical Skill Invocation Telemetry & Standby Decomposition (3-Tier Evidence, Scope Deduplication, Step Indices, Triggers) | `src/context_scanner.go`, `src/types.go`, `src/web/src/app.js`, `src/web/index.html` | `src/context_test.go`, headless browser | 🧪 |
+| R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix (EC2-Style Greedy Placement, Dynamic Column Balancing, Holographic Action Capsules) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 
@@ -123,4 +130,4 @@ spec: ../../specs/catalog/session-explorer.md
 - [x] Runnable example provided (`examples/demo.sh`)
 - [x] README.md completed with documentation & API contracts
 - [x] CONTEXT.md and DEVLOG.md up to date
-- [ ] User approval for release
+- [x] User approval for release

@@ -250,7 +250,8 @@
           <a href="#sec-session-arch" class="nav-tree-link">Go + Bun Standalone Binary</a>
           <a href="#sec-session-wip" class="nav-tree-link">Agent WIP Recovery &amp; Disambiguation</a>
           <a href="#sec-session-viewer" class="nav-tree-link">Code Viewer &amp; In-Page Find</a>
-          <a href="#sec-agent-context" class="nav-tree-link">Agent Context &amp; Behavioral Matrix</a>
+          <a href="#sec-agent-context" class="nav-tree-link">Agent Context &amp; Dual-Sourcing</a>
+          <a href="#sec-session-brain" class="nav-tree-link">Session Agent Brain &amp; Telemetry Cockpit</a>
           <a href="#sec-session-swagger" class="nav-tree-link">OpenAPI 3.0 &amp; Swagger UI</a>
           <a href="#sec-session-usage" class="nav-tree-link">Telemetry &amp; CLI Quickstart</a>
         </div>
@@ -1468,10 +1469,10 @@ flowchart TD
             </div>
           </div>
 
-          <!-- Section: Universal Agent Context & Behavioral Matrix (R-039) -->
+          <!-- Section: Universal Agent Context & Behavioral Matrix -->
           <h3 class="section-h2" id="sec-agent-context">Universal Agent Context &amp; Behavioral Matrix</h3>
           <p>
-            Autonomous coding assistants operate under a complex hierarchy of behavioral rules, system instructions, composable skills, plugins, and MCP tools. Session Explorer introduces the <strong>Universal Agent Context &amp; Behavioral Matrix</strong> (<code>R-039</code>), providing complete visibility into the cognitive boundaries, active capabilities, and token footprints governing every agent turn.
+            Autonomous coding assistants operate under a complex hierarchy of behavioral rules, system instructions, composable skills, plugins, and MCP tools. Session Explorer introduces the <strong>Universal Agent Context &amp; Behavioral Matrix</strong>, providing complete visibility into the cognitive boundaries, active capabilities, and token footprints governing every agent turn.
           </p>
 
           <!-- Context Dual-Sourcing Callout -->
@@ -1526,7 +1527,7 @@ flowchart TD
                 </pre>
               </div>
             </div>
-            <div class="canvas-caption">Figure 2.6: Universal Agent Context &amp; Behavioral Dual-Sourcing Engine (R-039)</div>
+            <div class="canvas-caption">Figure 2.6: Universal Agent Context &amp; Behavioral Dual-Sourcing Engine</div>
           </div>
 
           <div class="card-grid">
@@ -1544,7 +1545,75 @@ flowchart TD
             </div>
             <div class="glass-card">
               <h4>📖 Native File Viewer Re-use</h4>
-              <p>Deep synergy with R-038: Every rule and skill features 1-click inspection via <code>openFileViewer(path)</code>, rendering full KaTeX math, Mermaid diagrams, and line anchors without redundant UI modals.</p>
+              <p>Deep synergy with the In-Browser File Viewer: Every rule and skill features 1-click inspection via <code>openFileViewer(path)</code>, rendering full KaTeX math, Mermaid diagrams, and line anchors without redundant UI modals.</p>
+            </div>
+          </div>
+
+          <!-- Section: Universal Session Agent Brain & Panoramic Telemetry Cockpit -->
+          <h3 class="section-h2" id="sec-session-brain">Universal Session Agent Brain &amp; Panoramic Telemetry Cockpit</h3>
+          <p>
+            Autonomous coding agents execute dozens of opaque tool calls, shell scripts, and MCP queries in fractions of a second. Developers are left operating in the dark: <em>Did the agent enter an infinite build-break loop? Did it actually invoke the domain skills we authored, or did it hallucinate arbitrary bash commands? Did it probe sensitive network interfaces outside its sandbox boundaries?</em> Traditional tooling dumps flat terminal logs or raw JSONL, forcing engineers to manually comb through thousands of noisy lines.
+          </p>
+          <p>
+            Session Explorer transforms black-box agent trajectories into <strong>Forensic Session Intelligence</strong>—combining empirical skill evidence, orthogonal MCP namespace decomposition, 8-domain command classification, and real-time token bloat telemetry into an adaptive, zero-waste panoramic cockpit:
+          </p>
+
+          <!-- Forensic Telemetry & Empirical Evidence Invariant Callout -->
+          <div class="callout callout-theory" style="margin-bottom: 24px;">
+            <div class="callout-header">💡 Forensic Session Intelligence &amp; The Empirical Evidence Invariant</div>
+            <div class="callout-body">
+              <strong>How does Session Explorer separate actual agent execution from prompt preamble noise?</strong>
+              <br><br>
+              In modern LLM frameworks, dozens of skills are statically injected into the system prompt preamble. Merely declaring a skill does not indicate execution! Session Explorer establishes empirical truth through a strict <strong>3-tier evidence hierarchy</strong>:
+              <br><br>
+              <ul>
+                <li><strong>Tier 1 — Explicit Tool Target:</strong> The agent directly reads, modifies, or inspects a skill specification (e.g. <code>read_file</code> targeting <code>skills/omni-graph/SKILL.md</code>).</li>
+                <li><strong>Tier 2 — Subagent Dispatch:</strong> The agent invokes a specialized subagent whose declared role or configuration matches the skill definition (e.g. <code>invoke_subagent</code> with <code>TypeName="omni-graph"</code>).</li>
+                <li><strong>Tier 3 — Semantic Task Reference:</strong> The user prompt or trajectory step explicitly issues a direct command or skill reference (e.g. <code>/session-wip</code> or <code>make session-explorer</code>).</li>
+              </ul>
+              Skills lacking empirical proof are categorized as <strong>Standby Skills</strong> with their scope tags (<code>workspace</code>, <code>global</code>, <code>plugin</code>, <code>builtin</code>) and on-demand token footprint clearly displayed for prompt bloat audits.
+            </div>
+          </div>
+
+          <!-- Interactive Zoomable Canvas: Universal Session Agent Brain Cockpit -->
+          <div class="canvas-container">
+            <div class="canvas-header-bar">
+              <span class="canvas-type-tag">Live Interface · Universal Session Agent Brain Cockpit</span>
+              <div class="canvas-controls-group">
+                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                <span class="zoom-level-badge">100%</span>
+                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                  <span>Theater</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-viewport">
+              <div class="canvas-content-surface">
+                <img src="assets/session-agent-brain-panoramic.png" alt="Universal Session Agent Brain &amp; Panoramic Telemetry Cockpit" loading="lazy">
+              </div>
+            </div>
+            <div class="canvas-caption">Figure 2.7: Universal Session Agent Brain &amp; Panoramic Telemetry Cockpit — Multi-Column Telemetry Displaying Invoked Skills with Execution Spans (SPAN: #2367 → #2547), MCP Server Segregation (Playwright 135 calls, Omni-Graph 18 calls), Native Tool Activity (read_file 351x), GenAI Diversity Metrics, and Standardized Step Navigation with Zero-Overlap Isolation.</div>
+          </div>
+
+          <div class="card-grid">
+            <div class="glass-card">
+              <h4>🎯 Empirical Skill Verification</h4>
+              <p>Eliminates prompt hallucinations by validating active tool utilization (read/edit triggers, subagent dispatch) showing exact linguistic token footprints, execution counters (e.g. <code>2x Active</code>), and chronological step spans.</p>
+            </div>
+            <div class="glass-card">
+              <h4>🔌 Orthogonal MCP &amp; Command Forensics</h4>
+              <p>Isolates external MCP namespaces from internal tools while deconstructing opaque terminal executions into 8 functional domains (<code>Git</code>, <code>Build</code>, <code>Test</code>, <code>Package</code>, <code>IO</code>, <code>System</code>, <code>Network</code>, <code>Automation</code>) to pinpoint compile churn and security crossings instantly.</p>
+            </div>
+            <div class="glass-card">
+              <h4>📊 GenAI Diversity &amp; Bloat Telemetry</h4>
+              <p>Quantifies reasoning diversity via $D = \frac{U_{\text{tools}}}{N_{\text{total}}}$, tracking the ratio of unique tools used ($U$) against total actions ($N$). Dynamically measures active prompt tokens (~38k tok) against dormant bloat (~29k tok).</p>
+            </div>
+            <div class="glass-card">
+              <h4>📐 Height-Balanced Spatial Density</h4>
+              <p>Solves asymmetric telemetry height mismatch using dynamic height-balanced bin packing ($\arg\min_k \sum_{j \in B_k} h_j$), packing 8+ breakdown pallets into a 3-column panoramic widescreen cockpit (<code>min(1560px, 94vw)</code>) with strict column containment and zero layout bleed.</p>
             </div>
           </div>
 

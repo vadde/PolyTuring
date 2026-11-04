@@ -98,6 +98,10 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-037 | Bounded Diagram Viewports & Fullscreen Theater Mode (constrained 440px scrollable canvas, distraction-free pan/zoom theater modal, double-click to expand) | Must | ✅ | 🧪 | src/web/src/styles.css, src/web/src/app.js, src/web/index.html |
 | R-038 | Native In-Browser File & Artifact Viewer (read files securely via GET /api/file, line number gutter, target line anchor scrolling/highlighting, markdown preview with KaTeX/Mermaid, session files aggregation drawer) | Must | ✅ | 🧪 | src/api.go HandleFile, src/web/src/app.js openFileViewer, src/web/index.html |
 | R-039 | Universal Agent Context & Behavioral Matrix: discover and inspect global, workspace, and session rules, skills, plugins, MCP servers, and hooks with precedence cascade and native file viewer inspection | Must | ✅ | 🧪 | context_scanner.go, api.go, context_test.go, src/web/ |
+| R-040 | Universal Session Agent Brain & MCP Behavioral Matrix: Empirical MCP and Native tool telemetry, step timelines, tool diversity index, and holographic mica matrix UI/UX | Must | ✅ | 🧪 | context_scanner.go, src/types.go, api.go, src/web/ |
+| R-041 | Command Execution & Tool Sub-Breakdown Distribution Engine: Decompose run_command and filesystem tools into command spectrum, binary distribution, category weights, step timelines, and holographic telemetry | Must | ✅ | 🧪 | context_scanner.go, src/types.go, context_test.go, src/web/ |
+| R-042 | Empirical Skill Invocation Telemetry & Standby Decomposition: 3-tier epistemic taxonomy, step indices, invocation triggers, scope deduplication, and holographic skill card UI/UX | Must | ✅ | 🧪 | context_scanner.go, src/types.go, context_test.go, src/web/ |
+| R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix: EC2-style greedy shortest-column container placement, 3-column panoramic widescreen expansion (width: min(1560px, 94vw)), and zero-vertical-gap flow | Must | 🔨 | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -352,7 +356,12 @@ Discovers workspace-specific agent guidelines (`.agents/rules/`, `AGENTS.md`, `C
 
 #### `GET /api/sessions/{id}/context`
 
-Analyzes the active rules and guidelines governing a specific session, tracking which skills were **Actively Invoked** (with invocation counts and first step index) versus mounted on-demand via progressive disclosure.
+Analyzes and extracts the complete empirical behavioral matrix of a specific session (R-040), tracking:
+- **Active vs Available Skills**: Execution counts, step markers, injected tokens, and progressive disclosure footprint.
+- **Empirical MCP Telemetry**: Discovered and ad-hoc MCP servers, active vs dormant tools, invocation frequencies, step index spans, and arguments insights.
+- **Native Agentic Tools**: Breakdown of filesystem, terminal, subagent, and search executions.
+- **Analytical Telemetry**: Tool Diversity Index ($D = U / N$), total calls, and error counts.
+- **Active Rules & Governance**: Constitutional invariants and workspace rules active in this session.
 
 
 ### 3.3 Data Source Specification
@@ -493,6 +502,31 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-043 | Given any rule or skill item, clicking `Inspect` opens its full content directly in the embedded Native File Viewer (R-038) with syntax highlighting, Markdown preview, and line numbers | R-039 |
 | AC-044 | Given multiple assistant ecosystems, the backend provider architecture abstracts rule and skill discovery across Antigravity, Claude Code, GitHub Copilot, and Cursor | R-039 |
 | AC-045 | Given rules and skills in the Agent Brain modal or session context drawer, the system computes and renders GenAI bloat telemetry including line count, word count, character count, and estimated tokens ($T \approx \max(\lceil C/4 \rceil, \lceil W \times 1.33 \rceil)$), distinguishing pre-loaded context bloat from on-demand footprint | R-039 |
+| AC-046 | Given a session with tool calls, requesting `GET /api/sessions/:id/context` returns structured `mcp_servers` with `invoked_count`, `active_tools`, `dormant_tools`, and `native_tools` breakdown | R-040 |
+| AC-047 | Given a transcript containing lazy MCP tool calls (`call_mcp_tool`) or eager calls (`mcp_*`), the extraction engine accurately identifies server names, tool names, invocation counts, first/last step indices, and recent arguments | R-040 |
+| AC-048 | Given native tool executions (`read_file`, `write_file`, `run_command`, `invoke_subagent`, etc.), the engine categorizes each tool, computes execution counts, step spans, and detects error states | R-040 |
+| AC-049 | Given the session detail view, the sticky header renders isomorphic Holographic Aero-Mica action capsules for `Agent Context` and `Files & Artifacts` featuring illuminated color-coded digital counter badges matching behavioral matrix palettes; clicking opens the Holographic Session Matrix or Files Drawer | R-040 |
+| AC-050 | Given the Session Agent Matrix modal, the user can search rules, skills, MCP servers, and tools via real-time search input or filter chips (`All`, `⚡ Skills`, `🔌 MCP Tools`, `🛠️ Native Tools`, `📜 Rules`, `🤖 Subagents`) | R-040 |
+| AC-051 | Given the Session Agent Matrix modal, the Telemetry Ribbon displays `📌 Active Injected Tokens`, `🔌 MCP Calls`, `🛠️ Tool Diversity Index` ($D = U/N$), and `💤 Dormant Bloat` | R-040 |
+| AC-052 | Given any tool step pill (`#X`), clicking navigates smoothly to that step in the main conversation timeline with an animated neon pulse highlight; clicking `📖 Inspect` on any rule/skill opens the file in the embedded Native File Viewer | R-040 |
+| AC-053 | Given a session with `run_command` executions, the engine decomposes them by binary (`git`, `make`, `go`, `bun`, `curl`, `kill`) and category (`VCS`, `Build`, `Test`, `Process`, `Inspect`, `Network`, `Runtime`, `System`) | R-041 |
+| AC-054 | Given a session with filesystem tool calls (`read_file`, `write_file`, `edit_file`), the engine decomposes operations by target file extension (`.go`, `.js`, `.css`, `.md`, `.json`) and tracks top files touched with step indices | R-041 |
+| AC-055 | Given the `run_command` card in the Session Agent Matrix, the UI renders a Year 2126 Holographic Command Spectrum bar showing color-coded proportions and an interactive sub-command breakdown drawer with percentages and counts | R-041 |
+| AC-056 | Given any command or file sub-breakdown item, clicking a step pill (`#38`) smoothly jumps to that exact step in the transcript timeline and highlights it | R-041 |
+| AC-057 | Given the filter chips bar in `#sessionContextModal`, chips wrap dynamically into a non-scrollable flex matrix with illuminated color-coded counter badges (`.matrix-chip-counter`) | R-041 |
+| AC-058 | Given the Holographic Telemetry & Audit tab (Lens 3), the UI renders a dedicated Command Execution Spectrum and Sub-Tool Distribution breakdown | R-041 |
+| AC-059 | Given a session transcript, the engine detects Tier 1 skill invocations across all tool calls (`read_file`, `view_file`, `edit_file`, `run_command`) and populates `step_indices`, `last_step_idx`, and `invocation_triggers` | R-042 |
+| AC-060 | Given skills discovered across multiple scopes (workspace, plugin, global, builtin), skills are cleanly deduplicated by Name prioritizing workspace over global/builtin | R-042 |
+| AC-061 | Given the `#sessionContextModal`, the filter chip dynamically labels `Invoked Skills (${activeCount})` in Active lens and `Skills (${activeCount} active / ${totalCount} total)` in Cascade lens | R-042 |
+| AC-062 | Given the Session Agent Matrix modal, `skill_active` and `skill_dormant` render full-parity Holographic Skill Cards matching MCP and Native cards | R-042 |
+| AC-063 | Given an active skill card, the UI renders an illuminated `⚡ Nx` count badge, clickable `#X` step pills with timeline navigation, and trigger breakdown badges | R-042 |
+| AC-064 | Given a standby/dormant skill card in Cascade lens, the UI renders a `💤 Standby` badge, token bloat metric, line count, and 1-click `📖 Inspect` in embedded File Viewer | R-042 |
+| AC-065 | Given the enhanced skill models, all existing unit tests pass and new test `TestR042_ExtractSessionAgentContext_SkillBreakdownAndDeduplication` passes with 100% assertions | R-042 |
+| AC-066 | Given the `#sessionContextModal` and `#agentMatrixModal`, the modal viewport expands to widescreen panoramic dimensions (`width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh;`), utilizing available desktop real estate | R-043 |
+| AC-067 | Given $N$ variable-height agent cards, the frontend executes an EC2-style greedy bin-packing algorithm ($\min_k \sum h$) across $K$ column bins (3 columns on desktop >1200px, 2 columns on tablet, 1 on mobile) | R-043 |
+| AC-068 | Given the bin-packed layout, cards flow continuously down each column track with zero empty vertical gaps beneath shorter cards, eliminating dead grid row space | R-043 |
+| AC-069 | Given an expanding card (e.g. `run_command` drawer toggle), only its column track stretches smoothly without displacing or stretching adjacent column cards | R-043 |
+| AC-070 | Given window resizing or filter changes, the bin-pack layout dynamically re-computes column assignments and updates the DOM in <16ms (60 FPS) | R-043 |
 
 ---
 
@@ -569,3 +603,4 @@ Tests that MUST pass for this spec to be considered satisfied:
 | 2026-09-18 | @vadde | Initial draft |
 | 2026-09-18 | @vadde | Complete specification with all requirements |
 | 2026-10-19 | @vadde | Add R-037 (Bounded Diagram Viewports & Fullscreen Theater Mode) and R-038 (Native In-Browser File & Artifact Viewer) |
+| 2026-11-04 | @vadde | Add R-040 (Session Agent Brain & MCP Behavioral Matrix), R-041 (Command Execution & Tool Breakdown), and R-042 (Empirical Skill Invocation Telemetry & Standby Decomposition) |
