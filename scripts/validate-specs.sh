@@ -134,8 +134,8 @@ validate_tool() {
       else
         error "Released tool must have CHANGELOG version entries"
       fi
-      # No TODOs or FIXMEs
-      if grep -rq "TODO\|FIXME\|TBD\|HACK" "${tool_dir}/src/" 2>/dev/null; then
+      # No TODOs or FIXMEs (exclude dependencies and build artifacts)
+      if grep --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=vendor -rq "TODO\|FIXME\|TBD\|HACK" "${tool_dir}/src/" 2>/dev/null; then
         error "Released tool has TODO/FIXME/TBD/HACK in source code"
       else
         pass "No TODO/FIXME markers in source"

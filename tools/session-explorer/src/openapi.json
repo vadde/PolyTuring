@@ -644,12 +644,87 @@
           "active_rules": { "type": "array", "items": { "$ref": "#/components/schemas/AgentRule" } },
           "active_skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
           "available_skills": { "type": "array", "items": { "$ref": "#/components/schemas/AgentSkill" } },
-          "mcp_servers": { "type": "array", "items": { "$ref": "#/components/schemas/MCPServerInfo" } },
+          "mcp_servers": { "type": "array", "items": { "$ref": "#/components/schemas/SessionMCPServer" } },
+          "native_tools": { "type": "array", "items": { "$ref": "#/components/schemas/SessionNativeTool" } },
+          "tool_analytics": { "$ref": "#/components/schemas/SessionToolAnalytics" },
           "subagents": { "type": "array", "items": { "type": "string" } },
           "slash_commands": { "type": "array", "items": { "type": "string" } },
           "active_tokens_est": { "type": "integer", "description": "Tokens actually injected into the active session" },
           "on_demand_tokens_est": { "type": "integer" },
           "total_words_injected": { "type": "integer" }
+        }
+      },
+      "SessionMCPServer": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "command": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "scope": { "type": "string", "enum": ["global", "workspace", "builtin", "session", "plugin"] },
+          "configured_tools": { "type": "array", "items": { "type": "string" } },
+          "invoked_count": { "type": "integer" },
+          "active_tools": { "type": "array", "items": { "$ref": "#/components/schemas/SessionMCPTool" } },
+          "dormant_tools": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "SessionMCPTool": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "server_name": { "type": "string" },
+          "invoked_count": { "type": "integer" },
+          "step_indices": { "type": "array", "items": { "type": "integer" } },
+          "first_step_idx": { "type": "integer" },
+          "last_step_idx": { "type": "integer" },
+          "error_count": { "type": "integer" },
+          "recent_args_summary": { "type": "string" }
+        }
+      },
+      "ToolSubBreakdown": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "category": { "type": "string" },
+          "count": { "type": "integer" },
+          "percentage": { "type": "number" },
+          "step_indices": { "type": "array", "items": { "type": "integer" } },
+          "recent_items": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "SessionNativeTool": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "invoked_count": { "type": "integer" },
+          "step_indices": { "type": "array", "items": { "type": "integer" } },
+          "first_step_idx": { "type": "integer" },
+          "last_step_idx": { "type": "integer" },
+          "error_count": { "type": "integer" },
+          "sub_breakdown": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ToolSubBreakdown" }
+          }
+        }
+      },
+      "SessionToolAnalytics": {
+        "type": "object",
+        "properties": {
+          "total_tool_calls": { "type": "integer" },
+          "total_mcp_calls": { "type": "integer" },
+          "total_native_calls": { "type": "integer" },
+          "unique_tools_used": { "type": "integer" },
+          "tool_diversity_index": { "type": "number" },
+          "total_errors": { "type": "integer" },
+          "command_breakdown": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ToolSubBreakdown" }
+          },
+          "file_breakdown": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ToolSubBreakdown" }
+          }
         }
       },
       "AgentRule": {
@@ -691,7 +766,10 @@
           "tokens_est": { "type": "integer" },
           "size_bytes": { "type": "integer" },
           "invoked_count": { "type": "integer", "description": "Count of times executed in active session" },
-          "first_step_idx": { "type": "integer", "description": "Step index where first executed" }
+          "first_step_idx": { "type": "integer", "description": "Step index where first executed" },
+          "last_step_idx": { "type": "integer", "description": "Step index where last executed" },
+          "step_indices": { "type": "array", "items": { "type": "integer" }, "description": "List of timeline step indices where invoked" },
+          "invocation_triggers": { "type": "array", "items": { "type": "string" }, "description": "Concrete trigger actions" }
         }
       },
       "AgentPlugin": {

@@ -2,9 +2,9 @@
 
 > A high-performance, single-binary session intelligence explorer and browser for Antigravity IDE agent conversation histories.
 
-![Status](https://img.shields.io/badge/status-review-orange)
-![Version](https://img.shields.io/badge/version-0.3.0-emerald)
-![Language](https://img.shields.io/badge/language-Go%201.22%2B%20%7C%20Bun-indigo)
+![Status](https://img.shields.io/badge/status-released-brightgreen)
+![Version](https://img.shields.io/badge/version-0.3.5-emerald)
+![Language](https://img.shields.io/badge/language-Go%201.22%20%7C%20Bun-indigo)
 ![License](https://img.shields.io/badge/license-MIT-purple)
 
 ---
@@ -22,7 +22,10 @@
 - 💬 **Granular Filtering & Dialogue Mode**: 1-click `💬 Dialogue` mode isolates pure human-to-AI conversation, filtering out hundreds of autonomous tool execution cards.
 - 📊 **Bounded Diagrams & Fullscreen Theater**: Inline Mermaid diagrams bounded to 440px to eliminate vertical scroll trapping; double-click or Theater button opens pan/drag 2D theater with 20%–500% zoom, Fit to View, and SVG/Source copy.
 - 📁 **Native In-Browser File & Artifact Viewer**: Instant file inspection with Highlight.js syntax highlighting, line numbers gutter, anchor line highlighting (`#L10-L20`), full-width Markdown preview, pinned floating Find widget (`Cmd+F`), and dual-affordance 1-click copy path chips (`📋` → `✓`).
-- 🧠 **Universal Agent Context & Behavioral Matrix**: Complete multi-tier visibility into the constitutional rules, skills, plugins, MCP servers, and lifecycle hooks governing agent behavior across Global, Workspace, and Session tiers. Automatically tracks empirical tool executions with step jump markers and deep 1-click File Viewer inspection.
+- 🧠 **Universal Session Agent Brain & MCP Behavioral Matrix (R-040)**: Complete multi-tier visibility into the constitutional rules, skills, plugins, MCP servers (`omni-graph`, `playwright`), and lifecycle hooks governing agent behavior. Auto-detects lazy MCP (`call_mcp_tool`) and eager MCP (`mcp_*`), tracks active vs dormant tools, step index spans, and GenAI Tool Diversity Index ($D = U/N$).
+- 🔬 **Command Execution & Tool Sub-Breakdown Spectrum (R-041)**: Decomposes generic tools (e.g. `run_command` and filesystem operations) into executable binaries (`git`, `make`, `go test`, `bun`, `curl`, `lsof`), 8 operational categories (`VCS`, `Build`, `Test`, `Process`, `Inspect`, `Network`, `Runtime`, `Filesystem`), and file extensions (`.go`, `.js`, `.css`, `.json`, `.md`). Renders Year 2126 Holographic Command Spectrum bars, interactive sub-command matrix cards, and 1-click step jumping (`#38`, `#113`).
+- ⚡ **Empirical Skill Invocation Telemetry & Standby Decomposition (R-042)**: Rigorously distinguishes between Tier 1 empirically executed skills (via `read_file`/`view_file` on `SKILL.md` or scripts) and Tier 2 standby skills mounted in prompts. Captures step markers (`#11`, `#944`), invocation triggers, first/last execution jumpers (`⏮ #11`, `⏭ #947`), and scope deduplication across workspace, global, and builtin tiers.
+- 🧩 **EC2-Style Greedy Bin-Packing Spatial Density & Panoramic Masonry Matrix (R-043)**: Replaced static CSS Grid row constraints with greedy shortest-column bin packing ($\arg\min_k \sum_{j \in B_k} h_j$), stacking unequal height cards vertically directly beneath preceding elements without dead gaps. Expanded modal width to panoramic cockpit real estate (`min(1560px, 94vw)`), fitting 3 fluid columns across widescreen viewports, and upgrading session trail navigation counters into Year 2126 holographic action capsules (`.holo-header-btn`).
 - 🛑 **Agent WIP Recovery & Disambiguation**: Sub-millisecond state restore (`/api/wip`, `make session-wip`) with mandatory agent halting when multiple parallel sessions exist in a workspace.
 - 📖 **Embedded Offline OpenAPI 3.0 & Swagger UI**: Zero-CDN interactive API explorer at `http://localhost:9876/docs`.
 

@@ -327,8 +327,11 @@ type AgentSkill struct {
 	CharCount     int               `json:"char_count"`
 	TokensEst     int               `json:"tokens_est"`
 	SizeBytes     int64             `json:"size_bytes"`
-	InvokedCount  int               `json:"invoked_count,omitempty"`  // Count of tool calls or reads in session
-	FirstStepIdx  int               `json:"first_step_idx,omitempty"` // Step index where first triggered
+	InvokedCount       int               `json:"invoked_count,omitempty"`       // Count of tool calls or reads in session
+	FirstStepIdx       int               `json:"first_step_idx,omitempty"`      // Step index where first triggered
+	LastStepIdx        int               `json:"last_step_idx,omitempty"`       // Step index where last triggered (R-042)
+	StepIndices        []int             `json:"step_indices,omitempty"`        // Timeline step indices where invoked (R-042)
+	InvocationTriggers []string          `json:"invocation_triggers,omitempty"` // Triggers: e.g. ["read_file: SKILL.md", "run_command: scripts/..."] (R-042)
 }
 
 // AgentPlugin represents a packaged bundle of skills, rules, policies, and configurations.
@@ -398,21 +401,87 @@ type WorkspaceAgentContext struct {
 	TotalWords         int             `json:"total_words"`
 }
 
+// SessionMCPTool represents an empirical MCP tool execution in a session.
+// Implements: R-040
+type SessionMCPTool struct {
+	Name              string `json:"name"`
+	ServerName        string `json:"server_name"`
+	InvokedCount      int    `json:"invoked_count"`
+	StepIndices       []int  `json:"step_indices"`
+	FirstStepIdx      int    `json:"first_step_idx"`
+	LastStepIdx       int    `json:"last_step_idx"`
+	ErrorCount        int    `json:"error_count"`
+	RecentArgsSummary string `json:"recent_args_summary,omitempty"`
+}
+
+// SessionMCPServer represents an MCP server's presence and usage in a session.
+// Implements: R-040
+type SessionMCPServer struct {
+	Name            string            `json:"name"`
+	Command         string            `json:"command,omitempty"`
+	Args            []string          `json:"args,omitempty"`
+	Scope           AgentContextScope `json:"scope"`
+	ConfiguredTools []string          `json:"configured_tools,omitempty"`
+	InvokedCount    int               `json:"invoked_count"`
+	ActiveTools     []SessionMCPTool  `json:"active_tools"`
+	DormantTools    []string          `json:"dormant_tools,omitempty"`
+}
+
+// ToolSubBreakdown represents decomposed execution distribution for generic tools (e.g. run_command, read_file).
+// Implements: R-041
+type ToolSubBreakdown struct {
+	Key         string   `json:"key"`                   // e.g. "git", "make", ".go", "research"
+	Label       string   `json:"label"`                 // Clean human-readable display label
+	Category    string   `json:"category,omitempty"`    // e.g. "VCS", "Build", "Test", "Process", "Inspect"
+	Count       int      `json:"count"`                 // Number of executions
+	Percentage  float64  `json:"percentage"`            // 0.0 to 100.0 of parent tool calls
+	StepIndices []int    `json:"step_indices"`          // Timeline steps where this sub-command/file occurred
+	RecentItems []string `json:"recent_items,omitempty"` // Top recent summaries or file paths
+}
+
+// SessionNativeTool represents a native agent tool execution (e.g. read_file, run_command).
+// Implements: R-040, R-041
+type SessionNativeTool struct {
+	Name         string              `json:"name"`
+	Category     string              `json:"category"` // Filesystem, Terminal, Subagent, Search, Browser, Orchestration
+	InvokedCount int                 `json:"invoked_count"`
+	StepIndices  []int               `json:"step_indices"`
+	FirstStepIdx int                 `json:"first_step_idx"`
+	LastStepIdx  int                 `json:"last_step_idx"`
+	ErrorCount   int                 `json:"error_count"`
+	SubBreakdown []ToolSubBreakdown  `json:"sub_breakdown,omitempty"` // Decomposed command/file breakdown
+}
+
+// SessionToolAnalytics provides analytical insights into agent tool usage.
+// Implements: R-040, R-041
+type SessionToolAnalytics struct {
+	TotalToolCalls     int                `json:"total_tool_calls"`
+	TotalMCPCalls      int                `json:"total_mcp_calls"`
+	TotalNativeCalls   int                `json:"total_native_calls"`
+	UniqueToolsUsed    int                `json:"unique_tools_used"`
+	ToolDiversityIndex float64            `json:"tool_diversity_index"` // Unique tools / total calls
+	TotalErrors        int                `json:"total_errors"`
+	CommandBreakdown   []ToolSubBreakdown `json:"command_breakdown,omitempty"`
+	FileBreakdown      []ToolSubBreakdown `json:"file_breakdown,omitempty"`
+}
+
 // SessionAgentContext represents active rules, skills, and tools in a conversation session.
-// Implements: R-039
+// Implements: R-039, R-040
 type SessionAgentContext struct {
-	SessionID          string          `json:"session_id"`
-	Workspace          string          `json:"workspace"`
-	ProjectName        string          `json:"project_name"`
-	ActiveRules        []AgentRule     `json:"active_rules"`
-	ActiveSkills       []AgentSkill    `json:"active_skills"`    // Skills actually invoked during the session
-	AvailableSkills    []AgentSkill    `json:"available_skills"` // Skills available via progressive disclosure
-	MCPServers         []MCPServerInfo `json:"mcp_servers"`
-	Subagents          []string        `json:"subagents,omitempty"`
-	SlashCommands      []string        `json:"slash_commands,omitempty"`
-	ActiveTokensEst    int             `json:"active_tokens_est"`    // Tokens injected into session (rules + invoked skills)
-	OnDemandTokensEst  int             `json:"on_demand_tokens_est"`  // Tokens available if all on-demand skills were called
-	TotalWordsInjected int             `json:"total_words_injected"`
+	SessionID          string               `json:"session_id"`
+	Workspace          string               `json:"workspace"`
+	ProjectName        string               `json:"project_name"`
+	ActiveRules        []AgentRule          `json:"active_rules"`
+	ActiveSkills       []AgentSkill         `json:"active_skills"`    // Skills actually invoked during the session
+	AvailableSkills    []AgentSkill         `json:"available_skills"` // Skills available via progressive disclosure
+	MCPServers         []SessionMCPServer   `json:"mcp_servers"`
+	NativeTools        []SessionNativeTool  `json:"native_tools"`
+	ToolAnalytics      SessionToolAnalytics `json:"tool_analytics"`
+	Subagents          []string             `json:"subagents,omitempty"`
+	SlashCommands      []string             `json:"slash_commands,omitempty"`
+	ActiveTokensEst    int                  `json:"active_tokens_est"`    // Tokens injected into session (rules + invoked skills)
+	OnDemandTokensEst  int                  `json:"on_demand_tokens_est"`  // Tokens available if all on-demand skills were called
+	TotalWordsInjected int                  `json:"total_words_injected"`
 }
 
 

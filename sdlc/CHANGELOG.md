@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2026-11-04]
+
+### Released
+- **session-explorer** v0.3.5 — Released Universal Session Agent Brain & Behavioral Matrix with empirical MCP/native tool telemetry, command spectrum deconstruction, 3-tier empirical skill invocation telemetry with deduplication, EC2-style greedy bin-packing spatial placement with panoramic widescreen expansion (`min(1560px, 94vw)`), holographic digital action capsules, and universal `Steps:` prefix standardization across all pallets.
+
 ## [Unreleased]
 
 ### Added

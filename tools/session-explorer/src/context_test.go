@@ -264,3 +264,326 @@ func TestR039_API_AgentContextEndpoints(t *testing.T) {
 		t.Errorf("expected SessionID 'session-api-1', got %q", sessResp.SessionID)
 	}
 }
+
+// TestR040_ExtractSessionAgentContext_MCPAndToolTelemetry tests the empirical extraction
+// of MCP servers, active tools, dormant tools, native agent tools, and analytical diversity metrics.
+// Implements: R-040, AC-046, AC-047, AC-048
+func TestR040_ExtractSessionAgentContext_MCPAndToolTelemetry(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-04T10:00:00Z","content":"<USER_REQUEST>Search and navigate</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:01:00Z","content":"Searching AST","tool_calls":[{"name":"call_mcp_tool","args":{"ServerName":"\"omni-graph\"","ToolName":"\"omni_search\"","Arguments":"{\"query\":\"ast query\"}"}}]}
+{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:02:00Z","content":"Searching again","tool_calls":[{"name":"call_mcp_tool","args":{"ServerName":"omni-graph","ToolName":"omni_search","Arguments":"{\"query\":\"second query\"}"}}]}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:03:00Z","content":"Looking up definition","tool_calls":[{"name":"call_mcp_tool","args":{"ServerName":"omni-graph","ToolName":"omni_definition","Arguments":"{\"symbol\":\"MyClass\"}"}}]}
+{"step_index":4,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:04:00Z","content":"Navigating web page","tool_calls":[{"name":"call_mcp_tool","args":{"ServerName":"playwright","ToolName":"browser_navigate","Arguments":"{\"url\":\"http://localhost:3000\"}"}}]}
+{"step_index":5,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:05:00Z","content":"Reading local file","tool_calls":[{"name":"read_file","args":{"Path":"/repo/main.go"}}]}
+{"step_index":6,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:06:00Z","content":"Running test suite","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test ./..."}}]}`
+
+	createMockSession(t, tmpDir, "sess-mcp-telemetry", content)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	sctx, err := idx.ExtractSessionAgentContext("sess-mcp-telemetry")
+	if err != nil {
+		t.Fatalf("ExtractSessionAgentContext failed: %v", err)
+	}
+
+	// 1. Verify Overall Tool Analytics
+	if sctx.ToolAnalytics.TotalToolCalls != 6 {
+		t.Errorf("expected TotalToolCalls == 6, got %d", sctx.ToolAnalytics.TotalToolCalls)
+	}
+	if sctx.ToolAnalytics.TotalMCPCalls != 4 {
+		t.Errorf("expected TotalMCPCalls == 4, got %d", sctx.ToolAnalytics.TotalMCPCalls)
+	}
+	if sctx.ToolAnalytics.TotalNativeCalls != 2 {
+		t.Errorf("expected TotalNativeCalls == 2, got %d", sctx.ToolAnalytics.TotalNativeCalls)
+	}
+	if sctx.ToolAnalytics.UniqueToolsUsed != 5 {
+		t.Errorf("expected UniqueToolsUsed == 5, got %d", sctx.ToolAnalytics.UniqueToolsUsed)
+	}
+	if sctx.ToolAnalytics.ToolDiversityIndex <= 0.0 {
+		t.Errorf("expected ToolDiversityIndex > 0, got %f", sctx.ToolAnalytics.ToolDiversityIndex)
+	}
+
+	// 2. Verify MCP Servers and Tools
+	foundOmni := false
+	foundPlaywright := false
+	for _, srv := range sctx.MCPServers {
+		if srv.Name == "omni-graph" {
+			foundOmni = true
+			if srv.InvokedCount != 3 {
+				t.Errorf("expected omni-graph InvokedCount == 3, got %d", srv.InvokedCount)
+			}
+			if len(srv.ActiveTools) != 2 {
+				t.Errorf("expected 2 active tools on omni-graph, got %d", len(srv.ActiveTools))
+			}
+			for _, tool := range srv.ActiveTools {
+				if tool.Name == "omni_search" {
+					if tool.InvokedCount != 2 {
+						t.Errorf("expected omni_search InvokedCount == 2, got %d", tool.InvokedCount)
+					}
+					if tool.FirstStepIdx != 1 || tool.LastStepIdx != 2 {
+						t.Errorf("expected omni_search steps 1..2, got %d..%d", tool.FirstStepIdx, tool.LastStepIdx)
+					}
+				}
+			}
+		}
+		if srv.Name == "playwright" {
+			foundPlaywright = true
+			if srv.InvokedCount != 1 {
+				t.Errorf("expected playwright InvokedCount == 1, got %d", srv.InvokedCount)
+			}
+		}
+	}
+	if !foundOmni {
+		t.Errorf("expected omni-graph MCP server to be discovered")
+	}
+	if !foundPlaywright {
+		t.Errorf("expected playwright MCP server to be discovered")
+	}
+
+	// 3. Verify Native Tools
+	foundReadFile := false
+	foundRunCommand := false
+	for _, nt := range sctx.NativeTools {
+		if nt.Name == "read_file" {
+			foundReadFile = true
+			if nt.Category != "Filesystem" {
+				t.Errorf("expected read_file Category 'Filesystem', got %q", nt.Category)
+			}
+			if nt.InvokedCount != 1 || nt.FirstStepIdx != 5 {
+				t.Errorf("expected read_file 1 call at step 5, got %d at step %d", nt.InvokedCount, nt.FirstStepIdx)
+			}
+		}
+		if nt.Name == "run_command" {
+			foundRunCommand = true
+			if nt.Category != "Terminal" {
+				t.Errorf("expected run_command Category 'Terminal', got %q", nt.Category)
+			}
+			if nt.InvokedCount != 1 || nt.FirstStepIdx != 6 {
+				t.Errorf("expected run_command 1 call at step 6, got %d at step %d", nt.InvokedCount, nt.FirstStepIdx)
+			}
+		}
+	}
+	if !foundReadFile {
+		t.Errorf("expected read_file in NativeTools")
+	}
+	if !foundRunCommand {
+		t.Errorf("expected run_command in NativeTools")
+	}
+}
+
+// Implements: R-041, AC-053, AC-054, AC-055
+func TestR041_ExtractSessionAgentContext_CommandAndToolBreakdown(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-04T11:00:00Z","content":"<USER_REQUEST>Build, test, and commit</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:01:00Z","content":"Checking git","tool_calls":[{"name":"run_command","args":{"CommandLine":"git status --porcelain","toolSummary":"Git status check"}}]}
+{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:02:00Z","content":"Building web bundle","tool_calls":[{"name":"run_command","args":{"CommandLine":"cd tools/session-explorer && make build-web","toolSummary":"Web asset bundling"}}]}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:03:00Z","content":"Running unit tests","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test -v ./...","toolSummary":"Go test execution"}}]}
+{"step_index":4,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:04:00Z","content":"Running bun test","tool_calls":[{"name":"run_command","args":{"CommandLine":"bun test","toolSummary":"Bun test suite"}}]}
+{"step_index":5,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:05:00Z","content":"Reading Go file","tool_calls":[{"name":"read_file","args":{"Path":"/repo/src/server.go"}}]}
+{"step_index":6,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:06:00Z","content":"Reading JS file","tool_calls":[{"name":"read_file","args":{"Path":"/repo/src/web/app.js"}}]}
+{"step_index":7,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:07:00Z","content":"Editing CSS file","tool_calls":[{"name":"edit_file","args":{"Path":"/repo/src/web/styles.css"}}]}
+{"step_index":8,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:08:00Z","content":"Checking port","tool_calls":[{"name":"run_command","args":{"CommandLine":"lsof -i :9876","toolSummary":"Port check"}}]}
+{"step_index":9,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T11:09:00Z","content":"Running curl","tool_calls":[{"name":"run_command","args":{"CommandLine":"curl -s http://localhost:9876/api/version","toolSummary":"Health probe"}}]}`
+
+	createMockSession(t, tmpDir, "sess-command-breakdown", content)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	sctx, err := idx.ExtractSessionAgentContext("sess-command-breakdown")
+	if err != nil {
+		t.Fatalf("ExtractSessionAgentContext failed: %v", err)
+	}
+
+	// 1. Check NativeTools run_command sub-breakdown
+	var runCmdTool *SessionNativeTool
+	for i := range sctx.NativeTools {
+		if sctx.NativeTools[i].Name == "run_command" {
+			runCmdTool = &sctx.NativeTools[i]
+			break
+		}
+	}
+	if runCmdTool == nil {
+		t.Fatalf("expected run_command in NativeTools")
+	}
+	if runCmdTool.InvokedCount != 6 {
+		t.Errorf("expected run_command InvokedCount == 6, got %d", runCmdTool.InvokedCount)
+	}
+	if len(runCmdTool.SubBreakdown) == 0 {
+		t.Fatalf("expected run_command SubBreakdown to be populated")
+	}
+
+	// Map sub-breakdowns by key
+	cmdMap := make(map[string]ToolSubBreakdown)
+	for _, sb := range runCmdTool.SubBreakdown {
+		cmdMap[sb.Key] = sb
+	}
+
+	// Verify git status decomposed
+	if gitSub, ok := cmdMap["git status"]; !ok {
+		t.Errorf("expected 'git status' in run_command sub_breakdown, keys were: %+v", runCmdTool.SubBreakdown)
+	} else {
+		if gitSub.Category != "VCS" {
+			t.Errorf("expected git status category 'VCS', got %q", gitSub.Category)
+		}
+		if len(gitSub.StepIndices) != 1 || gitSub.StepIndices[0] != 1 {
+			t.Errorf("expected git status step indices [1], got %v", gitSub.StepIndices)
+		}
+	}
+
+	// Verify make decomposed from cd ... && make
+	if makeSub, ok := cmdMap["make build-web"]; !ok {
+		t.Errorf("expected 'make build-web' in run_command sub_breakdown")
+	} else {
+		if makeSub.Category != "Build" {
+			t.Errorf("expected make category 'Build', got %q", makeSub.Category)
+		}
+	}
+
+	// Verify go test decomposed
+	if goSub, ok := cmdMap["go test"]; !ok {
+		t.Errorf("expected 'go test' in run_command sub_breakdown")
+	} else {
+		if goSub.Category != "Test" {
+			t.Errorf("expected go test category 'Test', got %q", goSub.Category)
+		}
+	}
+
+	// Verify lsof decomposed to Process
+	if lsofSub, ok := cmdMap["lsof"]; !ok {
+		t.Errorf("expected 'lsof' in run_command sub_breakdown")
+	} else {
+		if lsofSub.Category != "Process" {
+			t.Errorf("expected lsof category 'Process', got %q", lsofSub.Category)
+		}
+	}
+
+	// Verify curl decomposed to Network
+	if curlSub, ok := cmdMap["curl"]; !ok {
+		t.Errorf("expected 'curl' in run_command sub_breakdown")
+	} else {
+		if curlSub.Category != "Network" {
+			t.Errorf("expected curl category 'Network', got %q", curlSub.Category)
+		}
+	}
+
+	// 2. Check Global CommandBreakdown in ToolAnalytics
+	if len(sctx.ToolAnalytics.CommandBreakdown) == 0 {
+		t.Fatalf("expected sctx.ToolAnalytics.CommandBreakdown to be populated")
+	}
+	totalCmdPercentage := 0.0
+	for _, cb := range sctx.ToolAnalytics.CommandBreakdown {
+		totalCmdPercentage += cb.Percentage
+	}
+	if totalCmdPercentage < 95.0 || totalCmdPercentage > 105.0 {
+		t.Errorf("expected total command percentage ~100%%, got %f", totalCmdPercentage)
+	}
+
+	// 3. Check FileBreakdown in ToolAnalytics
+	if len(sctx.ToolAnalytics.FileBreakdown) == 0 {
+		t.Fatalf("expected sctx.ToolAnalytics.FileBreakdown to be populated")
+	}
+	fileExtMap := make(map[string]ToolSubBreakdown)
+	for _, fb := range sctx.ToolAnalytics.FileBreakdown {
+		fileExtMap[fb.Key] = fb
+	}
+	if _, ok := fileExtMap[".go"]; !ok {
+		t.Errorf("expected .go in FileBreakdown")
+	}
+	if _, ok := fileExtMap[".js"]; !ok {
+		t.Errorf("expected .js in FileBreakdown")
+	}
+	if _, ok := fileExtMap[".css"]; !ok {
+		t.Errorf("expected .css in FileBreakdown")
+	}
+}
+
+// TestR042_ExtractSessionAgentContext_SkillBreakdownAndDeduplication tests that skills
+// are deduplicated across scopes, step indices and last step indices are captured,
+// and standby skills are properly segregated with complete telemetry.
+// Implements: R-042, AC-059, AC-060, AC-065
+func TestR042_ExtractSessionAgentContext_SkillBreakdownAndDeduplication(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Setup workspace with two skills
+	wsDir := filepath.Join(tmpDir, "repo-skills-test")
+	skillDir1 := filepath.Join(wsDir, ".agents", "skills", "omni-graph")
+	os.MkdirAll(skillDir1, 0755)
+	skillPath1 := filepath.Join(skillDir1, "SKILL.md")
+	os.WriteFile(skillPath1, []byte("---\nname: omni-graph\ndescription: Knowledge graph and AST navigation.\n---\n# Omni Graph"), 0644)
+
+	skillDir2 := filepath.Join(wsDir, ".agents", "skills", "dormant-skill")
+	os.MkdirAll(skillDir2, 0755)
+	skillPath2 := filepath.Join(skillDir2, "SKILL.md")
+	os.WriteFile(skillPath2, []byte("---\nname: dormant-skill\ndescription: Dormant on-demand capability.\n---\n# Dormant"), 0644)
+
+	// Create session that invokes omni-graph at steps 1, 3, and 5 via read_file and run_command
+	content := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-04T10:00:00Z","content":"<USER_REQUEST>Search the codebase</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:01:00Z","content":"Reading skill","tool_calls":[{"name":"read_file","args":{"Path":"` + skillPath1 + `"}}]}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:03:00Z","content":"Inspecting skill again","tool_calls":[{"name":"view_file","args":{"AbsolutePath":"` + skillPath1 + `"}}]}
+{"step_index":5,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-04T10:05:00Z","content":"Running helper script","tool_calls":[{"name":"run_command","args":{"CommandLine":"skills/omni-graph/scripts/check.sh"}}]}
+`
+
+	createMockSession(t, tmpDir, "sess-skill-r042", content)
+
+	idx := NewSessionIndex(tmpDir, false)
+	idx.knownProjects["repo-skills-test"] = wsDir
+
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("ScanAll failed: %v", err)
+	}
+
+	sctx, err := idx.ExtractSessionAgentContext("sess-skill-r042")
+	if err != nil {
+		t.Fatalf("ExtractSessionAgentContext failed: %v", err)
+	}
+
+	// 1. Verify omni-graph is in ActiveSkills with InvokedCount == 3
+	if len(sctx.ActiveSkills) != 1 {
+		t.Fatalf("expected 1 active skill, got %d", len(sctx.ActiveSkills))
+	}
+	active := sctx.ActiveSkills[0]
+	if active.Name != "omni-graph" {
+		t.Errorf("expected omni-graph, got %s", active.Name)
+	}
+	if active.InvokedCount != 3 {
+		t.Errorf("expected InvokedCount 3, got %d", active.InvokedCount)
+	}
+	if active.FirstStepIdx != 1 {
+		t.Errorf("expected FirstStepIdx 1, got %d", active.FirstStepIdx)
+	}
+	if active.LastStepIdx != 5 {
+		t.Errorf("expected LastStepIdx 5, got %d", active.LastStepIdx)
+	}
+	if len(active.StepIndices) != 3 {
+		t.Errorf("expected 3 step indices, got %v", active.StepIndices)
+	}
+	if len(active.InvocationTriggers) == 0 {
+		t.Errorf("expected invocation triggers to be populated, got %v", active.InvocationTriggers)
+	}
+
+	// 2. Verify dormant-skill is in AvailableSkills and NOT duplicated
+	foundDormant := false
+	for _, sk := range sctx.AvailableSkills {
+		if sk.Name == "dormant-skill" {
+			foundDormant = true
+			if sk.InvokedCount != 0 {
+				t.Errorf("expected dormant skill InvokedCount 0, got %d", sk.InvokedCount)
+			}
+		}
+		if sk.Name == "omni-graph" {
+			t.Errorf("active skill omni-graph should not appear in AvailableSkills")
+		}
+	}
+	if !foundDormant {
+		t.Errorf("expected dormant-skill in AvailableSkills")
+	}
+}
