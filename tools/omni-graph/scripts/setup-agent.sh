@@ -107,6 +107,48 @@ with open(output_file, 'w', encoding='utf-8') as f:
 " "${script_dir}" "${output_file}"
 }
 
+# ─── Helper: Safe MCP Config Merge ───────────────────────────────────────────
+merge_mcp_config_json() {
+  local mcp_script="$1"
+  local output_file="$2"
+  local uv_bin
+  uv_bin="$(command -v uv || echo "uv")"
+
+  python3 -c "
+import json, os, sys
+
+uv_bin = sys.argv[1]
+mcp_script = sys.argv[2]
+output_file = sys.argv[3]
+
+data = {'mcpServers': {}}
+if os.path.exists(output_file):
+    try:
+        with open(output_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        data = {'mcpServers': {}}
+
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+
+data['mcpServers']['omni-graph'] = {
+    'command': uv_bin,
+    'args': [
+        'run',
+        '--script',
+        mcp_script
+    ],
+    'env': {
+        'OMNI_API_URL': 'http://localhost:8080'
+    }
+}
+
+with open(output_file, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2)
+" "${uv_bin}" "${mcp_script}" "${output_file}"
+}
+
 # ─── Target Resolution & Guardrails ──────────────────────────────────────────
 
 if [[ "${TARGET}" == "global" || "${TARGET}" == "--global" ]]; then
@@ -137,6 +179,16 @@ if [[ "${TARGET}" == "global" || "${TARGET}" == "--global" ]]; then
   # 4. Safely configure / merge global hooks
   merge_hooks_json "${DEST_DIR}/scripts" "${DEST_DIR}/hooks.json"
   echo "  ✅ Configured global hooks: ~/.gemini/config/hooks.json"
+
+  # 5. Safely configure / merge global MCP server
+  merge_mcp_config_json "${DEST_DIR}/skills/omni-graph/scripts/omni-mcp.py" "${DEST_DIR}/mcp_config.json"
+  echo "  ✅ Configured global MCP server: ~/.gemini/config/mcp_config.json"
+
+  # 6. Global CLI symlink
+  if [[ -d "${HOME}/.local/bin" ]]; then
+    ln -sf "${DEST_DIR}/skills/omni-graph/scripts/omni.sh" "${HOME}/.local/bin/omni"
+    echo "  ✅ Symlinked global CLI: ~/.local/bin/omni"
+  fi
 
 elif [[ "${TARGET}" == "workspace" || "${TARGET}" == "." ]]; then
   DEST_DIR="${REPO_ROOT}/.agents"
