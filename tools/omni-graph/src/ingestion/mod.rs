@@ -464,7 +464,7 @@ async fn execute_ingest(
                 }
                 let p = e.path();
                 let is_dir = e.file_type().is_dir();
-                !crate::watcher::is_path_ignored(&gitignore, p, is_dir)
+                !crate::watcher::is_path_ignored(&root_path_buf, &gitignore, p, is_dir)
             })
             .filter_map(|e| e.ok())
         {

@@ -2206,27 +2206,27 @@ mod hybrid_gitignore_tests {
         let log_file = root.join("debug.log");
         let sec_file = root.join("secrets.env");
 
-        assert!(is_path_ignored(&gitignore, &pw_file, false), ".playwright-mcp child file must be ignored");
-        assert!(is_path_ignored(&gitignore, &root.join(".playwright-mcp"), true), ".playwright-mcp directory must be ignored");
-        assert!(is_path_ignored(&gitignore, &cov_file, false), "coverage child file must be ignored");
-        assert!(is_path_ignored(&gitignore, &log_file, false), "*.log pattern must be ignored");
-        assert!(is_path_ignored(&gitignore, &sec_file, false), "secrets.env must be ignored");
+        assert!(is_path_ignored(&root, &gitignore, &pw_file, false), ".playwright-mcp child file must be ignored");
+        assert!(is_path_ignored(&root, &gitignore, &root.join(".playwright-mcp"), true), ".playwright-mcp directory must be ignored");
+        assert!(is_path_ignored(&root, &gitignore, &cov_file, false), "coverage child file must be ignored");
+        assert!(is_path_ignored(&root, &gitignore, &log_file, false), "*.log pattern must be ignored");
+        assert!(is_path_ignored(&root, &gitignore, &sec_file, false), "secrets.env must be ignored");
 
         // Static Layer 1 Invariants should also be rejected
         let node_modules_file = root.join("node_modules").join("package.json");
         let target_file = root.join("target").join("debug").join("app");
         let binary_file = root.join("src").join("logo.png");
 
-        assert!(is_path_ignored(&gitignore, &node_modules_file, false), "node_modules must be ignored via Layer 1");
-        assert!(is_path_ignored(&gitignore, &target_file, false), "target directory must be ignored via Layer 1");
-        assert!(is_path_ignored(&gitignore, &binary_file, false), "binary .png file must be ignored via Layer 1");
+        assert!(is_path_ignored(&root, &gitignore, &node_modules_file, false), "node_modules must be ignored via Layer 1");
+        assert!(is_path_ignored(&root, &gitignore, &target_file, false), "target directory must be ignored via Layer 1");
+        assert!(is_path_ignored(&root, &gitignore, &binary_file, false), "binary .png file must be ignored via Layer 1");
 
         // Legitimate source and doc files must NOT be ignored
         let source_file = root.join("src").join("main.rs");
         let readme_file = root.join("README.md");
 
-        assert!(!is_path_ignored(&gitignore, &source_file, false), "src/main.rs must not be ignored");
-        assert!(!is_path_ignored(&gitignore, &readme_file, false), "README.md must not be ignored");
+        assert!(!is_path_ignored(&root, &gitignore, &source_file, false), "src/main.rs must not be ignored");
+        assert!(!is_path_ignored(&root, &gitignore, &readme_file, false), "README.md must not be ignored");
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -2244,17 +2244,17 @@ mod hybrid_gitignore_tests {
         let target_dir = root.join("target").join("out.bin");
         let zip_file = root.join("archive.zip");
 
-        assert!(is_path_ignored(&gitignore, &node_modules, false), "node_modules must be pruned even without .gitignore");
-        assert!(is_path_ignored(&gitignore, &git_dir, false), ".git must be pruned even without .gitignore");
-        assert!(is_path_ignored(&gitignore, &target_dir, false), "target must be pruned even without .gitignore");
-        assert!(is_path_ignored(&gitignore, &zip_file, false), "binary zip must be pruned even without .gitignore");
+        assert!(is_path_ignored(&root, &gitignore, &node_modules, false), "node_modules must be pruned even without .gitignore");
+        assert!(is_path_ignored(&root, &gitignore, &git_dir, false), ".git must be pruned even without .gitignore");
+        assert!(is_path_ignored(&root, &gitignore, &target_dir, false), "target must be pruned even without .gitignore");
+        assert!(is_path_ignored(&root, &gitignore, &zip_file, false), "binary zip must be pruned even without .gitignore");
 
         // Clean source files must be accepted
         let go_source = root.join("server.go");
         let doc_file = root.join("architecture.md");
 
-        assert!(!is_path_ignored(&gitignore, &go_source, false), "server.go must be accepted in non-git workspace");
-        assert!(!is_path_ignored(&gitignore, &doc_file, false), "architecture.md must be accepted in non-git workspace");
+        assert!(!is_path_ignored(&root, &gitignore, &go_source, false), "server.go must be accepted in non-git workspace");
+        assert!(!is_path_ignored(&root, &gitignore, &doc_file, false), "architecture.md must be accepted in non-git workspace");
 
         let _ = fs::remove_dir_all(&root);
     }

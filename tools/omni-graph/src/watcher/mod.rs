@@ -119,9 +119,12 @@ pub fn load_workspace_gitignore(root: &Path) -> Gitignore {
 /// - Layer 1: Static System Invariants (.git, node_modules, target, binary/log extensions)
 /// - Layer 2: Dynamic in-memory Ripgrep Gitignore matching
 /// - Layer 3: Non-git fallback (if no .gitignore, Layer 1 applies cleanly)
-pub fn is_path_ignored(gitignore: &Gitignore, path: &Path, is_dir: bool) -> bool {
-    // Layer 1: Check static directory invariants
-    for comp in path.components() {
+pub fn is_path_ignored(root: &Path, gitignore: &Gitignore, path: &Path, is_dir: bool) -> bool {
+    // Strip the workspace root so that host system directories (e.g. /tmp, /var/folders) are never falsely flagged
+    let rel_path = path.strip_prefix(root).unwrap_or(path);
+
+    // Layer 1: Check static directory invariants relative to workspace root
+    for comp in rel_path.components() {
         let name = comp.as_os_str().to_string_lossy();
         if EXCLUDED_DIRS.iter().any(|d| name.as_ref() == *d) {
             return true;
@@ -323,6 +326,7 @@ impl WatchManager {
 
 /// Count files in a directory (excluding noise and gitignored files)
 pub fn count_tracked_files(path: &str, gitignore: &Gitignore) -> usize {
+    let root = Path::new(path);
     let mut count = 0;
     for entry in walkdir::WalkDir::new(path)
         .into_iter()
@@ -332,7 +336,7 @@ pub fn count_tracked_files(path: &str, gitignore: &Gitignore) -> usize {
             }
             let p = e.path();
             let is_dir = e.file_type().is_dir();
-            !is_path_ignored(gitignore, p, is_dir)
+            !is_path_ignored(root, gitignore, p, is_dir)
         })
         .filter_map(|e| e.ok())
     {
@@ -673,7 +677,7 @@ async fn run_watcher(
 }
 
 /// Determine if a notify event should be processed (R-015 Hybrid Filter)
-fn should_process_event(event: &Event, _root: &PathBuf, gitignore: &Gitignore) -> bool {
+fn should_process_event(event: &Event, root: &Path, gitignore: &Gitignore) -> bool {
     match event.kind {
         EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {}
         _ => return false,
@@ -681,7 +685,7 @@ fn should_process_event(event: &Event, _root: &PathBuf, gitignore: &Gitignore) -
 
     for path in &event.paths {
         let is_dir = path.is_dir();
-        if is_path_ignored(gitignore, path, is_dir) {
+        if is_path_ignored(root, gitignore, path, is_dir) {
             return false;
         }
     }
