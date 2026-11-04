@@ -5,6 +5,7 @@ import {
   Download,
   Play,
   Check,
+  CheckCircle2,
   Copy,
   Terminal,
   Layers,
@@ -361,14 +362,16 @@ export const ApiSpecExplorer: React.FC<ApiSpecExplorerProps> = ({ onBackToGraph,
 
   return (
     <div
+      id="api-spec-scroll-root"
       style={{
-        width: '100vw',
-        height: '100vh',
+        width: '100%',
+        height: '100%',
         overflowY: 'auto',
+        overflowX: 'hidden',
         background: 'linear-gradient(180deg, #050813 0%, #03040a 100%)',
         color: '#f8fafc',
         fontFamily: 'var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
-        padding: '24px 32px 64px',
+        padding: '24px 32px 240px',
         boxSizing: 'border-box',
       }}
     >
@@ -1082,6 +1085,42 @@ export const ApiSpecExplorer: React.FC<ApiSpecExplorerProps> = ({ onBackToGraph,
             )}
           </div>
         )}
+
+        {/* Bottom End-of-Spec Indicator & Quick Top Navigation */}
+        <div
+          style={{
+            marginTop: 36,
+            padding: '20px 24px',
+            borderRadius: 12,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: 'var(--text-muted, #94a3b8)',
+            fontSize: '0.8rem',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CheckCircle2 size={16} color="#34d399" />
+            <span>
+              All <strong>{filteredEndpoints.length}</strong> API endpoints loaded and operational.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('api-spec-scroll-root');
+              if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="cyber-button-secondary"
+            style={{ padding: '6px 14px', fontSize: '0.74rem', cursor: 'pointer' }}
+          >
+            ↑ Back to Top
+          </button>
+        </div>
       </div>
     </div>
   );

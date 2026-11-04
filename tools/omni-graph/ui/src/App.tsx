@@ -161,9 +161,26 @@ const GALAXY_COLORS = [
   '#4ade80', // Mint
 ];
 
+const getInitialWorkspace = (): string | null => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('workspace') || null;
+  }
+  return null;
+};
+
+const getInitialViewMode = (): 'graph' | 'analytics' | 'api-docs' => {
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/api-docs' || path === '/swagger') return 'api-docs';
+    if (path === '/analytics') return 'analytics';
+  }
+  return 'graph';
+};
+
 export default function App() {
   // Navigation View Mode: 3D Graph Studio vs Agent Analytics vs OpenAPI 3.0 Explorer
-  const [viewMode, setViewMode] = useState<'graph' | 'analytics' | 'api-docs'>('graph');
+  const [viewMode, setViewMode] = useState<'graph' | 'analytics' | 'api-docs'>(getInitialViewMode);
 
   // URL Routing Sync & Browser History
   useEffect(() => {
@@ -171,40 +188,49 @@ export default function App() {
       const path = window.location.pathname.toLowerCase();
       const params = new URLSearchParams(window.location.search);
 
+      let targetMode: 'graph' | 'analytics' | 'api-docs' = 'graph';
       if (path === '/api-docs' || path === '/swagger') {
-        setViewMode('api-docs');
+        targetMode = 'api-docs';
       } else if (path === '/analytics') {
-        setViewMode('analytics');
+        targetMode = 'analytics';
       } else if (path === '/ingest') {
-        setViewMode('graph');
+        targetMode = 'graph';
         setIsBrowserModalOpen(true);
       } else {
-        setViewMode('graph');
+        targetMode = 'graph';
+      }
+      setViewMode(targetMode);
+
+      const ws = params.get('workspace') || null;
+      if (ws !== selectedWorkspaceRef.current) {
+        setSelectedWorkspace(ws);
+        selectedWorkspaceRef.current = ws;
+        loadGraph(ws);
+        loadGalaxyTopology(ws);
       }
 
-      const ws = params.get('workspace');
-      if (ws) {
-        setSelectedWorkspace(ws);
-      }
       const cluster = params.get('cluster');
       if (cluster) {
         const cid = parseInt(cluster, 10);
         if (!isNaN(cid)) setSelectedClusterId(cid);
+      } else {
+        setSelectedClusterId(null);
       }
     };
 
-    handleUrlRouting();
     window.addEventListener('popstate', handleUrlRouting);
     return () => window.removeEventListener('popstate', handleUrlRouting);
   }, []);
 
-  const navigateTo = (mode: 'graph' | 'analytics' | 'api-docs', ws?: string, extraParams?: Record<string, string>) => {
+  const navigateTo = (mode: 'graph' | 'analytics' | 'api-docs', ws?: string | null, extraParams?: Record<string, string>) => {
     setViewMode(mode);
     const targetWs = ws !== undefined ? ws : selectedWorkspace;
     const newPath = mode === 'graph' ? '/graph' : `/${mode}`;
     const params = new URLSearchParams(window.location.search);
     if (targetWs) {
       params.set('workspace', targetWs);
+    } else {
+      params.delete('workspace');
     }
     if (extraParams) {
       Object.entries(extraParams).forEach(([k, v]) => {
@@ -227,7 +253,7 @@ export default function App() {
 
   // Workspaces state
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(getInitialWorkspace);
   const selectedWorkspaceRef = useRef<string | null>(selectedWorkspace);
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isWorktreeFleetOpen, setIsWorktreeFleetOpen] = useState(false);
@@ -491,8 +517,8 @@ export default function App() {
   useEffect(() => {
     loadHealth();
     loadWorkspaces();
-    loadGraph(selectedWorkspace);
-    loadGalaxyTopology(selectedWorkspace);
+    loadGraph(selectedWorkspaceRef.current);
+    loadGalaxyTopology(selectedWorkspaceRef.current);
     fetchWatchers();
     fetchIngestStatus();
 
@@ -571,6 +597,7 @@ export default function App() {
 
   const handleSelectWorkspace = (ws: string | null) => {
     setSelectedWorkspace(ws);
+    selectedWorkspaceRef.current = ws;
     setIsWorkspaceDropdownOpen(false);
     setWorkspaceSearchTerm('');
     setSelectedNode(null);
@@ -578,6 +605,20 @@ export default function App() {
     setSelectedClusterId(null);
     setIsolatedClusterId(null);
     loadGraph(ws);
+    loadGalaxyTopology(ws);
+
+    // Synchronize URL search params and browser history immediately
+    const params = new URLSearchParams(window.location.search);
+    if (ws) {
+      params.set('workspace', ws);
+    } else {
+      params.delete('workspace');
+    }
+    params.delete('cluster');
+    const newPath = viewMode === 'graph' ? '/graph' : `/${viewMode}`;
+    const searchStr = params.toString();
+    const fullUrl = newPath + (searchStr ? `?${searchStr}` : '');
+    window.history.pushState({ mode: viewMode, workspace: ws }, '', fullUrl);
   };
 
   // ─── 2. Community Galaxy Grouping ──────────────────────────────────────────
@@ -4024,6 +4065,26 @@ export default function App() {
                 >
                   <span>+ Ingest Another</span>
                 </button>
+                {activeIngestions.every((j) => j.completed) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      activeIngestions.forEach((j) => handleDismissIngestJob(j.workspace));
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: 12,
+                      padding: '3px 8px',
+                      color: '#cbd5e1',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer',
+                    }}
+                    title="Dismiss all completed jobs and close this banner"
+                  >
+                    Clear All
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsIngestBarMinimized(true)}

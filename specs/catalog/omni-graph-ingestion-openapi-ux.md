@@ -71,6 +71,10 @@ flowchart TD
 - **`R-011` (Top Bar Navigation Integration)**: A prominent `{ } API Spec (OpenAPI 3.0)` button shall be integrated into the top navigation bar at `http://localhost:3000/`.
 - **`R-012` (Enterprise Client Routing & State Persistence)**: The UI shall support HTML5 history routing (`/`, `/graph`, `/analytics`, `/api-docs`, `/ingest`) that survives hard browser refreshes (`F5`), browser Back/Forward (`popstate`), and preserves `?workspace=...` query parameters.
 
+### Forensic Routing & Viewport Containment (`R-013` - `R-014`)
+- **`R-013` (Bidirectional Workspace URL Routing & Synchronous Mount)**: Selecting any workspace in the UI dropdown or worktree switcher shall immediately update `window.location.search` (`?workspace=XYZ`) via HTML5 `history.pushState`. Initial application state shall synchronously read from URL parameters, guaranteeing that page reloads or deep-links never revert to previous workspaces. Browser Back/Forward navigation shall automatically reload graph topologies for the active historical workspace.
+- **`R-014` (Bounded Scroll Viewports & Bottom Clearance)**: Embedded full-screen view panels (API Explorer, Analytics) shall bind their scroll containers to 100% of the visible viewport bounding box rather than `100vh`, preventing off-screen scrollbar clipping. Scroll views shall provide generous bottom clearance (`>=200px`) and end-of-content indicators with "Back to Top" controls so bottom elements are never obscured by floating status widgets or the Ingestion HUD.
+
 ---
 
 ## 4. Test Harness & Acceptance Verification
@@ -84,6 +88,8 @@ flowchart TD
 | `R-008` | Click backdrop or `X` during ingestion | Modal closes smoothly without interrupting background queue. |
 | `R-009`, `R-010` | Navigate to `/api-docs` and click "Try It Live" on `/api/health` | Renders liquid-glass explorer, executes query, returns HTTP 200 with latency timing. |
 | `R-011`, `R-012` | Hard browser refresh on `http://localhost:3000/api-docs?workspace=PolyTuring` | Page directly renders API Spec with `PolyTuring` workspace preserved; no 404. |
+| `R-013` | Switch workspace from `PolyTuring` to `DSA` and reload (`F5`) | URL immediately updates to `?workspace=DSA`. Page reload preserves `DSA` and renders DSA graph without reverting to PolyTuring. |
+| `R-014` | Scroll to bottom of `/api-docs` | Last endpoint (`GET /api/openapi.json`) and end-of-spec footer card are 100% visible, fully clear of floating HUD widgets, and "↑ Back to Top" scrolls to top. |
 
 ---
 
@@ -98,3 +104,5 @@ flowchart TD
 - [x] Directory Palette Status Badges & Queue Actions (`ui/src/App.tsx`)
 - [x] Modal Footer State Simplification & Clean Guarantee Banner (`ui/src/App.tsx`)
 - [x] Ingestion HUD Queue Badges (`ui/src/App.tsx`)
+- [x] Bidirectional Workspace URL Routing & Deep-Link Preservation (`ui/src/App.tsx`)
+- [x] Bounded Viewport Scroll Containment & HUD Floating Clearance (`ui/src/ApiSpecExplorer.tsx`)

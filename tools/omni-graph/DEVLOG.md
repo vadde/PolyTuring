@@ -34,6 +34,16 @@
    - Replaced disabled `"Ingesting..."` footer button with dynamic state: `+ Add '${ws}' to Queue` when another job is active, `Already in Queue (#${pos})` when queued, and `Re-sync & Refresh` when already indexed.
    - Updated Ingestion HUD to display `QUEUED #${job.queue_position}` badges.
 
+5. **Forensic Workspace Routing & Deep-Link Preservation (`App.tsx`, R-013)**:
+   - Fixed missing URL synchronization in `handleSelectWorkspace`: changing workspace from `PolyTuring` to `DSA` now immediately pushes `?workspace=DSA` into `window.location.search`.
+   - Initialized React state synchronously from `window.location.search`, preventing reload (`F5`) from resetting back to `PolyTuring`.
+   - Wired `popstate` to automatically re-load graph topologies when traversing browser history.
+6. **Bounded Scroll Viewports & HUD Bottom Clearance (`ApiSpecExplorer.tsx`, R-014)**:
+   - Root cause of bottom cut-off: `width: 100vw, height: 100vh` inside an absolute container (`top: 84px, bottom: 14px`) pushed the scrollbar track 98px below the fold.
+   - Fixed container to `width: 100%, height: 100%, overflowY: auto, padding: 24px 32px 240px`, ensuring all cards scroll well above floating HUD widgets.
+   - Added end-of-spec footer card (`All 27 API endpoints loaded and operational`) with a smooth "↑ Back to Top" button.
+   - Added "Clear All" button to Ingestion HUD when all background jobs complete.
+
 #### Verification
 - All 82 Rust backend unit tests pass: `cargo test --test unit_tests`.
 - Frontend builds cleanly: `npm run build` completed with 0 TypeScript errors.
@@ -42,6 +52,8 @@
   - "Back to 3D Graph Studio" returns to `/graph`.
   - Directory browser allows selecting different repositories and enqueuing them without button lockouts.
   - Hard browser refresh on `http://localhost:3000/api-docs` loads directly without 404.
+  - Workspace switch to `DSA` updates URL to `?workspace=DSA`; hard reload preserves `DSA` and loads DSA graph.
+  - Scrolling to bottom of `/api-docs` reveals `GET /api/openapi.json` and footer card with "↑ Back to Top".
 
 ---
 
