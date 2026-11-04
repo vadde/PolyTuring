@@ -1,8 +1,49 @@
-# 📓 Development Log — omni-graph
+### 2026-11-04 — FIFO Ingestion Task Queue, Atomic Clean Sync Invariant, OpenAPI 3.0 & Futuristic Swagger Explorer
 
-> Chronological record of all development sessions on this tool.
-> **Append-only** — never delete entries, only add new ones at the top.
-> Each entry captures what happened, what changed, and what to do next.
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.4.0 Ingestion Pipeline & Enterprise API Explorer)
+**Branch**: `feat/omni-graph-ingest-ux-openapi`
+**Spec Reference**: `specs/catalog/omni-graph-ingestion-openapi-ux.md` (R-001 through R-012)
+**Duration**: ~45m
+
+#### Context & Objectives
+- Resolved user concerns regarding parallel ingestion conflicts in SurrealDB v2 (`read or write conflict` on concurrent writes).
+- Eliminated confusing "Clean Re-ingest — purge existing data before scan" checkbox by making clean atomic purge a de facto system invariant whenever codebases are indexed.
+- Eliminated global disabled `"Ingesting..."` button lockouts, replacing them with a non-blocking FIFO queue and distinct per-repository action buttons (`+ Add to Queue`, `Re-sync & Refresh Graph`, `Start Ingestion`).
+- Created a comprehensive OpenAPI 3.0.3 specification covering all 27+ endpoints at `/api/openapi.json`.
+- Built an interactive, cosmic liquid-glass Swagger / API Explorer at `/api-docs` accessible via a dedicated top-bar navigation button with deep-linking and state preservation across hard page refreshes.
+
+#### Key Actions & Implementations
+1. **Tokio FIFO Ingestion Task Queue (`src/ingestion/mod.rs`)**:
+   - Implemented `IngestTask` channel message with an internal background worker loop in `IngestionPipeline::new`.
+   - Serialized database transactions and TEI embedding requests, completely preventing SurrealDB transaction conflicts.
+   - Guaranteed atomic purge: `db.purge_workspace(workspace_name)` executes automatically before re-indexing.
+   - Deterministic error trapping: Any failure updates `job.phase = "failed"`, `job.completed = true`, and sets `job.error`.
+   - Excluded `.playwright-mcp`, `.playwright`, `.gemini`, and `.log` from file scanner and live watcher to eliminate infinite sync loops.
+2. **OpenAPI 3.0.3 Specification & Endpoint (`src/api/openapi.json`, `src/api/mod.rs`)**:
+   - Authored complete OpenAPI 3.0.3 schema covering 27 endpoints across System, AST & LSP, Semantic Retrieval, Graph & Topology, Ingestion & Watcher, Worktrees, and Agent Analytics tags.
+   - Registered `GET /api/openapi.json` route in `api/mod.rs`.
+3. **Futuristic Liquid-Glass Swagger Explorer (`ui/src/ApiSpecExplorer.tsx`)**:
+   - Year 2500 cosmic liquid-glass styling with frosted cards, tag category pills, search filter, and parameter tables.
+   - Interactive "Try It Live" execution console with latency timer (ms) and formatted response payload viewer.
+   - 1-click "Copy cURL" and "Download Spec" actions.
+4. **UI Ingestion Palette & Navigation Overhaul (`ui/src/App.tsx`)**:
+   - Added `{ } API Spec (OpenAPI 3.0)` button to header bar and wired client-side HTML5 routing (`/`, `/graph`, `/analytics`, `/api-docs`).
+   - Removed confusing manual "Clean Re-ingest" checkbox; replaced with "Atomic Clean Invariant" guarantee banner.
+   - Enabled directory list rows to show live status badges (`● Ingesting`, `⌛ Queued #${pos}`, `✓ Indexed`) and quick 1-click `Queue` / `Re-sync` actions.
+   - Replaced disabled `"Ingesting..."` footer button with dynamic state: `+ Add '${ws}' to Queue` when another job is active, `Already in Queue (#${pos})` when queued, and `Re-sync & Refresh` when already indexed.
+   - Updated Ingestion HUD to display `QUEUED #${job.queue_position}` badges.
+
+#### Verification
+- All 82 Rust backend unit tests pass: `cargo test --test unit_tests`.
+- Frontend builds cleanly: `npm run build` completed with 0 TypeScript errors.
+- Verified live via Playwright MCP:
+  - Header button navigates to `http://localhost:3000/api-docs` and renders liquid glass explorer.
+  - "Back to 3D Graph Studio" returns to `/graph`.
+  - Directory browser allows selecting different repositories and enqueuing them without button lockouts.
+  - Hard browser refresh on `http://localhost:3000/api-docs` loads directly without 404.
+
+---
 
 ### 2026-11-03 — Holistic Machine-Wide Global Deployment & MCP Configuration Refresh
 

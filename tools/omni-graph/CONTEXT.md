@@ -26,6 +26,11 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| FIFO Ingestion Task Queue & Concurrency Protection | Complete | — | 🟢 Tokio mpsc FIFO queue serializing SurrealDB writes and eliminating write conflicts |
+| Atomic Clean Invariant & Purge Integration | Complete | — | 🟢 purge_workspace automatically executed before re-indexing; removed manual toggle |
+| OpenAPI 3.0 Specification & Route (/api/openapi.json) | Complete | — | 🟢 Complete 27-endpoint schema covering all Omni-Graph endpoints |
+| Cosmic Liquid-Glass Swagger Explorer (/api-docs) | Complete | — | 🟢 Year 2500 frosted glass UI, Try-It-Live console, latency timer, cURL copy |
+| Ingestion Palette Non-Blocking Multi-Repo Actions | Complete | — | 🟢 Directory row badges (Ingesting, Queued, Indexed), quick Queue/Ingest actions, no button lockout |
 | Spec Requirements (R-XXX) | 78 | 80 | 🟢 97.5% Complete (2 Deferred to v0.3.1: R-066, R-072) |
 | Acceptance Criteria (AC-XXX) | 35 | 37 | 🟢 94.6% Complete (2 Deferred: AC for R-066, R-072) |
 | Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
