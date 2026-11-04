@@ -4,7 +4,42 @@
 > **Append-only** — never delete entries, only add new ones at the top.
 > Each entry captures what happened, what changed, and what to do next.
 
-### 2026-11-03 — Triad Execution Hierarchy, Rosetta Stone & Degraded Recovery Playbook in SKILL.md
+### 2026-11-03 — Holistic Machine-Wide Global Deployment & MCP Configuration Refresh
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `in-progress` (v0.3.0 Release Verification & Machine-Wide Provisioning)
+**Branch**: `main`
+**Duration**: ~15m
+
+#### Context & Objectives
+- Addressed user request to holistically refresh the global-level Omni-Graph skill and configure the MCP server across the machine for Antigravity CLI and IDE.
+- Audited target directories against the canonical Antigravity Customization Architecture (`~/.gemini/config/`), replacing stale October 16 assets with v0.3.0 Triad capabilities.
+
+#### Key Actions & Implementations
+1. **Global Skill & Executables Synchronization**:
+   - Replaced `~/.gemini/config/skills/omni-graph/SKILL.md` (updated from 12 KB to 26.7 KB; verified byte-for-byte 0 diff against repo).
+   - Deployed companion executables `omni-mcp.py` (15.3 KB) and `omni.sh` (18.3 KB) into `~/.gemini/config/skills/omni-graph/scripts/` with executable permissions (`chmod +x`).
+2. **Machine-Wide MCP Server Automation**:
+   - Enhanced `tools/omni-graph/scripts/setup-agent.sh` with `merge_mcp_config_json` helper to automatically register `omni-graph` in `~/.gemini/config/mcp_config.json`.
+   - Updated global MCP server configuration to run `~/.gemini/config/skills/omni-graph/scripts/omni-mcp.py` via `uv run`, decoupling execution from any specific repository path.
+   - Removed hardcoded workspace constraint from global `mcp_config.json`, enabling dynamic Git root / workspace detection across all repositories on the machine.
+   - Authored `<appDataDir>/mcp/omni-graph/instructions.md` providing best practices, tool choice guidelines, and 150-line gate rules directly to AI agents invoking MCP tools.
+3. **Global CLI Symlink**:
+   - Added automatic symlink creation in `setup-agent.sh`: `~/.local/bin/omni -> ~/.gemini/config/skills/omni-graph/scripts/omni.sh`.
+   - Verified `omni health` and `omni workspaces` execute globally from any terminal directory.
+4. **Lifecycle Hooks & Retrieval Rules**:
+   - Synchronized `~/.gemini/config/scripts/hook_pre_tool.sh` (hash verified `2ed498a...`).
+   - Verified `~/.gemini/config/rules/00-omni-graph-mandatory-retrieval.md` and `~/.gemini/config/hooks.json`.
+
+#### Verification
+- `uv run --script ~/.gemini/config/skills/omni-graph/scripts/omni-mcp.py` responded to `initialize` (`v0.3.0`) and `tools/list` (6 tools).
+- Verified `omni_definition` for `inject_watcher_status` returned 3 AST matches in `PolyTuring`.
+- Verified `omni health` reported healthy across Rust, SurrealDB, and TEI containers.
+- Clean working tree maintained on `main`.
+
+---
+
+
 
 **Agent/Author**: Antigravity (Google DeepMind)
 **SDLC Phase**: `in-progress` (v0.3.0 Hardening & Architectural Overhaul)
