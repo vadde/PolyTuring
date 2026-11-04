@@ -607,3 +607,4 @@ make setup-agent TARGET=global      # Installs to ~/.gemini/config (machine-wide
 | Date | Author | Changes |
 |------|--------|---------|
 | 2026-09-24 | @vadde | Initial draft — full specification with research from Graphify, CodeGraph, Serena, ECC |
+| 2026-11-04 | @vadde | v0.4.0: Path-based AST lookup, MCP references schema fix, OpenAPI 3.0.3, FIFO ingestion queue, 3-layer filter |

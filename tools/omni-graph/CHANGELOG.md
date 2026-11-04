@@ -5,6 +5,18 @@ All notable changes to this tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-04
+
+### Added
+- **Tokio FIFO Ingestion Task Queue (R-081)**: Bounded in-memory FIFO queue (`tokio::sync::mpsc`) and worker loop serializing background ingestion tasks to eliminate SurrealDB v2 write-conflict aborts (`1001: Commit transaction resulted in a conflict`). Supports atomic workspace purge (`DELETE /ws:<name>`) for 100% clean graphs with zero zombie nodes.
+- **3-Layer Hybrid Ripgrep Filter Engine (R-082)**: Dynamic hot-reloading `.gitignore` parsing via `ignore::gitignore::GitignoreBuilder` paired with non-git directory fallback and static Layer 1 invariants (`.git`, `target`, `node_modules`, `dist`, `.gemini`), completely suppressing live-watcher event storms and indexing bloat.
+- **Interactive OpenAPI 3.0.3 Specification & Swagger Explorer (R-083)**: Exposed OpenAPI 3.0.3 specification at `/api/openapi.json` and interactive liquid-glass explorer at `/api-docs` with schema definitions for all 9 REST endpoints, latency telemetry, and live execution playground.
+- **Path-Based AST Resolution & Condensation (R-084)**: First-class file path and directory lookup in `find_symbols`, `find_references`, and `ContextCondenser::condense` (`file_path = $target OR file_path CONTAINS $target`). Querying a file path (e.g. `src/watcher/mod.rs`) resolves the file node, its contained symbols, and generates a prompt-safe (<1,490 token) neighborhood context slice.
+- **Cognitive Intelligence Interpretation Framework (R-085)**: Added 5-step Agent Reconnaissance Ladder, Reference Edge Categorization Matrix, and Token Budget SLA verification protocols to `SKILL.md` across repository, tool, and global locations.
+
+### Fixed
+- **MCP Server References Desynchronization**: Resolved schema mismatch in `omni-mcp.py` (`omni_references` tool) by parsing `res.get("references", [])` into Direct Callers, Containment, Inheritance, and Document nodes instead of reading obsolete keys.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added

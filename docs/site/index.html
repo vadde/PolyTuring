@@ -41,7 +41,7 @@
           <div class="brand-title">PolyTuring</div>
           <div class="brand-sub">vadde/PolyTuring monorepo</div>
         </div>
-        <span class="brand-badge">v0.3.0 Living Docs</span>
+        <span class="brand-badge">v0.4.0 Living Docs</span>
       </a>
     </div>
 
@@ -229,6 +229,7 @@
           <a href="#sec-omni-triad" class="nav-tree-link">⚡ The Agentic Triad (MCP &amp; CLI)</a>
           <a href="#sec-omni-topological" class="nav-tree-link">🕸️ Topological Backbone &amp; PPR</a>
           <a href="#sec-omni-sair" class="nav-tree-link">🛡️ SAIR &amp; Content Partitioning</a>
+          <a href="#sec-omni-fifo" class="nav-tree-link">⚡ FIFO Queue &amp; OpenAPI 3.0</a>
           <a href="#token-simulator" class="nav-tree-link">Token Budget Simulator</a>
           <a href="#api-playground" class="nav-tree-link">REST API Playbook &amp; Curl</a>
         </div>
@@ -1098,6 +1099,17 @@ flowchart TB
             <li><strong>3-Tier SAIR Resolution Ladder</strong>: Local file scope first $\to$ Directory/module namespace second $\to$ Generic Verb Blacklist (preventing spurious cross-package edge synthesis for common generic verbs).</li>
             <li><strong>Dual-Tier Content Partitioning</strong>: Storage and vector indexes are partitioned into dedicated code and documentation tiers. Vector search and Graph-RAG queries default to <code>include_docs=false</code>, querying verified source code AST nodes with sub-millisecond precision unless architectural documentation is explicitly requested.</li>
           </ul>
+
+          <h3 class="section-h2" id="sec-omni-fifo">Enterprise Ingestion: FIFO Task Queue, OpenAPI 3.0 &amp; Cognitive AST Intelligence</h3>
+          <p>
+            Omni-Graph v0.4.0 introduces enterprise-grade ingestion serialization, public API documentation, and path-aware AST resolution:
+          </p>
+          <ul style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
+            <li><strong>Tokio FIFO Ingestion Queue</strong>: Serializes background indexing tasks through a bounded <code>tokio::sync::mpsc</code> channel to eliminate SurrealDB v2 write-conflict aborts (<code>1001: Commit transaction resulted in a conflict</code>). Automatically enforces atomic workspace purge for 100% clean graphs with zero zombie nodes.</li>
+            <li><strong>3-Layer Hybrid Ripgrep Filter</strong>: Dynamic <code>.gitignore</code> hot-reloading with static Layer 1 invariants and non-git directory fallback, eliminating live-watcher event storms and indexing bloat.</li>
+            <li><strong>Interactive OpenAPI 3.0.3 Explorer</strong>: Accessible at <code>/api-docs</code> and <code>/api/openapi.json</code>, featuring Year 2500 cosmic liquid-glass styling, full schema definitions for all 9 endpoints, live query runner, and latency telemetry.</li>
+            <li><strong>Path-Based AST &amp; Line Intelligence</strong>: First-class symbol, reference, and condensation queries for exact file paths (e.g. <code>src/watcher/mod.rs</code>) and directories, accompanied by the 5-step Agent Reconnaissance Ladder in <code>SKILL.md</code>.</li>
+          </ul>
         </div>
       </section>
 
@@ -1190,6 +1202,8 @@ flowchart TB
                 <option value="worktrees">GET /api/worktrees (Active Git Worktrees)</option>
                 <option value="sync-worktrees">POST /api/worktrees/sync (Fleet Dynamic Alignment)</option>
                 <option value="ingest">POST /api/ingest (Codebase Ingestion)</option>
+                <option value="openapi">GET /api/openapi.json (OpenAPI 3.0.3 Specification)</option>
+                <option value="api-docs">GET /api-docs (Interactive OpenAPI 3.0 Documentation)</option>
               </select>
             </div>
             <div class="control-item">

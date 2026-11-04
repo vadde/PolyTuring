@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
 status: in-progress
-last_session: 2026-11-03
+last_session: 2026-11-04
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `in-progress`
-- **Version**: 0.3.0
+- **Version**: 0.4.0
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
@@ -26,6 +26,8 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| Path-Based AST Resolution & MCP Parity | Complete | — | 🟢 First-class file and directory path symbol/reference/condense matching + MCP schema parity |
+| Cognitive Intelligence Framework (SKILL.md) | Complete | — | 🟢 Line bounds, blast radius risk matrix, instability index decoding, 5-step reconnaissance ladder |
 | FIFO Ingestion Task Queue & Concurrency Protection | Complete | — | 🟢 Tokio mpsc FIFO queue serializing SurrealDB writes and eliminating write conflicts |
 | Atomic Clean Invariant & Purge Integration | Complete | — | 🟢 purge_workspace automatically executed before re-indexing; removed manual toggle |
 | OpenAPI 3.0 Specification & Route (/api/openapi.json) | Complete | — | 🟢 Complete 27-endpoint schema covering all Omni-Graph endpoints |
@@ -34,7 +36,7 @@ blockers: []
 | Spec Requirements (R-XXX) | 78 | 80 | 🟢 97.5% Complete (2 Deferred to v0.3.1: R-066, R-072) |
 | Acceptance Criteria (AC-XXX) | 35 | 37 | 🟢 94.6% Complete (2 Deferred: AC for R-066, R-072) |
 | Non-Functional (NF-XXX) | 15 | 15 | 🟢 100% Complete |
-| Test Coverage | 85/85 Unit & Integration Tests | 85 | 🟢 100% Verified (0.01s) |
+| Test Coverage | 86/86 Unit & Integration Tests | 86 | 🟢 100% Verified (0.01s) |
 | Hybrid Ripgrep Gitignore Filter (R-015) | Complete | — | 🟢 3-layer noise pruning with dynamic .gitignore hot-reload and non-git fallback |
 | Workspace Deep-Linking & History Sync (R-013) | Complete | — | 🟢 Bidirectional URL query synchronization preserving workspace on reload |
 | Bounded Viewport Scroll & HUD Clearance (R-014) | Complete | — | 🟢 100% viewport containment, clearance above bottom HUDs, Back to Top FAB |

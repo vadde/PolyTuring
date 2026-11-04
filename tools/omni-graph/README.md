@@ -3,7 +3,7 @@
 > A 100% local, multi-container semantic knowledge hub that models codebases as rich AST graphs augmented with vector embeddings and community clustering — purpose-built for Apple Silicon ARM64 unified memory.
 
 ![Status](https://img.shields.io/badge/status-in--progress-blue)
-![Version](https://img.shields.io/badge/version-0.3.0-emerald)
+![Version](https://img.shields.io/badge/version-0.4.0-emerald)
 ![Language](https://img.shields.io/badge/language-rust%20%2B%20react%20%2B%20python-orange)
 ![Engine](https://img.shields.io/badge/database-SurrealDB%20v2-green)
 ![Embeddings](https://img.shields.io/badge/embeddings-HF%20TEI%20(384--dim)-purple)
@@ -86,13 +86,14 @@ To prevent LLM agents from reverting to primitive string searches when under hea
 
 ## 3. Symbolic LSP Tools (Serena Model)
 
-Inspired by Serena's language server architecture, Omni-Graph extracts deterministic Abstract Syntax Trees via Tree-Sitter across polyglot codebases (Rust, Python, Go, TypeScript, JavaScript):
+Inspired by Serena's language server architecture, Omni-Graph extracts deterministic Abstract Syntax Trees via Tree-Sitter across polyglot codebases (Rust, Python, Go, TypeScript, JavaScript, Java, C/C++, Shell, and Markdown). All endpoints accept symbol names, exact file paths (`src/watcher/mod.rs`), or directory paths:
 
 | LSP Capability | Omni-Graph API | CLI Command | Description |
 | :--- | :--- | :--- | :--- |
-| `textDocument/definition` | `GET /api/symbol?name=<sym>` | `./scripts/omni.sh symbol <name>` | Locates exact declaration, file path, line range, and code signature |
-| `textDocument/references` | `GET /api/references?symbol=<sym>` | `./scripts/omni.sh references <name>` | Discovers all functions and structs calling or referencing the symbol |
-| `subgraph/condense` | `GET /api/condense?symbol=<sym>&hops=2` | `./scripts/omni.sh condense <name> 2` | Slices a 2-hop neighborhood into a rich Markdown block (<1500 tokens) |
+| `textDocument/definition` | `GET /api/symbol?name=<sym_or_path>` | `./scripts/omni symbol <name_or_path>` | Locates exact declaration, file path, line range, and code signature (or file node + enclosed symbols) |
+| `textDocument/references` | `GET /api/references?symbol=<sym_or_path>` | `./scripts/omni references <name_or_path>` | Discovers all callers, importing files, containment hierarchy (`CONTAINS`), and directory links |
+| `subgraph/condense` | `GET /api/condense?symbol=<sym_or_path>&hops=2` | `./scripts/omni condense <name_or_path> 2` | Slices a 2-hop neighborhood or entire file into a rich Markdown block (<1500 tokens) |
+| `openapi/spec` | `GET /api/openapi.json` | `curl :8080/api/openapi.json` | Complete 27-endpoint OpenAPI 3.0.3 specification with interactive liquid-glass explorer at `/api-docs` |
 
 ---
 

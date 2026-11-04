@@ -211,6 +211,185 @@ All endpoints serve JSON directly from the Rust core on `http://localhost:8080`:
 
 ---
 
+## 🧠 Cognitive Intelligence Interpretation: How to Decode & Exploit Responses
+
+Omni-Graph does not simply return raw text—it produces structured topological intelligence designed to guide your reasoning. Here is how to decode each response payload and make optimal engineering decisions:
+
+### 1. Decoding `omni_definition` (or `GET /api/symbol`)
+Returns an array of matching AST symbols across the workspace:
+
+```json
+{
+  "matches": [
+    {
+      "id": "node:`PolyTuring:tools/omni-graph/src/ingestion/mod.rs:execute_ingest:391`",
+      "file_path": "tools/omni-graph/src/ingestion/mod.rs",
+      "kind": "function",
+      "label": "execute_ingest",
+      "language": "rust",
+      "line_start": 391,
+      "line_end": 861,
+      "text": "async fn execute_ingest( db: &DbClient, embedder: &EmbedderClient... ) { ... }",
+      "community": 66
+    }
+  ]
+}
+```
+
+* **`line_start` & `line_end` (The 150-Line Gate Bounding Box)**:
+  * **1-Indexed Inclusive**: Line numbers are exact 1-indexed compiler AST boundaries.
+  * **Mandatory Action**: Never read the entire file into context. Pass `StartLine: match.line_start` and `EndLine: match.line_end` (or a focused sub-range) to `read_file`. This saves up to 90% of your token window and satisfies the 150-line gate.
+  * **Chunking Large Symbols (>150 Lines)**: If `line_end - line_start > 150` (e.g., an 800-line pipeline function), DO NOT attempt to read the entire symbol at once. Slice into consecutive 140-line windows (`StartLine: line_start, EndLine: line_start + 140`).
+  * **Active Line-Shifting Caveat**: When you edit a file, the live watcher updates in ~500ms. If you perform multiple edits in the same turn before live watch syncs, account for line offset delta $\pm\Delta N$.
+* **`text` (Code Preview Snippet)**:
+  * Contains the first ~500 characters of the symbol or file. Inspect this snippet to verify parameter signatures, docstrings, or return types *before* executing any file reads.
+* **`kind` (Taxonomy Interpretation)**:
+  * `function` / `method`: Executable logic. Inspect `line_start` to understand implementation.
+  * `struct` / `class` / `interface` / `trait`: Data model or public contract. Modifying this alters memory layout or interface signatures.
+  * `field` / `enum` / `macro`: Sub-symbol structures or metaprogramming constructs.
+  * `file` (R-063): Discrete file node. `line_start = 1`, `line_end = total_lines` in the file. `text` contains the first 500 characters of file header.
+  * `directory` (R-063): Spatial container node (`line_start = 0, line_end = 0`). Reveals directory layout without running shell `ls`.
+  * `workspace`: Top-level workspace root.
+* **Querying by File Path or Partial Path**:
+  * You can query file paths directly: `omni_definition(symbol="src/watcher/mod.rs")` or `omni_definition(symbol="watcher")`.
+  * Returns both the discrete `file` node and all symbols contained within that path.
+* **`matches.len() > 1` (Disambiguation Trigger)**:
+  * If multiple matches exist, check `file_path` and `language`.
+  * Common cause: Trait definition in one file, implementation in another, or separate tools sharing a common function name (`new`, `run`, `init`). Always scope your subsequent queries using the matching `file_path`.
+
+---
+
+### 2. Decoding `omni_references` (or `GET /api/references`)
+Returns all inbound references, callers, and structural relationships pointing to the target symbol:
+
+```json
+{
+  "references": [
+    {
+      "file_path": "tools/omni-graph/src/ingestion/mod.rs",
+      "label": "new",
+      "kind": "function",
+      "type": "CALLS",
+      "category": "EXTRACTED"
+    },
+    {
+      "file_path": "tools/omni-graph/tests/unit_tests.rs",
+      "label": "test_r015_hybrid_filter",
+      "kind": "function",
+      "type": "CALLS",
+      "category": "EXTRACTED"
+    },
+    {
+      "file_path": "tools/omni-graph/src/ingestion/mod.rs",
+      "label": "mod.rs",
+      "kind": "file",
+      "type": "CONTAINS",
+      "category": "CONTAINMENT"
+    }
+  ]
+}
+```
+
+* **The Blast-Radius Risk Matrix**:
+  * `type: "CALLS"`: **Active Execution Callers**. Modifying the target's parameters, return type, or side effects will break these functions.
+  * `type: "IMPORTS"`: **Module Dependents**. Renaming or moving the target symbol requires updating import statements in these files.
+  * `type: "CONTAINS"`: **Parent / Child Containment**.
+    * Querying a symbol: points up to its enclosing `file` node.
+    * Querying a file: points down to every declared symbol inside it.
+  * `type: "CONTAINS_FILE"`: **Directory File Membership**. Points from parent directory to the child file.
+  * `type: "CONTAINS_DIR"`: **Directory Tree Hierarchy**. Points from parent directory down to child directory.
+  * `type: "IMPLEMENTS"` / `"EXTENDS"`: **Polymorphic Hierarchy**. Identifies structs or classes inheriting from this interface/base class.
+* **Hierarchical Traversal (Files & Directories)**:
+  * To list all symbols in a file without reading disk: `omni_references(symbol="src/watcher/mod.rs")` (filters `type: CONTAINS`).
+  * To inspect directory structure: `omni_references(symbol="watcher")` (reveals parent directory and contained files).
+* **Automated Test Suite Discovery**:
+  * **Critical Pattern**: Filter references where `file_path` contains `test`, `tests/`, `spec`, or `_test.go`.
+  * **Mandatory Protocol**: These are the exact regression tests you must run after making changes to verify zero regressions!
+
+---
+
+### 3. Decoding `omni_condense` (or `GET /api/condense`)
+Extracts a personalized PageRank (PPR) condensed neighborhood slice guaranteed under `<1,490 tokens`.
+
+* **`direct_callers`**: Inbound execution triggers. Answers: *"Who invokes this component?"*
+* **`direct_callees`**: Outbound dependencies and delegated workers. Answers: *"What services and helpers does this component rely on to do its job?"*
+* **`related_files`**: The tightly coupled cluster of files involved in this feature.
+* **`formatted_markdown` (Execution Flow Analysis)**:
+  * Gives you a pre-digested view of function signatures, caller $\to$ target $\to$ callee edges, and code snippets.
+  * **Cognitive Decision**: When investigating an unfamiliar bug or workflow, call `omni_condense` first. It replaces reading 5-10 separate files across multiple directories with a single, prompt-safe trace.
+
+---
+
+### 4. Decoding `omni_galaxies` (or `GET /api/galaxies`)
+Returns the top modular subsystems discovered via Louvain/Leiden label propagation clustering:
+
+```json
+{
+  "galaxies": [
+    {
+      "name": "tools/omni-graph/src/db (mod.rs)",
+      "dominant_path": "tools/omni-graph/src/db",
+      "node_count": 156,
+      "afferent_coupling": 61,
+      "efferent_coupling": 44,
+      "instability": 0.419,
+      "role": "Domain Service",
+      "sample_symbols": ["DbClient", "store_nodes", "store_edges", "purge_workspace"]
+    }
+  ]
+}
+```
+
+* **Afferent Coupling ($C_a$)**: Number of incoming dependencies from outside the galaxy.
+  * High $C_a$ = High centrality. Many other subsystems depend on this module.
+* **Efferent Coupling ($C_e$)**: Number of outgoing dependencies to outside the galaxy.
+  * High $C_e$ = High coordination. This module delegates work out to other modules.
+* **Instability Index ($I = \frac{C_e}{C_a + C_e}$, range 0.0 to 1.0)**:
+  * **$I \to 0.0$ (Extremely Stable Core)**: Foundational services (e.g. `src/db`). Modifying these has a massive blast radius across the entire repo. Exercise maximum caution and verify all tests.
+  * **$0.3 \le I \le 0.7$ (Balanced Domain Services)**: Business logic, parsers, and pipeline workers (e.g. `src/ingestion`, `src/api`).
+  * **$I \to 1.0$ (Volatile Leaf / Orchestrator)**: CLI entrypoints, UI components, test runners. Easy to modify; changes are isolated with minimal ripple effect on core systems.
+* **`dominant_path` & `sample_symbols`**:
+  * Tells you where the subsystem lives on disk and what its 3-5 central hub symbols are. If tasked with exploring a new area, begin with the hub symbols.
+
+---
+
+### 5. Decoding `omni_search` vs `omni_query`
+* **When to use `omni_search` (Precision Pinpoint)**:
+  * Use when you need to locate specific functions, structs, or files by conceptual name (e.g., `"fifo queue worker"`, `"jwt verification"`).
+  * Check the top 3-5 results, note the `file_path`, and transition immediately to `omni_definition` or `omni_condense`.
+  * Set `include_docs: true` ONLY when searching user guides, RFCs, or markdown devlogs.
+* **When to use `omni_query` (Architectural Synthesis)**:
+  * Use when asking high-level structural questions: *"How does Omni-Graph handle file watcher debouncing and error recovery?"*
+  * It executes hybrid Graph-RAG (vector seeds + community summaries + AST graph links) to produce a synthesized Markdown brief.
+  * Do NOT use `omni_query` when you only need a file path or line number—use `omni_search` or `omni_definition` instead.
+
+---
+
+### 6. The 5-Step Autonomous Agent Reconnaissance Ladder
+
+Whenever approaching an unfamiliar codebase or solving a non-trivial issue, execute this cognitive ladder:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                      THE 5-STEP AGENT RECONNAISSANCE LADDER                            │
+├───────┬──────────────────────────┬─────────────────────────────┬───────────────────────┤
+│ Step  │ Action                   │ Tool / Command              │ Cognitive Objective   │
+├───────┼──────────────────────────┼─────────────────────────────┼───────────────────────┤
+│ 1.    │ Subsystem Identification │ `omni_galaxies()`           │ Identify owning domain│
+│       │                          │                             │ & instability risk    │
+│ 2.    │ Symbol Pinpointing       │ `omni_definition(symbol)`   │ Acquire exact path    │
+│       │                          │                             │ & line bounds         │
+│ 3.    │ Execution Flow Tracing   │ `omni_condense(symbol)`     │ Trace callers/callees │
+│       │                          │                             │ in <1,490 tokens      │
+│ 4.    │ Blast-Radius & Test Audit│ `omni_references(symbol)`   │ Identify dependents   │
+│       │                          │                             │ & test suites         │
+│ 5.    │ Surgical Bounded Action  │ `read_file(start, end)`     │ Inspect bounded slice │
+│       │                          │                             │ & execute change      │
+└───────┴──────────────────────────┴─────────────────────────────┴───────────────────────┘
+```
+
+---
+
 ## 🧩 Resolving Permutations, Combinations & Scoping
 
 ### 1. Workspace Scoping Permutations
