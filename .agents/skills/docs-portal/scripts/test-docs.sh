@@ -193,6 +193,14 @@ if ! grep -q 'cleanSvg.style.width\s*=\s*vbW\s*+\s*.px.' "${SITE_DIR}/app.js"; t
   echo "❌ Missing explicit unconstrained viewBox pixel sizing on cloned SVG in app.js"
   exit 1
 fi
+if grep -E 'sourceCanvas\.querySelector\([^\)]*[\x27\x22]svg[\x27\x22]\)' "${SITE_DIR}/app.js" > /dev/null; then
+  echo "❌ Fatal anti-pattern: sourceCanvas.querySelector('svg') matches fullscreen button icon instead of canvas content!"
+  exit 1
+fi
+if ! grep -E '(cleanImg|imgEl)\.style\.width\s*=\s*natW\s*\+\s*.px.' "${SITE_DIR}/app.js" > /dev/null; then
+  echo "❌ Missing unconstrained natural image dimensioning in app.js"
+  exit 1
+fi
 if ! grep -q 'savedScrollY' "${SITE_DIR}/app.js"; then
   echo "❌ Missing savedScrollY scroll position preservation in app.js"
   exit 1

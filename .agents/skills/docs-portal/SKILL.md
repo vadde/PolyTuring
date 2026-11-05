@@ -262,19 +262,21 @@ flowchart TB
 2. **Sub-Millisecond Zoom/Pan SLA**:
    - `.theater-surface` MUST specify `transition: none !important;` to eliminate pointer lag.
    - Panning uses `translate(${panX}px, ${panY}px) scale(${zoom})` for 1:1 pixel accuracy.
-3. **Unconstrained SVG ViewBox Dimensioning**:
-   - When cloning SVG into `#theater-surface`, extract `viewBox` width and height (`[minX, minY, vbW, vbH]`).
-   - Assign explicit unconstrained pixel dimensions:
+3. **Content Surface Scoping & Unconstrained Dimensioning (SVG, Image, Table)**:
+   - **Scope Invariant**: When extracting content to display in `#theater-surface`, NEVER query `sourceCanvas.querySelector('svg')` at the container root, as it will inadvertently match the 13px `<svg>` icon inside the toolbar's `.fullscreen-btn`. Always isolate extraction strictly inside `sourceCanvas.querySelector('.canvas-content-surface')`.
+   - **SVG ViewBox Dimensioning**: When cloning SVG into `#theater-surface`, extract `viewBox` width and height (`[minX, minY, vbW, vbH]`). Assign explicit unconstrained pixel dimensions:
      ```javascript
      cleanSvg.style.width = vbW + 'px';
      cleanSvg.style.height = vbH + 'px';
      cleanSvg.style.maxWidth = 'none';
      cleanSvg.style.maxHeight = 'none';
      ```
-   - **Why this is mandatory**: Global CSS rules apply `.mermaid svg { width: 100% !important; max-width: 100% !important; }` to fit diagrams within card containers. Without setting explicit pixel width on the cloned SVG, CSS forces the diagram to shrink to modal bounds, causing `scale(1.0)` and `Fit` to look identical! Explicit pixel dimensions unlock **true 1:1 crisp physical resolution** at 100%.
+   - **Image Natural Dimensioning**: When cloning `<img>` elements into `#theater-surface`, force `cleanImg.loading = 'eager'`, extract `naturalWidth` and `naturalHeight`, assign explicit pixel dimensions (`cleanImg.style.width = natW + 'px'; cleanImg.style.maxWidth = 'none';`), and attach an `onload` recalibration handler if still loading.
+   - **Table Glass Card Preservation**: When displaying `<table>` elements in theater mode, wrap in high-contrast frosted glass (`.theater-surface .table-wrapper`).
+   - **Why this is mandatory**: Global CSS rules apply `.mermaid svg { width: 100% !important; max-width: 100% !important; }` and `.canvas-viewport img { max-width: 100%; }` to fit items within card containers. Without setting explicit pixel width and unconstrained `max-width: none;` on the cloned content, CSS forces the content to shrink to modal bounds, causing `scale(1.0)` and `Fit` to look identical! Explicit pixel dimensions unlock **true 1:1 crisp physical resolution** at 100%.
 4. **Clear UX Distinction: `100%` vs `Fit`**:
    - `100%` (`#theater-zoom-reset`): Sets zoom scale to **`1.0`** (true native physical resolution). Panning allows exploring detailed clusters without pixel blur.
-   - `Fit` (`#theater-zoom-fit`): Dynamically calculates optimal fit scale `Math.min(availW / vbW, availH / vbH)` so the entire diagram fits cleanly inside the viewport margins with zero clipping.
+   - `Fit` (`#theater-zoom-fit`): Dynamically calculates optimal fit scale `Math.min(availW / targetW, availH / targetH)` across SVGs, images, and tables so the entire target fits cleanly inside viewport margins with zero clipping.
 5. **Fluid Multiplicative Wheel Zoom**:
    - Trackpad and mouse wheel zooming uses multiplicative scaling (`factor = e.deltaY < 0 ? 1.15 : 0.87`) clamped between `0.15` and `5.0`.
 6. **Scroll Position Grounding & Flash-Focus Animation**:
