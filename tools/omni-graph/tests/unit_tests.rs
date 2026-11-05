@@ -192,7 +192,7 @@ function fetchData(url) {
         assert!(result.is_some(), "Parser should handle JavaScript");
         let pr = result.unwrap();
         let fns: Vec<_> = pr.nodes.iter().filter(|n| n.kind == "function").collect();
-        assert!(fns.len() >= 1);
+        assert!(!fns.is_empty());
         assert_eq!(fns[0].label, "fetchData");
         assert_eq!(fns[0].language, "javascript");
     }
@@ -208,7 +208,7 @@ function greet(name: string): string {
         assert!(result.is_some(), "Parser should handle TypeScript");
         let pr = result.unwrap();
         let fns: Vec<_> = pr.nodes.iter().filter(|n| n.kind == "function").collect();
-        assert!(fns.len() >= 1);
+        assert!(!fns.is_empty());
         assert_eq!(fns[0].label, "greet");
         assert_eq!(fns[0].language, "typescript");
     }
@@ -2360,6 +2360,491 @@ mod search_result_serde_tests {
         assert_eq!(parsed.community, Some(42));
     }
 }
+
+mod hardening_v050_tests {
+    use omni_graph::analysis::CommunityDetector;
+    use omni_graph::db::{DbClient, DbLink, DbNode, InboundEdgeRef};
+    use omni_graph::parser::ExtractedNode;
+
+    fn make_db_node(id: &str, file: &str, label: &str) -> DbNode {
+        DbNode {
+            id: id.to_string(),
+            workspace: Some("test-ws".to_string()),
+            label: label.to_string(),
+            kind: "function".to_string(),
+            file_path: file.to_string(),
+            language: "rust".to_string(),
+            line_start: 1,
+            line_end: 10,
+            text: format!("fn {}() {{}}", label),
+            community: None,
+            file_hash: None,
+        }
+    }
+
+    #[test]
+    fn test_r077_ingestion_and_recluster_parity() {
+        // Construct a graph with a core cluster and small micro-communities
+        let mut nodes = Vec::new();
+        for i in 1..=10 {
+            nodes.push(make_db_node(&format!("core_{}", i), "src/core.rs", &format!("core_fn_{}", i)));
+        }
+        for i in 1..=3 {
+            nodes.push(make_db_node(&format!("micro_{}", i), &format!("src/util_{}.rs", i), &format!("util_fn_{}", i)));
+        }
+
+        let mut links = Vec::new();
+        // Dense core
+        for i in 1..9 {
+            links.push(DbLink {
+                id: format!("e_{}", i),
+                workspace: Some("test-ws".to_string()),
+                source: format!("core_{}", i),
+                target: format!("core_{}", i + 1),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+        // Micro links connecting to core
+        for i in 1..=3 {
+            links.push(DbLink {
+                id: format!("e_micro_{}", i),
+                workspace: Some("test-ws".to_string()),
+                source: format!("micro_{}", i),
+                target: "core_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+
+        // Path 1: Ingestion pipeline (detect_with_seeds + consolidate)
+        let mut assignments_ingestion = CommunityDetector::detect_with_seeds(&nodes, &links, 15, None);
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments_ingestion, 5);
+        let (summaries_ingestion, _) = CommunityDetector::compute_galaxy_metrics("test-ws", &nodes, &links, &assignments_ingestion);
+
+        // Path 2: Recluster API (detect + consolidate)
+        let mut assignments_recluster = CommunityDetector::detect(&nodes, &links, 15);
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments_recluster, 5);
+        let (summaries_recluster, _) = CommunityDetector::compute_galaxy_metrics("test-ws", &nodes, &links, &assignments_recluster);
+
+        // Parity Verification (R-077):
+        // Both pipelines must produce identical cluster counts and identical assignments
+        assert_eq!(
+            summaries_ingestion.len(),
+            summaries_recluster.len(),
+            "Ingestion and Recluster API must produce identical galaxy counts"
+        );
+
+        for node in &nodes {
+            assert_eq!(
+                assignments_ingestion.get(&node.id),
+                assignments_recluster.get(&node.id),
+                "Node '{}' community assignment must match across ingestion and recluster",
+                node.id
+            );
+        }
+    }
+
+    #[test]
+    fn test_r079_delta_sync_preserves_inbound_callers() {
+        let inbound_edges = vec![
+            InboundEdgeRef {
+                caller_id: "test-ws:tests/test_profiler.rs:test_measure:10".to_string(),
+                target_label: "SQLAlchemyProfiler".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            InboundEdgeRef {
+                caller_id: "test-ws:src/legacy.rs:old_call:20".to_string(),
+                target_label: "RemovedFunction".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        // Newly parsed nodes in profiler.rs where line numbers shifted
+        let surviving_nodes = vec![
+            ExtractedNode {
+                id: "test-ws:file:src/profiler.rs".to_string(),
+                workspace: "test-ws".to_string(),
+                label: "profiler.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: "src/profiler.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 120,
+                text: "file content".to_string(),
+            },
+            ExtractedNode {
+                id: "test-ws:src/profiler.rs:SQLAlchemyProfiler:45".to_string(), // shifted from line 25 to 45
+                workspace: "test-ws".to_string(),
+                label: "SQLAlchemyProfiler".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/profiler.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 45,
+                line_end: 90,
+                text: "pub struct SQLAlchemyProfiler {}".to_string(),
+            },
+        ];
+
+        let (sql, count) = DbClient::build_relink_inbound_sql("test-ws", &inbound_edges, &surviving_nodes);
+
+        // R-079: Must relink surviving symbol and discard deleted symbol
+        assert_eq!(count, 1, "Only surviving symbol 'SQLAlchemyProfiler' should be relinked");
+        assert!(sql.contains("test-ws:tests/test_profiler.rs:test_measure:10"), "Must reference caller id");
+        assert!(sql.contains("test-ws:src/profiler.rs:SQLAlchemyProfiler:45"), "Must link to new node id with updated line");
+        assert!(!sql.contains("RemovedFunction"), "Deleted symbol must not be relinked");
+        assert!(sql.contains("RELATE $s->linked_to->$t"), "Must use valid SurrealDB RELATE syntax");
+    }
+
+    #[tokio::test]
+    async fn test_r080_is_indexing_read_barrier() {
+        use omni_graph::config::Config;
+        use omni_graph::embedder::EmbedderClient;
+        use omni_graph::ingestion::{FileCache, IngestionJobStatus, IngestionPipeline};
+
+        let cfg = Config::from_env();
+        let db = DbClient::new(&cfg);
+        let embedder = EmbedderClient::new(cfg.tei_url);
+        let cache = FileCache::new();
+        let pipeline = IngestionPipeline::new(db, embedder, cache);
+
+        // Initially idle
+        assert!(pipeline.is_indexing(Some("test-ws")).await.is_none());
+        assert!(pipeline.is_indexing(None).await.is_none());
+
+        // Simulate active indexing job (R-080)
+        let active_job = IngestionJobStatus {
+            workspace: "test-ws".to_string(),
+            path: "/tmp/test".to_string(),
+            is_refresh: false,
+            phase: "indexing".to_string(),
+            queue_position: 0,
+            files_scanned: 100,
+            files_indexed: 50,
+            files_skipped: 0,
+            total_files: 100,
+            nodes_created: 500,
+            edges_created: 1200,
+            clusters_computed: 0,
+            started_at: 1000,
+            elapsed_ms: 5000,
+            completed: false,
+            error: None,
+        };
+        pipeline.set_job_status(active_job).await;
+
+        // Must lock target workspace
+        let locked = pipeline.is_indexing(Some("test-ws")).await;
+        assert!(locked.is_some(), "Active indexing workspace must be locked");
+        let info = locked.unwrap();
+        assert_eq!(info.phase, "indexing");
+        assert_eq!(info.files_indexed, 50);
+
+        // Unrelated workspace must NOT be locked
+        assert!(pipeline.is_indexing(Some("other-ws")).await.is_none());
+
+        // Omniverse/global query (None) must detect active background indexing
+        assert!(pipeline.is_indexing(None).await.is_some());
+
+        // Once job completes, read fence must lift cleanly
+        let completed_job = IngestionJobStatus {
+            workspace: "test-ws".to_string(),
+            path: "/tmp/test".to_string(),
+            is_refresh: false,
+            phase: "completed".to_string(),
+            queue_position: 0,
+            files_scanned: 100,
+            files_indexed: 100,
+            files_skipped: 0,
+            total_files: 100,
+            nodes_created: 1000,
+            edges_created: 2500,
+            clusters_computed: 12,
+            started_at: 1000,
+            elapsed_ms: 12000,
+            completed: true,
+            error: None,
+        };
+        pipeline.set_job_status(completed_job).await;
+
+        assert!(pipeline.is_indexing(Some("test-ws")).await.is_none(), "Lock must lift once completed");
+        assert!(pipeline.is_indexing(None).await.is_none());
+    }
+
+    #[test]
+    fn test_r078_two_pass_resolves_forward_references() {
+        use omni_graph::ingestion::SymbolTable;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let mut symbol_table = SymbolTable::new();
+
+        // Pass 1: Walk File A (e.g. index 10)
+        // File A defines test_profiler, which calls SQLAlchemyProfiler before File B is visited
+        let file_a_node = ExtractedNode {
+            id: "test-ws:tests/test_profiler.py:test_profiler:10".to_string(),
+            workspace: "test-ws".to_string(),
+            label: "test_profiler".to_string(),
+            kind: "function".to_string(),
+            file_path: "tests/test_profiler.py".to_string(),
+            language: "python".to_string(),
+            line_start: 10,
+            line_end: 20,
+            text: "def test_profiler(): SQLAlchemyProfiler()".to_string(),
+        };
+        symbol_table.register_file_nodes(&[file_a_node]);
+        symbol_table.register_file_imports(
+            "test-ws",
+            "tests/test_profiler.py",
+            &["SQLAlchemyProfiler".to_string()],
+        );
+
+        let unresolved_edge = ExtractedEdge {
+            workspace: "test-ws".to_string(),
+            source_id: "test-ws:tests/test_profiler.py:test_profiler:10".to_string(),
+            target_label: "SQLAlchemyProfiler".to_string(),
+            target_id: None, // unresolved forward reference
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        symbol_table.queue_edges(vec![unresolved_edge]);
+
+        assert_eq!(symbol_table.total_unresolved_queued(), 1);
+
+        // Pass 1 continues: Walk File B much later (e.g. index 100)
+        // File B defines SQLAlchemyProfiler
+        let file_b_node = ExtractedNode {
+            id: "test-ws:django_sorcery/db/profiler.py:SQLAlchemyProfiler:25".to_string(),
+            workspace: "test-ws".to_string(),
+            label: "SQLAlchemyProfiler".to_string(),
+            kind: "class".to_string(),
+            file_path: "django_sorcery/db/profiler.py".to_string(),
+            language: "python".to_string(),
+            line_start: 25,
+            line_end: 80,
+            text: "class SQLAlchemyProfiler: pass".to_string(),
+        };
+        symbol_table.register_file_nodes(&[file_b_node]);
+
+        // Pass 2: Deferred Linkage Pass (R-078)
+        let (resolved_edges, resolved_count, dropped_count) = symbol_table.resolve_all_queued_edges();
+
+        // Verification (R-078): Forward reference must resolve with 100% success
+        assert_eq!(resolved_count, 1, "Forward reference should be resolved in Pass 2");
+        assert_eq!(dropped_count, 0, "No valid forward reference should be dropped");
+        assert_eq!(resolved_edges.len(), 1);
+        assert_eq!(
+            resolved_edges[0].target_id,
+            Some("test-ws:django_sorcery/db/profiler.py:SQLAlchemyProfiler:25".to_string()),
+            "Resolved target must link to File B symbol declared later in walk order"
+        );
+    }
+
+    #[test]
+    fn test_r082_ast_receiver_preservation() {
+        use omni_graph::parser::CodeParser;
+
+        let python_code = r#"
+def create_account():
+    user = User.objects.create(username="antigravity")
+    self.log("Created")
+"#;
+        let pr = CodeParser::parse_file("test-ws", "services.py", python_code).unwrap();
+
+        // Verify method call "create" is emitted
+        let calls: Vec<_> = pr.edges.iter().filter(|e| e.edge_type == "CALLS").collect();
+        assert!(calls.iter().any(|c| c.target_label == "create"), "Must emit CALLS to 'create'");
+
+        // Verify root receiver "User" is preserved as a REFERENCES edge (R-082)
+        let refs: Vec<_> = pr.edges.iter().filter(|e| e.edge_type == "REFERENCES").collect();
+        assert!(refs.iter().any(|r| r.target_label == "User"), "Must emit REFERENCES edge to root receiver 'User'");
+
+        // Verify "self" is not emitted as a spurious reference
+        assert!(!refs.iter().any(|r| r.target_label == "self"), "'self' should never be emitted as receiver reference");
+    }
+
+    #[test]
+    fn test_r084_hierarchical_leiden_coarsening() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::{DbLink, DbNode};
+        use std::collections::{HashMap, HashSet};
+
+        // Create 30 nodes across 20 distinct fine-grained clusters
+        let mut nodes = Vec::new();
+        let mut assignments = HashMap::new();
+        for i in 0..30 {
+            let nid = format!("node_{}", i);
+            nodes.push(DbNode {
+                id: nid.clone(),
+                workspace: Some("test-ws".to_string()),
+                label: format!("fn_{}", i),
+                kind: "function".to_string(),
+                file_path: format!("pkg_{}/mod.rs", i / 3),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn test() {}".to_string(),
+                community: None,
+                file_hash: None,
+            });
+            // Assign 15 distinct initial cluster IDs
+            assignments.insert(nid, i % 15);
+        }
+
+        let mut links = Vec::new();
+        for i in 0..29 {
+            links.push(DbLink {
+                id: format!("edge_{}", i),
+                workspace: Some("test-ws".to_string()),
+                source: format!("node_{}", i),
+                target: format!("node_{}", i + 1),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+
+        let initial_count = assignments.values().copied().collect::<HashSet<_>>().len();
+        assert_eq!(initial_count, 15, "Should start with 15 clusters");
+
+        // Coarsen to at most 6 macro subsystems (R-084)
+        CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 6);
+
+        let final_count = assignments.values().copied().collect::<HashSet<_>>().len();
+        assert!(final_count <= 6, "Must coarsen to at most 6 macro subsystems, got {}", final_count);
+        assert!(final_count >= 1, "Must maintain non-empty clusters");
+
+        // Every node must have a valid community ID in [0..final_count)
+        for nid in nodes.iter().map(|n| &n.id) {
+            let cid = *assignments.get(nid).unwrap();
+            assert!(cid >= 0 && cid < final_count as i32, "Community ID must be compacted");
+        }
+    }
+
+    #[test]
+    fn test_r085_package_metrics_completeness() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::{DbLink, DbNode};
+        use std::collections::HashMap;
+
+        // Create 10 nodes in a single galaxy: 4 interfaces (abstract) and 6 concrete functions
+        let mut nodes = Vec::new();
+        let mut assignments = HashMap::new();
+
+        for i in 0..4 {
+            let id = format!("iface_{}", i);
+            nodes.push(DbNode {
+                id: id.clone(),
+                workspace: Some("test-ws".to_string()),
+                label: format!("Interface{}", i),
+                kind: "interface".to_string(),
+                file_path: "core/types.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "pub trait Interface {}".to_string(),
+                community: None,
+                file_hash: None,
+            });
+            assignments.insert(id, 0);
+        }
+
+        for i in 0..6 {
+            let id = format!("fn_{}", i);
+            nodes.push(DbNode {
+                id: id.clone(),
+                workspace: Some("test-ws".to_string()),
+                label: format!("Worker{}", i),
+                kind: "function".to_string(),
+                file_path: "core/worker.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn worker() {}".to_string(),
+                community: None,
+                file_hash: None,
+            });
+            assignments.insert(id, 0);
+        }
+
+        // Add 2 foreign nodes in another galaxy (galaxy 1)
+        for i in 0..2 {
+            let id = format!("ext_{}", i);
+            nodes.push(DbNode {
+                id: id.clone(),
+                workspace: Some("test-ws".to_string()),
+                label: format!("Ext{}", i),
+                kind: "function".to_string(),
+                file_path: "client/app.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn ext() {}".to_string(),
+                community: None,
+                file_hash: None,
+            });
+            assignments.insert(id, 1);
+        }
+
+        // Links:
+        // 1 incoming call from ext_0 to iface_0 (Ca = 1 for galaxy 0)
+        // 3 outgoing calls from fn_0, fn_1, fn_2 to ext_1 (Ce = 3 for galaxy 0)
+        let links = vec![
+            DbLink {
+                id: "e1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "ext_0".to_string(),
+                target: "iface_0".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "e2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "fn_0".to_string(),
+                target: "ext_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "e3".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "fn_1".to_string(),
+                target: "ext_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "e4".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "fn_2".to_string(),
+                target: "ext_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        let (_, galaxies) = CommunityDetector::compute_galaxy_metrics("test-ws", &nodes, &links, &assignments);
+        let g0 = galaxies.iter().find(|g| g.galaxy_id == 0).expect("Galaxy 0 must exist");
+
+        // R-085 Package Metrics Verification:
+        // Node count: 10
+        assert_eq!(g0.node_count, 10);
+        // Afferent Coupling Ca = 1, Efferent Coupling Ce = 3
+        assert_eq!(g0.afferent_coupling, 1);
+        assert_eq!(g0.efferent_coupling, 3);
+        // Instability I = Ce / (Ca + Ce) = 3 / (1 + 3) = 0.75
+        assert!((g0.instability - 0.75).abs() < 1e-4, "I must equal 0.75");
+        // Abstractness A = 4 / 10 = 0.4
+        assert!((g0.abstractness - 0.4).abs() < 1e-4, "A must equal 0.4");
+        // Distance D = |A + I - 1| = |0.4 + 0.75 - 1| = |0.15| = 0.15
+        assert!((g0.distance - 0.15).abs() < 1e-4, "D must equal 0.15");
+        // Theoretical bounds
+        assert!(g0.abstractness >= 0.0 && g0.abstractness <= 1.0);
+        assert!(g0.distance >= 0.0 && g0.distance <= 1.0);
+    }
+}
+
 
 
 

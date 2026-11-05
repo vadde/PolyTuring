@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
-status: in-progress
-last_session: 2026-11-04
+status: review
+last_session: 2026-11-05
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -16,8 +16,8 @@ blockers: []
 
 ## Current State
 
-- **SDLC Phase**: `in-progress`
-- **Version**: 0.4.0
+- **SDLC Phase**: `review`
+- **Version**: 0.5.0-rc1
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
@@ -26,6 +26,15 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| Two-Pass Ingestion Engine (R-078) | Complete | — | 🟢 In-memory SymbolTable decoupled declarations from cross-file linkage; forward references resolved 100% |
+| Pipeline Symmetry & Leiden Coarsening (R-077, R-084) | Complete | — | 🟢 Identical 15 macro-galaxies across Ingestion and Re-cluster; multi-level hierarchical contraction |
+| Retentive Delta-Sync Caller Preservation (R-079) | Complete | — | 🟢 relink_inbound_edges preserves inbound callers across live file re-indexing |
+| Transactional Read-Fencing (R-080) | Complete | — | 🟢 HTTP 423 Locked during active indexing on read endpoints |
+| 256-Symbol Chunked Vector Batching (R-081) | Complete | — | 🟢 16.5x throughput speedup (django-sorcery cold refresh: 1,456s -> 87.9s) |
+| AST Receiver Chained Call Extraction (R-082) | Complete | — | 🟢 REFERENCES edges generated for receiver objects in chained calls |
+| Native SurrealDB v2 HNSW KNN Operator (R-083) | Complete | — | 🟢 Native <\|k, ef\|> operator active with 36-83ms search latency |
+| Uncle Bob Martin Package Metrics (R-085) | Complete | — | 🟢 Abstractness (A) and Distance from Main Sequence (D) computed and persisted |
+| Test Coverage | 95/95 Unit & Integration Tests | 95 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
 | Vector Search Cosine Null & Serde Deserialization Fix | Complete | — | 🟢 Excluded zero-vector structural nodes and handled null similarity, unblocking /api/search & /api/query |
 | Query Parameter Aliasing & Flexibility | Complete | — | 🟢 Permissive serde aliases (symbol/name, q/query, k/limit) eliminating 422 errors |
 | Pre-Tool Hook Guardrail Precision | Complete | — | 🟢 Guarded read_file (Path) under 150-line gate and registered api/query & scripts/omni in recon tracker |

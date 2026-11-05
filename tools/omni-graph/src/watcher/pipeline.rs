@@ -135,6 +135,9 @@ impl IncrementalPipeline {
         // 1. Look up existing community for this file before pruning to preserve community assignment
         let existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
 
+        // 1b. Capture existing inbound caller edges (R-079) before pruning old nodes
+        let inbound_edges = self.db.get_inbound_edges_for_file(workspace, rel_path).await.unwrap_or_default();
+
         // 2. Generate vector embeddings for newly parsed nodes FIRST (eliminates 404 blackout window)
         let enriched_texts: Vec<String> = all_nodes
             .iter()
@@ -160,9 +163,18 @@ impl IncrementalPipeline {
             return Err(e);
         }
 
-        // 4. Store new edges
+        // 5. Store new edges
         if let Err(e) = self.db.store_edges(&all_edges).await {
             warn!("Failed to store edges during live sync for '{}': {}", rel_path, e);
+        }
+
+        // 5b. Re-link surviving inbound caller edges to new symbol node IDs (R-079)
+        if !inbound_edges.is_empty() {
+            if let Ok(relinked) = self.db.relink_inbound_edges(workspace, &inbound_edges, &all_nodes).await {
+                if relinked > 0 {
+                    info!("Preserved and relinked {} inbound caller edges for '{}'", relinked, rel_path);
+                }
+            }
         }
 
         // 5. Update staleness cache

@@ -376,6 +376,22 @@ async fn galaxies_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock reads if workspace is actively indexing
+    if let Some(job) = state.pipeline.is_indexing(ws.as_deref()).await {
+        return (
+            StatusCode::LOCKED,
+            Json(serde_json::json!({
+                "status": "indexing_in_progress",
+                "workspace": job.workspace,
+                "phase": job.phase,
+                "files_indexed": job.files_indexed,
+                "total_files": job.total_files,
+                "retry_after_ms": 2000,
+                "message": format!("Workspace '{}' is actively {} ({} / {} files). Read requests are locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
+            }))
+        ).into_response();
+    }
+
     // 1. Try pre-computed galaxy table records first (R-042)
     if let Ok(records) = state.db.get_galaxies_records(ws.as_deref()).await {
         if !records.is_empty() {
@@ -389,6 +405,8 @@ async fn galaxies_handler(
                     "node_count": g.node_count,
                     "role": g.role,
                     "instability": g.instability,
+                    "abstractness": g.abstractness,
+                    "distance": g.distance,
                     "afferent_coupling": g.afferent_coupling,
                     "efferent_coupling": g.efferent_coupling,
                     "languages": g.languages,
@@ -403,8 +421,11 @@ async fn galaxies_handler(
             });
 
             let total_matched = galaxies.len();
-            if limit > 0 && galaxies.len() > limit {
-                galaxies.truncate(limit);
+            // R-084: Only truncate if client explicitly specified limit parameter
+            if let Some(explicit_limit) = params.limit {
+                if explicit_limit > 0 && galaxies.len() > explicit_limit {
+                    galaxies.truncate(explicit_limit);
+                }
             }
 
             return Json(serde_json::json!({
@@ -1019,11 +1040,28 @@ async fn cluster_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock reclustering if workspace is actively indexing
+    if let Some(job) = state.pipeline.is_indexing(workspace.as_deref()).await {
+        return (
+            StatusCode::LOCKED,
+            Json(serde_json::json!({
+                "status": "indexing_in_progress",
+                "workspace": job.workspace,
+                "phase": job.phase,
+                "files_indexed": job.files_indexed,
+                "total_files": job.total_files,
+                "retry_after_ms": 2000,
+                "message": format!("Workspace '{}' is actively {} ({} / {} files). Clustering is locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
+            }))
+        ).into_response();
+    }
+
     match state.db.get_graph(workspace.as_deref()).await {
         Ok((nodes, links)) => {
             let ws_name = workspace.clone().unwrap_or_else(|| "default".to_string());
             let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
             CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 15);
             let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
             let filtered_summaries: Vec<_> = summaries.into_iter().filter(|s| s.node_count >= min_size).collect();
             let total_communities = filtered_summaries.len();
@@ -1125,6 +1163,22 @@ async fn galaxy_topology_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock topology if workspace is actively indexing
+    if let Some(job) = state.pipeline.is_indexing(ws.as_deref()).await {
+        return (
+            StatusCode::LOCKED,
+            Json(serde_json::json!({
+                "status": "indexing_in_progress",
+                "workspace": job.workspace,
+                "phase": job.phase,
+                "files_indexed": job.files_indexed,
+                "total_files": job.total_files,
+                "retry_after_ms": 2000,
+                "message": format!("Workspace '{}' is actively {} ({} / {} files). Topology is locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
+            }))
+        ).into_response();
+    }
+
     let mut records = state.db.get_galaxies_records(ws.as_deref()).await.unwrap_or_default();
     if records.is_empty() {
         // If galaxy table empty, compute on the fly
@@ -1133,6 +1187,7 @@ async fn galaxy_topology_handler(
                 let ws_name = ws.clone().unwrap_or_else(|| "default".to_string());
                 let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
                 CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+                CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 15);
                 let (_, computed_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
                 let _ = state.db.update_communities(&assignments).await;
                 let _ = state.db.store_galaxies(&ws_name, &computed_records).await;

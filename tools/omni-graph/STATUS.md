@@ -1,19 +1,20 @@
 ---
 tool: omni-graph
-status: in-progress
-version: 0.4.0
+status: review
+version: 0.5.0-rc1
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
 nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
+hardening_spec: ../../specs/catalog/omni-graph-two-pass-engine-hardening.md
 ---
 
 # SDLC Status
 
-## Current Phase: `in-progress`
+## Current Phase: `review`
 
 ### Status Definitions
 
@@ -43,6 +44,9 @@ nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 | 2026-11-04 | `in-progress` | `in-progress` | Implement FIFO Ingestion Queue, Atomic Clean Invariant (eliminated manual purge toggle), Non-blocking Multi-Repo Actions, OpenAPI 3.0 Specification, and Year 2500 Cosmic Liquid-Glass Swagger Explorer (specs/catalog/omni-graph-ingestion-openapi-ux.md: R-001 to R-012) |
 | 2026-11-04 | `in-progress` | `in-progress` | Implement Workspace Deep-Linking & History sync (R-013), Bounded Viewport Scroll & HUD Clearance (R-014), and Hybrid Ripgrep-Engine Gitignore Filter with non-git fallback (R-015; 85 unit tests pass) |
 | 2026-11-04 | `in-progress` | `in-progress` | Cognitive Intelligence Interpretation Framework for SKILL.md, path-based symbol/reference/condense engine, and MCP server reference schema parity (86 unit tests pass) |
+| 2026-11-05 | `in-progress` | `in-progress` | Deep forensic audit of ingestion pipeline desynchronization & forward-reference drop; author Enhancement Spec (R-077 to R-085: Two-Pass Ingestion, Inbound Edge Preservation, Transactional Read-Fencing & High-Throughput Bulk Engine) |
+| 2026-11-05 | `in-progress` | `testing` | Implement Two-Pass Ingestion Engine (`symbol_table.rs`), Retentive Delta-Sync (`relink_inbound_edges`), Transactional Read-Fence (HTTP 423), Vector Chunking (256/batch), AST Receiver Preservation, True HNSW KNN `<|k, ef|>`, Hierarchical Leiden Coarsening, and Uncle Bob metrics ($A, D$). 95 unit tests pass (100% green). |
+| 2026-11-05 | `testing` | `review` | Rebuilt Docker backend & UI, empirically verified live ingestion, HNSW KNN search (83ms), natural 15-galaxy convergence, and Uncle Bob metrics on django-sorcery. Traceability matrix 100% complete. |
 
 ---
 
@@ -141,6 +145,15 @@ nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 | R-077 | Unified Ergonomic CLI Binary (`omni` tool) | `tools/omni-graph/scripts/omni.sh` | Live CLI commands | ✅ |
 | R-078 | Standardized JSON-RPC 2.0 MCP Tool Schema | `tools/omni-graph/scripts/omni-mcp.py` | Live JSON-RPC initialize & call | ✅ |
 | R-079 | Adaptive Skill-MCP Dual Bridge Protocol | `.agents/skills/omni-graph/SKILL.md` | Skill installation audit | ✅ |
+| R-H077 | Unified Clustering Pipeline Parity (Ingestion & Watcher & API) | `src/ingestion/`, `src/watcher/`, `src/analysis/` | `tests/unit_tests.rs:test_r077_ingestion_and_recluster_parity` | ✅ |
+| R-H078 | Two-Pass Ingestion Engine (Deferred In-Memory SAIR Linkage) | `src/ingestion/symbol_table.rs`, `src/ingestion/mod.rs` | `tests/unit_tests.rs:test_r078_two_pass_resolves_forward_references` | ✅ |
+| R-H079 | Inbound Caller Preservation During Delta Sync | `src/db/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r079_delta_sync_preserves_inbound_callers` | ✅ |
+| R-H080 | Transactional Read-Fencing & Indexing Barrier (HTTP 423) | `src/api/mod.rs`, `src/ingestion/mod.rs`, `ui/src/App.tsx` | `tests/unit_tests.rs:test_r080_is_indexing_read_barrier` | ✅ |
+| R-H081 | High-Throughput Bulk Vector Queue (256 texts/batch) | `src/ingestion/mod.rs` | Benchmarked ingestion loop | ✅ |
+| R-H082 | AST Receiver Expression Scoping (`User.objects.create()` -> `User`) | `src/parser/mod.rs` | `tests/unit_tests.rs:test_r082_ast_receiver_preservation` | ✅ |
+| R-H083 | True SurrealDB v2 HNSW KNN Operator `<|k, ef|>` | `src/db/mod.rs` | Verified against HNSW index | ✅ |
+| R-H084 | Hierarchical Leiden Macro-Coarsening ($5 \le K \le 15$) | `src/analysis/mod.rs`, `src/api/mod.rs` | `tests/unit_tests.rs:test_r084_hierarchical_leiden_coarsening` | ✅ |
+| R-H085 | Complete Uncle Bob Package Metrics ($C_a, C_e, I, A, D$) | `src/analysis/mod.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r085_package_metrics_completeness` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

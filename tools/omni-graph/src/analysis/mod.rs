@@ -326,6 +326,153 @@ impl CommunityDetector {
         }
     }
 
+    /// Hierarchical Leiden macro-coarsening (R-084)
+    /// Recursively contracts fine-grained communities into cohesive macro subsystems
+    /// until the community count lands in [min_target, max_target] (e.g. 5..=15).
+    pub fn coarsen_to_macro_galaxies(
+        nodes: &[DbNode],
+        links: &[DbLink],
+        assignments: &mut HashMap<String, i32>,
+        max_target: usize,
+    ) {
+        if nodes.is_empty() || assignments.is_empty() {
+            return;
+        }
+
+        // 1. Determine unique communities
+        let mut unique_cids: HashSet<i32> = assignments.values().copied().collect();
+        if unique_cids.len() <= max_target {
+            return;
+        }
+
+        // Build node-to-community fast lookup
+        let mut node_comm: HashMap<&str, i32> = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            if let Some(&c) = assignments.get(&node.id) {
+                node_comm.insert(node.id.as_str(), c);
+            }
+        }
+
+        // Build community dominant directory
+        let mut comm_dirs: HashMap<i32, String> = HashMap::new();
+        let mut comm_members: HashMap<i32, Vec<&DbNode>> = HashMap::new();
+        for node in nodes {
+            if let Some(&c) = assignments.get(&node.id) {
+                comm_members.entry(c).or_default().push(node);
+            }
+        }
+        for (&c, members) in &comm_members {
+            let mut dir_counts: HashMap<String, usize> = HashMap::new();
+            for m in members {
+                if let Some(p) = std::path::Path::new(&m.file_path).parent() {
+                    let ps = p.to_string_lossy().to_string();
+                    if !ps.is_empty() && ps != "." {
+                        *dir_counts.entry(ps).or_insert(0) += 1;
+                    }
+                }
+            }
+            let dom = dir_counts.into_iter().max_by_key(|(_, cnt)| *cnt).map(|(d, _)| d).unwrap_or_default();
+            comm_dirs.insert(c, dom);
+        }
+
+        // 2. Iteratively merge smallest community with its highest affinity neighbor
+        while unique_cids.len() > max_target {
+            // Compute inter-community edge affinity
+            let mut meta_affinity: HashMap<(i32, i32), f32> = HashMap::new();
+            for link in links {
+                let sc = node_comm.get(link.source.as_str());
+                let tc = node_comm.get(link.target.as_str());
+                if let (Some(&s), Some(&t)) = (sc, tc) {
+                    if s != t {
+                        let key = if s < t { (s, t) } else { (t, s) };
+                        *meta_affinity.entry(key).or_insert(0.0) += get_edge_weight(&link.edge_type);
+                    }
+                }
+            }
+
+            // Find sizes of remaining communities
+            let mut sizes: Vec<(i32, usize)> = unique_cids.iter().map(|&c| {
+                let sz = comm_members.get(&c).map(|m| m.len()).unwrap_or(0);
+                (c, sz)
+            }).collect();
+            // Sort ascending by size to merge smallest community first
+            sizes.sort_by_key(|(_, sz)| *sz);
+
+            let candidate_c = sizes[0].0;
+
+            // Find best merge target for candidate_c:
+            // First check topological edge affinity
+            let mut best_target: Option<i32> = None;
+            let mut max_weight = -1.0f32;
+
+            for &other_c in &unique_cids {
+                if other_c == candidate_c {
+                    continue;
+                }
+                let key = if candidate_c < other_c { (candidate_c, other_c) } else { (other_c, candidate_c) };
+                if let Some(&w) = meta_affinity.get(&key) {
+                    if w > max_weight {
+                        max_weight = w;
+                        best_target = Some(other_c);
+                    }
+                }
+            }
+
+            // If no edge affinity, check directory affinity
+            if best_target.is_none() {
+                if let Some(cand_dir) = comm_dirs.get(&candidate_c) {
+                    if !cand_dir.is_empty() {
+                        for &other_c in &unique_cids {
+                            if other_c == candidate_c {
+                                continue;
+                            }
+                            if let Some(other_dir) = comm_dirs.get(&other_c) {
+                                if !other_dir.is_empty() && (cand_dir.starts_with(other_dir) || other_dir.starts_with(cand_dir)) {
+                                    best_target = Some(other_c);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fallback: merge with largest community
+            let target_c = best_target.unwrap_or_else(|| {
+                sizes.last().map(|(c, _)| *c).unwrap_or(candidate_c)
+            });
+
+            if target_c == candidate_c {
+                break; // Cannot merge further
+            }
+
+            // Execute merge candidate_c -> target_c
+            for node in comm_members.remove(&candidate_c).unwrap_or_default() {
+                node_comm.insert(node.id.as_str(), target_c);
+                if let Some(val) = assignments.get_mut(&node.id) {
+                    *val = target_c;
+                }
+                comm_members.entry(target_c).or_default().push(node);
+            }
+            unique_cids.remove(&candidate_c);
+        }
+
+        // 3. Compact final community IDs to contiguous 0..K space
+        let mut id_map: HashMap<i32, i32> = HashMap::new();
+        let mut sorted_cids: Vec<i32> = assignments.values().copied().collect::<HashSet<_>>().into_iter().collect();
+        sorted_cids.sort();
+
+        for (next_id, cid) in sorted_cids.into_iter().enumerate() {
+            id_map.insert(cid, next_id as i32);
+        }
+
+        for val in assignments.values_mut() {
+            if let Some(&compact) = id_map.get(val) {
+                *val = compact;
+            }
+        }
+    }
+
     /// Compute full architectural metrics (Ca, Ce, Instability, roles) and generate galaxy records
     pub fn compute_galaxy_metrics(
         workspace: &str,
@@ -421,6 +568,24 @@ impl CommunityDetector {
                 "Orchestrator / Leaf".to_string()
             };
 
+            // Uncle Bob Martin Package Metrics (R-085):
+            // Abstractness: A = N_abstract / N_total
+            // Distance from Main Sequence: D = |A + I - 1|
+            let abstract_count = members.iter().filter(|m| {
+                matches!(
+                    m.kind.to_lowercase().as_str(),
+                    "interface" | "trait" | "protocol" | "abstract_class" | "abstract" | "type_alias"
+                )
+            }).count();
+
+            let abstractness = if members.is_empty() {
+                0.0
+            } else {
+                (abstract_count as f64) / (members.len() as f64)
+            };
+
+            let distance = (abstractness + instability - 1.0).abs();
+
             let langs_vec: Vec<String> = languages.into_iter().collect();
 
             summaries.push(CommunitySummary {
@@ -442,6 +607,8 @@ impl CommunityDetector {
                 afferent_coupling: ca,
                 efferent_coupling: ce,
                 instability,
+                abstractness,
+                distance,
                 role,
                 key_symbols: top_symbols,
                 languages: langs_vec,
