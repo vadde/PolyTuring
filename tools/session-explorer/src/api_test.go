@@ -370,7 +370,21 @@ func TestAPI_OpenAPI_And_SwaggerDocs(t *testing.T) {
 		t.Fatalf("missing or invalid 'paths' object in spec")
 	}
 
-	expectedPaths := []string{"/api/sessions", "/api/stats", "/api/wip", "/api/skill/install"}
+	expectedPaths := []string{
+		"/api/sessions",
+		"/api/sessions/{id}",
+		"/api/sessions/{id}/tail",
+		"/api/sessions/{id}/context",
+		"/api/agent/context/global",
+		"/api/agent/context/workspace",
+		"/api/search",
+		"/api/stats",
+		"/api/refresh",
+		"/api/watch-interval",
+		"/api/wip",
+		"/api/file",
+		"/api/skill/install",
+	}
 	for _, ep := range expectedPaths {
 		if _, exists := paths[ep]; !exists {
 			t.Errorf("expected path %s in OpenAPI spec", ep)
@@ -393,6 +407,12 @@ func TestAPI_OpenAPI_And_SwaggerDocs(t *testing.T) {
 	}
 	if !strings.Contains(body, "executeGetWIP") {
 		t.Errorf("expected interactive runner in /docs response")
+	}
+	if !strings.Contains(body, "executeGetAgentSession") {
+		t.Errorf("expected session agent context runner in /docs response")
+	}
+	if !strings.Contains(body, "executeGetTail") {
+		t.Errorf("expected live SSE tail runner in /docs response")
 	}
 }
 
