@@ -485,6 +485,45 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
       </div>
     </div>
 
+    <!-- GET /api/sessions/{id}/tail -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="ep-path">/api/sessions/{id}/tail</span>
+        <span class="ep-summary">Live Server-Sent Events (SSE) conversation log stream</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Establishes a persistent SSE connection streaming newly appended conversation turns in real time with reconnect offsets.</div>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Value</th></tr>
+          <tr><td>id</td><td>path (string, required)</td><td><input type="text" id="p_tail_id" class="input-field" placeholder="Session UUID"></td></tr>
+          <tr><td>from_step</td><td>query (integer)</td><td><input type="number" id="p_tail_step" class="input-field" placeholder="0"></td></tr>
+        </table>
+        <button class="try-btn" onclick="executeGetTail()">Connect Stream</button>
+        <div id="resp_tail" class="response-box"></div>
+      </div>
+    </div>
+
+    <!-- GET / POST /api/watch-interval -->
+    <div class="endpoint-card">
+      <div class="ep-header" onclick="toggleDetails(this)">
+        <span class="verb get">GET</span>
+        <span class="verb post" style="margin-left: 4px;">POST</span>
+        <span class="ep-path">/api/watch-interval</span>
+        <span class="ep-summary">Get or set background live brain watch interval</span>
+      </div>
+      <div class="ep-body">
+        <div class="ep-desc">Retrieves or updates the background watcher interval in seconds (0 = off).</div>
+        <table class="params-table">
+          <tr><th>Action</th><th>Parameter</th><th>Value</th></tr>
+          <tr><td>GET</td><td>—</td><td><button class="try-btn" style="margin: 0;" onclick="executeGetWatchInterval()">Get Interval</button></td></tr>
+          <tr><td>POST</td><td>interval (seconds)</td><td><input type="number" id="p_watch_interval" class="input-field" placeholder="10"></td></tr>
+        </table>
+        <button class="try-btn" onclick="executeSetWatchInterval()">Update Interval</button>
+        <div id="resp_watch_interval" class="response-box"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -588,6 +627,45 @@ func handleSwaggerDocs(w http.ResponseWriter, r *http.Request) {
       if (!path) { alert('Please enter a file path'); return; }
       const params = new URLSearchParams({ path });
       runFetch('/api/file?' + params.toString(), { method: 'GET' }, 'resp_file');
+    }
+
+    function executeGetTail() {
+      const id = document.getElementById('p_tail_id').value.trim();
+      const step = document.getElementById('p_tail_step').value.trim();
+      if (!id) { alert('Please enter a session UUID'); return; }
+      const url = '/api/sessions/' + encodeURIComponent(id) + '/tail' + (step ? '?from_step=' + encodeURIComponent(step) : '');
+      const respEl = document.getElementById('resp_tail');
+      respEl.style.display = 'block';
+      respEl.textContent = '🔌 Connecting to SSE stream: ' + url + '...\n';
+      try {
+        const es = new EventSource(url);
+        es.onmessage = (e) => {
+          respEl.textContent += '\n[message] ' + e.data;
+        };
+        es.addEventListener('step', (e) => {
+          respEl.textContent += '\n[step] ' + e.data;
+        });
+        es.onerror = () => {
+          respEl.textContent += '\n❌ Stream disconnected or closed.';
+          es.close();
+        };
+      } catch (err) {
+        respEl.textContent += '❌ Connection failed: ' + err.message;
+      }
+    }
+
+    function executeGetWatchInterval() {
+      runFetch('/api/watch-interval', { method: 'GET' }, 'resp_watch_interval');
+    }
+
+    function executeSetWatchInterval() {
+      const sec = parseInt(document.getElementById('p_watch_interval').value, 10);
+      if (isNaN(sec)) { alert('Please enter a valid interval in seconds'); return; }
+      runFetch('/api/watch-interval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval: sec })
+      }, 'resp_watch_interval');
     }
   </script>
 </body>
