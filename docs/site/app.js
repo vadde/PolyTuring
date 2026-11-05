@@ -882,33 +882,53 @@
     let savedScrollY = 0;
 
     // Helper: calculate optimal viewport fit scale
-    function calculateFitScale(svgEl) {
-      if (!theaterViewport || !svgEl) return 1.0;
-      let vbW = 0, vbH = 0;
-      const vb = svgEl.getAttribute('viewBox');
-      if (vb) {
-        const parts = vb.trim().split(/[\s,]+/).map(Number);
-        if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
-          vbW = parts[2];
-          vbH = parts[3];
+    function calculateFitScale(targetEl) {
+      if (!theaterViewport || !targetEl) return 1.0;
+      let w = 0, h = 0;
+
+      if (targetEl.tagName && targetEl.tagName.toLowerCase() === 'svg') {
+        const vb = targetEl.getAttribute('viewBox');
+        if (vb) {
+          const parts = vb.trim().split(/[\s,]+/).map(Number);
+          if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
+            w = parts[2];
+            h = parts[3];
+          }
+        }
+        if (!w || !h) {
+          if (targetEl.viewBox && targetEl.viewBox.baseVal && targetEl.viewBox.baseVal.width > 0) {
+            w = targetEl.viewBox.baseVal.width;
+            h = targetEl.viewBox.baseVal.height;
+          } else {
+            const rect = targetEl.getBoundingClientRect();
+            w = rect.width;
+            h = rect.height;
+          }
+        }
+      } else if (targetEl.tagName && targetEl.tagName.toLowerCase() === 'img') {
+        w = targetEl.naturalWidth || targetEl.width;
+        h = targetEl.naturalHeight || targetEl.height;
+        if (!w || !h) {
+          const rect = targetEl.getBoundingClientRect();
+          w = rect.width;
+          h = rect.height;
+        }
+      } else {
+        w = targetEl.scrollWidth || targetEl.offsetWidth;
+        h = targetEl.scrollHeight || targetEl.offsetHeight;
+        if (!w || !h) {
+          const rect = targetEl.getBoundingClientRect();
+          w = rect.width;
+          h = rect.height;
         }
       }
-      if (!vbW || !vbH) {
-        if (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width > 0) {
-          vbW = svgEl.viewBox.baseVal.width;
-          vbH = svgEl.viewBox.baseVal.height;
-        } else {
-          const rect = svgEl.getBoundingClientRect();
-          vbW = rect.width || 800;
-          vbH = rect.height || 600;
-        }
-      }
-      vbW = vbW || 800;
-      vbH = vbH || 500;
+
+      w = w || 800;
+      h = h || 500;
       const availW = Math.max(300, (theaterViewport.clientWidth || window.innerWidth) - 64);
       const availH = Math.max(200, (theaterViewport.clientHeight || window.innerHeight) - 64);
-      const fitW = availW / vbW;
-      const fitH = availH / vbH;
+      const fitW = availW / w;
+      const fitH = availH / h;
       const scale = Math.min(fitW, fitH);
       return Math.max(0.15, Math.min(scale, 3.5));
     }
@@ -1027,8 +1047,11 @@
 
       theaterSurface.innerHTML = '';
 
-      // 2. Clone SVG with unconstrained viewBox pixel dimensions
-      let originalSvg = sourceCanvas.querySelector('.mermaid svg') || sourceCanvas.querySelector('svg');
+      // 2. Clone content into theater surface
+      const surf = sourceCanvas.querySelector('.canvas-content-surface') || sourceCanvas.querySelector('.canvas-viewport') || sourceCanvas;
+      const originalSvg = surf.querySelector('.mermaid svg') || surf.querySelector('svg');
+      const originalImg = surf.querySelector('img');
+
       if (originalSvg) {
         const cleanSvg = originalSvg.cloneNode(true);
         cleanSvg.removeAttribute('style');
@@ -1052,8 +1075,38 @@
         cleanSvg.style.maxWidth = 'none';
         cleanSvg.style.maxHeight = 'none';
         theaterSurface.appendChild(cleanSvg);
+      } else if (originalImg) {
+        const cleanImg = originalImg.cloneNode(true);
+        cleanImg.removeAttribute('style');
+        cleanImg.loading = 'eager';
+
+        const applyImgDimensions = (imgEl) => {
+          const natW = imgEl.naturalWidth || imgEl.width;
+          const natH = imgEl.naturalHeight || imgEl.height;
+          if (natW && natH) {
+            imgEl.style.width = natW + 'px';
+            imgEl.style.height = natH + 'px';
+          } else {
+            imgEl.style.width = '100%';
+            imgEl.style.height = 'auto';
+          }
+          imgEl.style.maxWidth = 'none';
+          imgEl.style.maxHeight = 'none';
+        };
+
+        applyImgDimensions(cleanImg);
+        theaterSurface.appendChild(cleanImg);
+
+        if (!cleanImg.naturalWidth || !cleanImg.naturalHeight) {
+          cleanImg.onload = () => {
+            applyImgDimensions(cleanImg);
+            activeTheaterZoom = calculateFitScale(cleanImg);
+            activeTheaterPanX = 0;
+            activeTheaterPanY = 0;
+            applyTheaterTransform();
+          };
+        }
       } else {
-        const surf = sourceCanvas.querySelector('.canvas-content-surface');
         if (surf) theaterSurface.innerHTML = surf.innerHTML;
       }
 
@@ -1072,8 +1125,8 @@
       document.body.style.overflow = 'hidden';
 
       // 4. Auto-fit scale on open
-      const renderedSvg = theaterSurface.querySelector('svg');
-      activeTheaterZoom = calculateFitScale(renderedSvg);
+      const renderedTarget = theaterSurface.querySelector('svg, img, .table-wrapper, table') || theaterSurface.firstElementChild;
+      activeTheaterZoom = calculateFitScale(renderedTarget);
       activeTheaterPanX = 0;
       activeTheaterPanY = 0;
       applyTheaterTransform();
@@ -1147,9 +1200,9 @@
 
     if (theaterZoomFit) {
       theaterZoomFit.addEventListener('click', () => {
-        const svg = theaterSurface?.querySelector('svg');
-        if (svg) {
-          activeTheaterZoom = calculateFitScale(svg);
+        const renderedTarget = theaterSurface?.querySelector('svg, img, .table-wrapper, table') || theaterSurface?.firstElementChild;
+        if (renderedTarget) {
+          activeTheaterZoom = calculateFitScale(renderedTarget);
         } else {
           activeTheaterZoom = 1.0;
         }

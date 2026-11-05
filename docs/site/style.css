@@ -1809,14 +1809,25 @@ tr:hover td {
   max-width: 100%;
 }
 
-.canvas-viewport img,
-.theater-surface img {
+.canvas-viewport img {
   max-width: 100%;
   height: auto;
   border-radius: var(--radius-sm);
   display: block;
   margin: 0 auto;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--bg-card-border);
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.theater-surface img {
+  max-width: none;
+  height: auto;
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
   border: 1px solid var(--bg-card-border);
   -webkit-user-drag: none;
   user-select: none;
@@ -1918,8 +1929,16 @@ dialog#theater-modal::backdrop {
   transition: none !important;
   display: inline-block;
   text-align: center;
-  max-width: 95%;
+  max-width: none;
   will-change: transform;
+}
+
+.theater-surface .table-wrapper {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--bg-card-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--glass-shadow) !important;
+  text-align: left;
 }
 
 .theater-surface svg text,
