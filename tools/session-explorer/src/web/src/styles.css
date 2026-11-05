@@ -1202,6 +1202,47 @@ body {
   transform: scale(1.06);
 }
 
+/* Tactile Holographic Counter Pulse (R-044) */
+.holo-btn-counter.updated {
+  animation: capsulePulse 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.holo-btn-counter.files.updated {
+  animation: capsulePulseFiles 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes capsulePulse {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.35);
+    background: rgba(99, 102, 241, 0.7);
+    color: #ffffff;
+    border-color: rgba(165, 180, 252, 1);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.9), 0 0 32px rgba(56, 189, 248, 0.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes capsulePulseFiles {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.35);
+    background: rgba(16, 185, 129, 0.7);
+    color: #ffffff;
+    border-color: rgba(110, 231, 183, 1);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.9), 0 0 32px rgba(52, 211, 153, 0.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .detail-controls-bar {
   display: flex;
   align-items: center;
@@ -2455,6 +2496,63 @@ body {
   color: var(--accent-cyan);
   box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
   font-weight: 600;
+}
+
+/* Dedicated Non-Destructive Trail Refresh Button (R-044) */
+.trail-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.trail-refresh-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: #c7d2fe;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+}
+
+.trail-refresh-btn:active {
+  transform: scale(0.96);
+}
+
+.trail-refresh-btn .refresh-icon {
+  display: inline-block;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: transform 0.3s ease;
+}
+
+.trail-refresh-btn.refreshing {
+  pointer-events: none;
+  opacity: 0.85;
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #ffffff;
+}
+
+.trail-refresh-btn.refreshing .refresh-icon {
+  animation: spinRefresh 0.75s linear infinite;
+  color: var(--accent-cyan, #06b6d4);
+}
+
+@keyframes spinRefresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Floating "New Steps Arrived" Button */

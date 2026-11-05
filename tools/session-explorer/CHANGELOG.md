@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-11-05
+
+### Added
+- **Live Reactive Telemetry Synchronization & Session Trail Refresh (R-044)**:
+  - Dynamic real-time synchronization of **Files & Artifacts** (`#detailFilesCountBadge`) and **Agent Context** (`#detailAgentContextCount`) during SSE live tailing (`/api/sessions/{id}/tail`) without requiring full browser reload.
+  - In-place reactive DOM updates for open Files & Artifacts modal and Session Agent Brain Matrix modal upon arrival of new steps.
+  - Debounced 350ms background synchronization of `/api/sessions/{id}/context` to prevent backend disk thrashing.
+  - Tactile holographic counter badge pulse animations (`.holo-btn-counter.updated` and `.holo-btn-counter.files.updated`) with scale and cyan/purple acrylic glow transitions on count upticks.
+  - Dedicated interactive Session Trail refresh button (`#refreshTrailBtn`) in `.tail-stream-control` with spinning animation (`@keyframes spinRefresh`) and toast notification feedback.
+  - Keyboard shortcut <kbd>R</kbd> (in session detail view) for non-destructive dual-source trail and context reload.
+  - Automatic catch-up telemetry refresh when toggling *Follow Live* or resuming paused live streams.
+  - Verified OpenAPI 3.0 schema parity across all agent context and telemetry endpoints.
+
 ## [0.3.5] - 2026-11-04
 
 ### Added
