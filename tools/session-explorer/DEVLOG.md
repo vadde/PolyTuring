@@ -24,11 +24,13 @@
   2. **Tactile Holographic Counter Pulse Animations**:
      - Implemented `pulseCounterBadge(badgeEl)` and CSS `@keyframes capsulePulse` / `@keyframes capsulePulseFiles` in `src/web/src/styles.css`.
      - When file operations occur or new cognitive tools/rules are invoked, the digital monospace counters scale to 1.35x and emit an illuminated acrylic glow, giving high-visibility peripheral feedback.
-  3. **Dedicated Non-Destructive Session Trail Refresh Button**:
+  3. **Dedicated Non-Destructive Session Trail Refresh Button & Filter Preservation (AC-074..AC-076)**:
      - Added `#refreshTrailBtn` to `.tail-stream-control` alongside *Live* and *Follow*.
      - Implemented `refreshCurrentSessionTrail(manual = true)`: concurrently fetches `/api/sessions/{id}` and `/api/sessions/{id}/context`, re-evaluates all counters, clears step buffers, updates open drawers, and triggers a tactile spinning animation (`@keyframes spinRefresh`) and toast notification (`showToast`).
      - Added power-user keyboard shortcut <kbd>R</kbd> (in session detail view).
      - Wired stream resume and auto-follow toggle to trigger an automatic catch-up refresh.
+     - **Step Summary & Filter Slice Invariant (AC-076)**: Extracted single source of truth `updateStepSummaryBadge()`. Eliminated hardcoded overrides in `appendOrPatchStep` and `refreshCurrentSessionTrail` that were erroneously overwriting `Showing X of Y steps` with `Y steps` whenever user had active Dialogue, Prompts, or Search filters active.
+     - **Bilateral Tactile Confirmation**: Passed `forcePulse = manual` to `updateSessionFilesBadge` so clicking Refresh triggers tactile feedback on both Files & Artifacts and Agent Context capsules simultaneously.
   4. **OpenAPI & Living Documentation Parity**:
      - Audited `src/openapi.json` and verified 100% schema parity across all agent context and telemetry models.
      - Updated living documentation portal (`docs/site/index.html` and `_site/`) in Chapter 02 with the new reactive sync section.
