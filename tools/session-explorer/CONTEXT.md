@@ -26,7 +26,7 @@ blockers: []
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
 | Spec Requirements (R-XXX) | 44 | 44 | ✅ 100% Implemented (R-044 Live Reactive Telemetry Sync) |
-| Acceptance Criteria (AC-XXX) | 75 | 75 | 🧪 100% Verified (AC-071..AC-075 verified via Playwright) |
+| Acceptance Criteria (AC-XXX) | 76 | 76 | 🧪 100% Verified (AC-071..AC-076 verified via Playwright) |
 | Non-Functional (NF-XXX) | 9 | 9 | 🧪 100% Verified |
 | Test Coverage | 100% | 100% | 🧪 28 test suites passing + live Playwright verified |
 | Documentation | Complete | — | ✅ Spec, README, STATUS, CONTEXT complete |

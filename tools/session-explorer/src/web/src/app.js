@@ -554,9 +554,6 @@ async function refreshData(silent = false) {
         if (res.ok) {
           const detail = await res.json();
           state.selectedSessionDetail = detail;
-          if (el.detailStepCountBadge && detail.session) {
-            el.detailStepCountBadge.textContent = `${detail.session.step_count} steps`;
-          }
           renderTimelineMessages();
         }
       } catch (e) {
@@ -2316,8 +2313,9 @@ function getFilteredAndSortedMessages() {
   return list;
 }
 
-function renderTimelineMessages() {
-  if (!el.timelineContainer || !state.selectedSessionDetail) return;
+// Single Source of Truth for Session Trail Step Summary & Count Badge (AC-076)
+function updateStepSummaryBadge() {
+  if (!state.selectedSessionDetail) return;
   const allMessages = state.selectedSessionDetail.messages || [];
   const filteredAndSorted = getFilteredAndSortedMessages();
 
@@ -2329,7 +2327,6 @@ function renderTimelineMessages() {
     state.messageFilter !== 'ALL'
   );
 
-  // Update summary count and reset button visibility
   const countBadge = el.detailStepCountBadge || document.getElementById('detailStepCountBadge');
   if (countBadge) {
     if (filteredAndSorted.length === allMessages.length) {
@@ -2353,6 +2350,14 @@ function renderTimelineMessages() {
   if (stepSortSelect && stepSortSelect.value !== sortMode) {
     stepSortSelect.value = sortMode;
   }
+}
+
+function renderTimelineMessages() {
+  if (!el.timelineContainer || !state.selectedSessionDetail) return;
+  const filteredAndSorted = getFilteredAndSortedMessages();
+
+  // Update summary count and reset button visibility adhering to active filters
+  updateStepSummaryBadge();
 
   if (filteredAndSorted.length === 0) {
     el.timelineContainer.innerHTML = `
@@ -2747,10 +2752,8 @@ function appendOrPatchStep(step) {
     state.selectedSessionDetail.messages.push(step);
   }
 
-  const allMessages = state.selectedSessionDetail.messages;
-  if (el.detailStepCountBadge) {
-    el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
-  }
+  // Update step count badge adhering to active filter (e.g. Dialogue, Prompts, Search)
+  updateStepSummaryBadge();
 
   // Live Reactive Telemetry Sync (R-044): Dynamic Files & Agent Context Updates
   updateSessionFilesBadge(state.selectedSessionDetail);
@@ -2912,24 +2915,16 @@ async function refreshCurrentSessionTrail(manual = true) {
       const detail = await detailRes.json();
       state.selectedSessionDetail = detail;
 
-      // Update step badge
-      const allMessages = detail.messages || [];
-      if (el.detailStepCountBadge) {
-        el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
-      }
-
-      // Re-evaluate and pulse files & artifacts
-      updateSessionFilesBadge(detail);
+      // Re-evaluate and pulse files & artifacts (force pulse on manual refresh for tactile confirmation)
+      updateSessionFilesBadge(detail, manual);
       if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
         renderSessionFilesList();
       }
 
-      // Re-render timeline messages to incorporate newest steps and commentary
-      if (manual) {
-        state.pendingStepsBuffer = [];
-        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
-        renderTimelineMessages();
-      }
+      // Re-render timeline messages to incorporate newest steps, update step summary badge adhering to filters
+      state.pendingStepsBuffer = [];
+      if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+      renderTimelineMessages();
     }
 
     if (contextRes.ok) {
@@ -3736,7 +3731,7 @@ function goToPrevFindMatch() {
 // ============================================================================
 //  Session Files & Artifacts Aggregator
 // ============================================================================
-function updateSessionFilesBadge(detail) {
+function updateSessionFilesBadge(detail, forcePulse = false) {
   state.sessionFilesMap.clear();
   if (!detail || !detail.messages) {
     if (el.detailFilesCountBadge) el.detailFilesCountBadge.textContent = '0';
@@ -3806,7 +3801,7 @@ function updateSessionFilesBadge(detail) {
     if (el.detailFilesBtn) {
       el.detailFilesBtn.title = `${count} files and artifacts touched in this session (click to inspect drawer)`;
     }
-    if (!isNaN(prevCount) && prevCount !== count) {
+    if (forcePulse || (!isNaN(prevCount) && prevCount !== count)) {
       pulseCounterBadge(el.detailFilesCountBadge);
     }
   }

@@ -533,6 +533,7 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-073 | Given any count update on the Agent Context or Files & Artifacts capsules, the badge triggers a tactile holographic pulse animation (`.holo-btn-counter.updated`) | R-044 |
 | AC-074 | Given the Session Trail toolbar (`.tail-stream-control`), a dedicated Refresh button (`#refreshTrailBtn`) allows on-demand non-destructive reload of all steps, agent context, and files/artifacts without full browser reload | R-044 |
 | AC-075 | Given the user resumes live streaming or toggles Follow Live, the engine triggers an automatic catch-up refresh of session trail messages, agent context, and files/artifacts | R-044 |
+| AC-076 | Given active turn filters (e.g. Dialogue, Prompts, Search query), live SSE incoming turns and session trail refreshes strictly preserve the filter slice and maintain the 'Showing X of Y steps' counter summary without wiping filter telemetry | R-044 |
 
 ---
 
