@@ -1,6 +1,6 @@
 ---
 tool: session-explorer
-status: review
+status: released
 last_session: 2026-11-05
 last_agent: "Antigravity"
 blockers: []
@@ -16,7 +16,7 @@ blockers: []
 
 ## Current State
 
-- **SDLC Phase**: `review`
+- **SDLC Phase**: `released`
 - **Version**: 0.3.6
 - **Language**: Go 1.22+ (backend) + vanilla HTML/CSS/JS (frontend, Bun-bundled)
 - **Category**: GenAI & ML
