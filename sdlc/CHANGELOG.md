@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2026-11-05]
+
+### Released
+- **session-explorer** v0.3.6 — Released Live Reactive Telemetry Synchronization & Session Trail Refresh (R-044): Dynamic real-time synchronization of Files & Artifacts and Agent Context badges/modals during SSE live streaming, tactile holographic counter pulse animations (`capsulePulse`), dedicated non-destructive Session Trail refresh button (`#refreshTrailBtn`) with spinning feedback and toast notification, keyboard shortcut <kbd>R</kbd>, and automatic catch-up telemetry refresh upon stream resume and follow toggling.
+
 ## [2026-11-04]
 
 ### Released

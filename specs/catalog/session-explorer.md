@@ -101,7 +101,8 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-040 | Universal Session Agent Brain & MCP Behavioral Matrix: Empirical MCP and Native tool telemetry, step timelines, tool diversity index, and holographic mica matrix UI/UX | Must | ✅ | 🧪 | context_scanner.go, src/types.go, api.go, src/web/ |
 | R-041 | Command Execution & Tool Sub-Breakdown Distribution Engine: Decompose run_command and filesystem tools into command spectrum, binary distribution, category weights, step timelines, and holographic telemetry | Must | ✅ | 🧪 | context_scanner.go, src/types.go, context_test.go, src/web/ |
 | R-042 | Empirical Skill Invocation Telemetry & Standby Decomposition: 3-tier epistemic taxonomy, step indices, invocation triggers, scope deduplication, and holographic skill card UI/UX | Must | ✅ | 🧪 | context_scanner.go, src/types.go, context_test.go, src/web/ |
-| R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix: EC2-style greedy shortest-column container placement, 3-column panoramic widescreen expansion (width: min(1560px, 94vw)), and zero-vertical-gap flow | Must | 🔨 | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix: EC2-style greedy shortest-column container placement, 3-column panoramic widescreen expansion (width: min(1560px, 94vw)), and zero-vertical-gap flow | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-044 | Live Reactive Telemetry Synchronization & Session Trail Refresh: Real-time dynamic updates of Files & Artifacts and Agent Context during SSE live following, tactile counter pulse animations, and dedicated non-destructive Session Trail refresh button (`#refreshTrailBtn`) | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -527,6 +528,11 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-068 | Given the bin-packed layout, cards flow continuously down each column track with zero empty vertical gaps beneath shorter cards, eliminating dead grid row space | R-043 |
 | AC-069 | Given an expanding card (e.g. `run_command` drawer toggle), only its column track stretches smoothly without displacing or stretching adjacent column cards | R-043 |
 | AC-070 | Given window resizing or filter changes, the bin-pack layout dynamically re-computes column assignments and updates the DOM in <16ms (60 FPS) | R-043 |
+| AC-071 | Given live SSE streaming (`/api/sessions/:id/tail`), incoming steps dynamically re-evaluate and uptick the Files & Artifacts counter badge (`#detailFilesCountBadge`) and re-render the open files modal in real-time | R-044 |
+| AC-072 | Given live SSE streaming, incoming steps trigger debounced background sync of `/api/sessions/:id/context`, dynamically upticking the Agent Context badge (`#detailAgentContextCount`) and live-updating the open Session Matrix modal | R-044 |
+| AC-073 | Given any count update on the Agent Context or Files & Artifacts capsules, the badge triggers a tactile holographic pulse animation (`.holo-btn-counter.updated`) | R-044 |
+| AC-074 | Given the Session Trail toolbar (`.tail-stream-control`), a dedicated Refresh button (`#refreshTrailBtn`) allows on-demand non-destructive reload of all steps, agent context, and files/artifacts without full browser reload | R-044 |
+| AC-075 | Given the user resumes live streaming or toggles Follow Live, the engine triggers an automatic catch-up refresh of session trail messages, agent context, and files/artifacts | R-044 |
 
 ---
 

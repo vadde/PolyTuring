@@ -324,6 +324,7 @@ const el = {
   detailLiveDot: document.getElementById('detailLiveDot'),
   tailStatusLabel: document.getElementById('tailStatusLabel'),
   toggleFollowStreamBtn: document.getElementById('toggleFollowStreamBtn'),
+  refreshTrailBtn: document.getElementById('refreshTrailBtn'),
   newStepsFloatingBtn: document.getElementById('newStepsFloatingBtn'),
   msgFilterChips: document.querySelectorAll('.msg-filter-chip'),
   sessionStepSearchInput: document.getElementById('sessionStepSearchInput'),
@@ -634,6 +635,15 @@ function initEventListeners() {
       e.preventDefault();
       openSearchModal();
     }
+    // 'r' or 'R' refreshes session trail when in detail view (R-044)
+    if ((e.key === 'r' || e.key === 'R') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (state.currentView === 'detail' &&
+          document.activeElement.tagName !== 'INPUT' &&
+          document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        refreshCurrentSessionTrail(true);
+      }
+    }
     // Esc closes modals and detail view
     if (e.key === 'Escape') {
       if (el.fileViewerFindWidget && el.fileViewerFindWidget.style.display !== 'none') {
@@ -809,6 +819,7 @@ function initEventListeners() {
         stopSessionLiveTail(true);
       } else if (state.selectedSessionId) {
         startSessionLiveTail(state.selectedSessionId);
+        refreshCurrentSessionTrail(false);
       }
     });
   }
@@ -820,7 +831,15 @@ function initEventListeners() {
       el.toggleFollowStreamBtn.classList.toggle('active', state.followStream);
       if (state.followStream) {
         flushPendingSteps();
+        refreshCurrentSessionTrail(false);
       }
+    });
+  }
+
+  // Dedicated Session Trail Refresh Button (R-044)
+  if (el.refreshTrailBtn) {
+    el.refreshTrailBtn.addEventListener('click', () => {
+      refreshCurrentSessionTrail(true);
     });
   }
 
@@ -1152,6 +1171,67 @@ async function loadSessions() {
   }
 }
 
+// ============================================================================
+//  Live Reactive Telemetry Sync & Holographic Pulse Animation (R-044)
+// ============================================================================
+function pulseCounterBadge(badgeEl) {
+  if (!badgeEl) return;
+  badgeEl.classList.remove('updated');
+  // Trigger reflow to restart CSS keyframe animation
+  void badgeEl.offsetWidth;
+  badgeEl.classList.add('updated');
+  setTimeout(() => {
+    badgeEl.classList.remove('updated');
+  }, 650);
+}
+
+function updateAgentContextBadge(ctx, forcePulse = false) {
+  if (!ctx || !el.detailAgentContextCount) return;
+  const activeRules = ctx.active_rules ? ctx.active_rules.length : 0;
+  const activeSkills = ctx.active_skills ? ctx.active_skills.length : 0;
+  let activeMCP = 0;
+  (ctx.mcp_servers || []).forEach(srv => {
+    activeMCP += (srv.active_tools || []).length;
+  });
+  const nativeTools = ctx.native_tools ? ctx.native_tools.length : 0;
+  const subagents = ctx.subagents ? ctx.subagents.length : 0;
+  const totalActive = activeRules + activeSkills + activeMCP + nativeTools + subagents;
+
+  const prevText = el.detailAgentContextCount.textContent.trim();
+  const prevVal = parseInt(prevText, 10);
+  el.detailAgentContextCount.textContent = totalActive.toString();
+
+  if (el.detailAgentContextBtn) {
+    el.detailAgentContextBtn.title = `${totalActive} active agent elements (${activeRules} rules • ${activeSkills} skills • ${activeMCP} MCP tools • ${nativeTools} native tools • ${subagents} subagents)`;
+  }
+
+  if (forcePulse || (!isNaN(prevVal) && prevVal !== totalActive)) {
+    pulseCounterBadge(el.detailAgentContextCount);
+  }
+}
+
+let liveContextSyncTimeout = null;
+function triggerLiveContextSync(sessionId) {
+  if (!sessionId) return;
+  if (liveContextSyncTimeout) {
+    clearTimeout(liveContextSyncTimeout);
+  }
+  liveContextSyncTimeout = setTimeout(() => {
+    fetch(`/api/sessions/${sessionId}/context`)
+      .then(r => r.ok ? r.json() : null)
+      .then(ctx => {
+        if (!ctx) return;
+        state.sessionContextData = ctx;
+        state.sessionMatrix.context = ctx;
+        updateAgentContextBadge(ctx);
+        if (el.sessionContextModal && el.sessionContextModal.classList.contains('active')) {
+          renderSessionMatrix();
+        }
+      })
+      .catch(e => console.warn('Live context sync error:', e));
+  }, 350);
+}
+
 async function loadSessionDetail(sessionId) {
   try {
     const res = await fetch(`/api/sessions/${sessionId}`);
@@ -1169,21 +1249,8 @@ async function loadSessionDetail(sessionId) {
       .then(ctx => {
         if (!ctx) return;
         state.sessionContextData = ctx;
-        if (el.detailAgentContextCount) {
-          const activeRules = ctx.active_rules ? ctx.active_rules.length : 0;
-          const activeSkills = ctx.active_skills ? ctx.active_skills.length : 0;
-          let activeMCP = 0;
-          (ctx.mcp_servers || []).forEach(srv => {
-            activeMCP += (srv.active_tools || []).length;
-          });
-          const nativeTools = ctx.native_tools ? ctx.native_tools.length : 0;
-          const subagents = ctx.subagents ? ctx.subagents.length : 0;
-          const totalActive = activeRules + activeSkills + activeMCP + nativeTools + subagents;
-          el.detailAgentContextCount.textContent = totalActive.toString();
-          if (el.detailAgentContextBtn) {
-            el.detailAgentContextBtn.title = `${totalActive} active agent elements (${activeRules} rules • ${activeSkills} skills • ${activeMCP} MCP tools • ${nativeTools} native tools • ${subagents} subagents)`;
-          }
-        }
+        state.sessionMatrix.context = ctx;
+        updateAgentContextBadge(ctx, false);
       })
       .catch(e => console.warn('Context fetch error:', e));
   } catch (err) {
@@ -2685,6 +2752,13 @@ function appendOrPatchStep(step) {
     el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
   }
 
+  // Live Reactive Telemetry Sync (R-044): Dynamic Files & Agent Context Updates
+  updateSessionFilesBadge(state.selectedSessionDetail);
+  if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
+    renderSessionFilesList();
+  }
+  triggerLiveContextSync(state.selectedSessionId || (state.selectedSessionDetail && state.selectedSessionDetail.id));
+
   // Keyed DOM: check if node already exists in DOM (e.g. status transition RUNNING -> DONE)
   if (state.renderedStepMap.has(step.step_index)) {
     const existingNode = state.renderedStepMap.get(step.step_index);
@@ -2815,6 +2889,74 @@ function stopSessionLiveTail(userInitiated = false) {
     state.tailStreaming = false;
     if (el.tailStreamControl) el.tailStreamControl.classList.remove('streaming', 'paused');
     if (el.detailLiveDot) el.detailLiveDot.classList.remove('pulsing');
+  }
+}
+
+// Dedicated Non-Destructive Session Trail & Telemetry Refresh (R-044)
+async function refreshCurrentSessionTrail(manual = true) {
+  const sessionId = state.selectedSessionId || (state.selectedSessionDetail && state.selectedSessionDetail.session && state.selectedSessionDetail.session.id);
+  if (!sessionId) return;
+
+  if (el.refreshTrailBtn) {
+    el.refreshTrailBtn.classList.add('refreshing');
+    el.refreshTrailBtn.disabled = true;
+  }
+
+  try {
+    const [detailRes, contextRes] = await Promise.all([
+      fetch(`/api/sessions/${sessionId}`),
+      fetch(`/api/sessions/${sessionId}/context`)
+    ]);
+
+    if (detailRes.ok) {
+      const detail = await detailRes.json();
+      state.selectedSessionDetail = detail;
+
+      // Update step badge
+      const allMessages = detail.messages || [];
+      if (el.detailStepCountBadge) {
+        el.detailStepCountBadge.textContent = `${allMessages.length} step${allMessages.length === 1 ? '' : 's'}`;
+      }
+
+      // Re-evaluate and pulse files & artifacts
+      updateSessionFilesBadge(detail);
+      if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
+        renderSessionFilesList();
+      }
+
+      // Re-render timeline messages to incorporate newest steps and commentary
+      if (manual) {
+        state.pendingStepsBuffer = [];
+        if (el.newStepsFloatingBtn) el.newStepsFloatingBtn.style.display = 'none';
+        renderTimelineMessages();
+      }
+    }
+
+    if (contextRes.ok) {
+      const ctx = await contextRes.json();
+      state.sessionContextData = ctx;
+      state.sessionMatrix.context = ctx;
+      updateAgentContextBadge(ctx, manual);
+      if (el.sessionContextModal && el.sessionContextModal.classList.contains('active')) {
+        renderSessionMatrix();
+      }
+    }
+
+    if (manual) {
+      showToast('✨ Session trail, agent context & files synchronized');
+    }
+  } catch (err) {
+    console.error('Session trail refresh failed:', err);
+    if (manual) {
+      showToast(`❌ Refresh failed: ${err.message}`);
+    }
+  } finally {
+    if (el.refreshTrailBtn) {
+      setTimeout(() => {
+        el.refreshTrailBtn.classList.remove('refreshing');
+        el.refreshTrailBtn.disabled = false;
+      }, 400);
+    }
   }
 }
 
@@ -3657,15 +3799,20 @@ function updateSessionFilesBadge(detail) {
   });
 
   if (el.detailFilesCountBadge) {
+    const prevText = el.detailFilesCountBadge.textContent.trim();
+    const prevCount = parseInt(prevText, 10);
     const count = state.sessionFilesMap.size;
     el.detailFilesCountBadge.textContent = count.toString();
     if (el.detailFilesBtn) {
       el.detailFilesBtn.title = `${count} files and artifacts touched in this session (click to inspect drawer)`;
     }
+    if (!isNaN(prevCount) && prevCount !== count) {
+      pulseCounterBadge(el.detailFilesCountBadge);
+    }
   }
 }
 
-function openSessionFilesModal() {
+function renderSessionFilesList() {
   if (!el.sessionFilesModal || !el.sessionFilesListContainer) return;
   const files = Array.from(state.sessionFilesMap.values());
   if (el.sessionFilesTotalCount) el.sessionFilesTotalCount.textContent = files.length.toString();
@@ -3677,61 +3824,66 @@ function openSessionFilesModal() {
         <p style="color: var(--text-muted);">No file operations or artifacts detected in this session.</p>
       </div>
     `;
-  } else {
-    const typeOrder = { artifact: 0, modified: 1, read: 2, reference: 3 };
-    files.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
-
-    el.sessionFilesListContainer.innerHTML = files.map(f => {
-      const typeBadge = f.type === 'artifact'
-        ? '<span class="file-meta-pill" style="border-color: rgba(168, 85, 247, 0.5); color: #c084fc; background: rgba(168, 85, 247, 0.15);">✨ Artifact</span>'
-        : f.type === 'modified'
-        ? '<span class="file-meta-pill" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; background: rgba(245, 158, 11, 0.15);">✏️ Modified</span>'
-        : '<span class="file-meta-pill">👁️ Read</span>';
-
-      return `
-        <div class="session-file-item" data-path="${escapeHtml(f.path)}">
-          <div class="session-file-item-left">
-            <span style="font-size: 1.3rem;">${getFileIcon(f.path)}</span>
-            <div class="session-file-item-info">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="session-file-name">${escapeHtml(f.name)}</span>
-                ${typeBadge}
-                <span style="font-size: 0.72rem; color: var(--text-dim);">Step ${f.stepIndex}</span>
-              </div>
-              <div class="session-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</div>
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="btn-ghost-sm open-file-item-btn" data-path="${escapeHtml(f.path)}" title="Open in Browser">Open ↗</button>
-            <button class="btn-icon copy-file-path-btn" style="width: 28px; height: 28px; font-size: 0.75rem;" data-path="${escapeHtml(f.path)}" title="Copy Path">📋</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    el.sessionFilesListContainer.querySelectorAll('.open-file-item-btn').forEach(btn => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        closeSessionFilesModal();
-        openFileViewer(btn.dataset.path);
-      };
-    });
-
-    el.sessionFilesListContainer.querySelectorAll('.session-file-item').forEach(item => {
-      item.onclick = () => {
-        closeSessionFilesModal();
-        openFileViewer(item.dataset.path);
-      };
-    });
-
-    el.sessionFilesListContainer.querySelectorAll('.copy-file-path-btn').forEach(btn => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        copyToClipboard(btn.dataset.path, 'File path copied to clipboard!');
-      };
-    });
+    return;
   }
 
+  const typeOrder = { artifact: 0, modified: 1, read: 2, reference: 3 };
+  files.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
+
+  el.sessionFilesListContainer.innerHTML = files.map(f => {
+    const typeBadge = f.type === 'artifact'
+      ? '<span class="file-meta-pill" style="border-color: rgba(168, 85, 247, 0.5); color: #c084fc; background: rgba(168, 85, 247, 0.15);">✨ Artifact</span>'
+      : f.type === 'modified'
+      ? '<span class="file-meta-pill" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; background: rgba(245, 158, 11, 0.15);">✏️ Modified</span>'
+      : '<span class="file-meta-pill">👁️ Read</span>';
+
+    return `
+      <div class="session-file-item" data-path="${escapeHtml(f.path)}">
+        <div class="session-file-item-left">
+          <span style="font-size: 1.3rem;">${getFileIcon(f.path)}</span>
+          <div class="session-file-item-info">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="session-file-name">${escapeHtml(f.name)}</span>
+              ${typeBadge}
+              <span style="font-size: 0.72rem; color: var(--text-dim);">Step ${f.stepIndex}</span>
+            </div>
+            <div class="session-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn-ghost-sm open-file-item-btn" data-path="${escapeHtml(f.path)}" title="Open in Browser">Open ↗</button>
+          <button class="btn-icon copy-file-path-btn" style="width: 28px; height: 28px; font-size: 0.75rem;" data-path="${escapeHtml(f.path)}" title="Copy Path">📋</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.sessionFilesListContainer.querySelectorAll('.open-file-item-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      closeSessionFilesModal();
+      openFileViewer(btn.dataset.path);
+    };
+  });
+
+  el.sessionFilesListContainer.querySelectorAll('.session-file-item').forEach(item => {
+    item.onclick = () => {
+      closeSessionFilesModal();
+      openFileViewer(item.dataset.path);
+    };
+  });
+
+  el.sessionFilesListContainer.querySelectorAll('.copy-file-path-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.path, 'File path copied to clipboard!');
+    };
+  });
+}
+
+function openSessionFilesModal() {
+  if (!el.sessionFilesModal) return;
+  renderSessionFilesList();
   el.sessionFilesModal.classList.add('active');
 }
 
