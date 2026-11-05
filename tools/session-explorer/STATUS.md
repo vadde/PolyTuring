@@ -1,6 +1,6 @@
 ---
 tool: session-explorer
-status: review
+status: released
 version: 0.3.6
 language: go
 category: GenAI & ML
@@ -12,7 +12,7 @@ spec: ../../specs/catalog/session-explorer.md
 
 # SDLC Status
 
-## Current Phase: `review`
+## Current Phase: `released`
 
 ### Status Definitions
 
@@ -39,7 +39,8 @@ spec: ../../specs/catalog/session-explorer.md
 | 2026-11-04 | `review` | `review` | R-043 (EC2-Style Greedy Bin-Packing Spatial Placement & Panoramic Masonry Matrix, Holographic Header Capsules) verified |
 | 2026-11-04 | `review` | `released` | User approved release v0.3.5 (R-040..R-043 verified and shipped) |
 | 2026-11-05 | `released` | `in-progress` | Implementing R-044 (Live Reactive Telemetry Synchronization & Session Trail Refresh) |
-| 2026-11-05 | `in-progress` | `review` | R-044 (Live Reactive Telemetry Synchronization & Session Trail Refresh) verified via Playwright and test suite; ready for v0.3.6 release |
+| 2026-11-05 | `in-progress` | `review` | R-044 (Live Reactive Telemetry Synchronization & Session Trail Refresh) verified via Playwright and test suite |
+| 2026-11-05 | `review` | `released` | User approved release v0.3.6 (R-044, AC-071..AC-076 shipped) |
 
 ---
 
