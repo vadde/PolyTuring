@@ -42,7 +42,8 @@ blockers: []
 | Lock-Free Generational Versioning (R-099) | Complete | — | 🟢 Arc<AtomicU64> incremented on all DB mutations; X-Graph-Generation injected on all HTTP responses |
 | High-Throughput Parallel Batch Persistence (R-100) | Complete | — | 🟢 tokio::join! on backbone storage and community inference; omni-mcp.py handles HTTP 423 gracefully |
 | Filesystem Symlink Cycle Guard & Navigation (R-109) | Complete | — | 🟢 Symlink metadata interception, canonical target resolution, LINKS_TO edge emission, zero duplicate AST clones |
-| Test Coverage | 113/113 Unit Tests | 113 | 🟢 100% Verified (0.08s, 0 clippy warnings) |
+| MathWorks MATLAB AST Ingestion (R-107) | Complete | — | 🟢 Vendored ABI 14 tree-sitter-matlab; extracted classdef, multiple inheritance EXTENDS, properties, constructors, methods, receiver preservation, import commands, package hierarchy |
+| Test Coverage | 118/118 Unit Tests | 118 | 🟢 100% Verified (0.05s, 0 clippy warnings) |
 | Live Watcher In-Memory SAIR Acceleration (R-078, R-091) | Complete | — | 🟢 Integrated in-memory SymbolTable into IncrementalPipeline; eliminated 392s subquery bottleneck; live sync completes in <250ms with dedicated 1s quiescent trigger |
 | AI-Native Cosmology & Modularity Guard (R-086, R-087) | Complete | — | 🟢 Purged Miller's Law clamp; enforced Affinity-Floor Invariant and delta Q guard |
 | Scale-Adaptive Subsystem Sizing (R-088) | Complete | — | 🟢 Sub-linear dynamic ceiling K_adaptive(N) bounding natural domains without forced merges |
