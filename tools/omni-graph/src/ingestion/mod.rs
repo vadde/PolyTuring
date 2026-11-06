@@ -736,6 +736,128 @@ async fn execute_ingest(
                 Ok(b) => b,
                 Err(_) => continue,
             };
+
+            // Intercept MathWorks Simulink .slx OPC ZIP archives before null-byte check (R-108)
+            if ext == "slx" {
+                let rel_path = path
+                    .strip_prefix(root)
+                    .unwrap_or(path)
+                    .to_string_lossy()
+                    .to_string();
+
+                let mut hasher = Sha256::new();
+                hasher.update(&raw_bytes);
+                let hash = hex::encode(hasher.finalize());
+
+                if !cache.is_stale(&rel_path, &hash).await {
+                    files_skipped += 1;
+                    continue;
+                }
+
+                files_scanned += 1;
+
+                if let Some(parse_res) = CodeParser::parse_simulink_slx(workspace_name, &rel_path, &raw_bytes) {
+                    let filename = Path::new(&rel_path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| rel_path.clone());
+                    let file_node_id = format!("{}:file:{}", workspace_name, rel_path);
+                    let file_node = ExtractedNode {
+                        id: file_node_id.clone(),
+                        workspace: workspace_name.to_string(),
+                        label: filename.clone(),
+                        kind: "file".to_string(),
+                        file_path: rel_path.clone(),
+                        language: "simulink".to_string(),
+                        line_start: 1,
+                        line_end: 1,
+                        text: format!("Simulink Model Archive: {}", filename),
+                    };
+
+                    let parent_dir = Path::new(&rel_path)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let parent_id = if parent_dir.is_empty() || parent_dir == "." {
+                        format!("{}:workspace", workspace_name)
+                    } else {
+                        format!("{}:dir:{}", workspace_name, parent_dir)
+                    };
+
+                    let cont_edge = ExtractedEdge {
+                        workspace: workspace_name.to_string(),
+                        source_id: parent_id,
+                        target_label: filename,
+                        target_id: Some(file_node_id.clone()),
+                        edge_type: "CONTAINS".to_string(),
+                        category: "CONTAINMENT".to_string(),
+                    };
+
+                    let mut file_containment_edges = vec![cont_edge];
+                    for node in &parse_res.nodes {
+                        if node.kind == "model" {
+                            file_containment_edges.push(ExtractedEdge {
+                                workspace: workspace_name.to_string(),
+                                source_id: file_node_id.clone(),
+                                target_label: node.label.clone(),
+                                target_id: Some(node.id.clone()),
+                                edge_type: "CONTAINS".to_string(),
+                                category: "CONTAINMENT".to_string(),
+                            });
+                        }
+                    }
+
+                    // Collect directory hierarchy for Topological Containment Backbone (R-063)
+                    let mut cur_dir = Path::new(&rel_path).parent();
+                    while let Some(parent) = cur_dir {
+                        let p_str = parent.to_string_lossy().to_string();
+                        if p_str.is_empty() || p_str == "." {
+                            break;
+                        }
+                        discovered_dirs.insert(p_str);
+                        cur_dir = parent.parent();
+                    }
+
+                    let mut all_nodes = Vec::with_capacity(parse_res.nodes.len() + 1);
+                    all_nodes.push(file_node);
+                    all_nodes.extend(parse_res.nodes);
+
+                    let mut all_edges = Vec::with_capacity(parse_res.edges.len() + file_containment_edges.len());
+                    all_edges.extend(file_containment_edges);
+                    all_edges.extend(parse_res.edges);
+
+                    // Register nodes in in-memory symbol table (R-078 Pass 1)
+                    symbol_table.register_file_nodes(&all_nodes);
+
+                    let node_texts: Vec<String> = all_nodes.iter().map(|n| n.text.clone()).collect();
+                    pending_texts.extend(node_texts);
+                    pending_files.push(PendingBatchFile {
+                        rel_path: rel_path.clone(),
+                        hash: hash.clone(),
+                        nodes: all_nodes,
+                        containment_edges: all_edges,
+                        text_count: pending_texts.len(),
+                    });
+
+                    if pending_files.len() >= 64 {
+                        flush_vector_batch(
+                            workspace_name,
+                            &mut pending_files,
+                            &mut pending_texts,
+                            embedder,
+                            db,
+                            cache,
+                            &mut files_indexed,
+                            &mut total_nodes,
+                            &mut total_edges,
+                        )
+                        .await;
+                    }
+
+                    continue;
+                }
+            }
+
             let peek_len = raw_bytes.len().min(512);
             if raw_bytes[..peek_len].contains(&0) {
                 // Binary file containing null bytes (ELF, Mach-O, raw data), skip cleanly
