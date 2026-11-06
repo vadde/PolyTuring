@@ -471,6 +471,11 @@ export default function App() {
       const ws = wsFilter !== undefined ? wsFilter : selectedWorkspaceRef.current;
       const qs = ws ? `workspace=${encodeURIComponent(ws)}&_t=${Date.now()}` : `_t=${Date.now()}`;
       const res = await fetch(`/api/galaxy/topology?${qs}`);
+      if (res.status === 423) {
+        const lockInfo = await res.json().catch(() => ({}));
+        console.info('Ingestion active — galaxy topology locked (HTTP 423):', lockInfo);
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setTopologyGalaxies(json.galaxies || []);
@@ -488,6 +493,11 @@ export default function App() {
         : `_t=${Date.now()}`;
       const url = `/api/graph?${qs}`;
       const res = await fetch(url);
+      if (res.status === 423) {
+        const lockInfo = await res.json().catch(() => ({}));
+        console.info('Ingestion active — graph data locked (HTTP 423):', lockInfo);
+        return;
+      }
       if (res.ok) {
         const gJson = await res.json();
         setNodes(gJson.nodes || []);
@@ -750,6 +760,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      if (res.status === 423) {
+        const lockInfo = await res.json().catch(() => ({}));
+        setClusterToast(`🔒 ${lockInfo.message || 'Ingestion in progress. Clustering is locked until ingestion completes.'}`);
+        setTimeout(() => setClusterToast(null), 6000);
+        return;
+      }
 
       if (res.ok) {
         const data = await res.json();

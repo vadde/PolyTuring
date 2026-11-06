@@ -886,6 +886,33 @@ impl CodeParser {
                             category: "EXTRACTED".to_string(),
                         });
                     }
+
+                    // AST Receiver Preservation (R-082):
+                    // When encountering chained method calls (e.g. User.objects.create() or DbClient::new()),
+                    // extract the root receiver object ("User", "DbClient") and emit a REFERENCES edge.
+                    let stripped_callee = callee_name.strip_prefix("crate::").unwrap_or(callee_name);
+                    let root_receiver = stripped_callee
+                        .split('.')
+                        .next()
+                        .unwrap_or("")
+                        .split("::")
+                        .next()
+                        .unwrap_or("")
+                        .trim();
+
+                    if !root_receiver.is_empty()
+                        && root_receiver != clean_callee
+                        && !matches!(root_receiver.to_lowercase().as_str(), "self" | "this" | "cls" | "super" | "crate" | "std")
+                    {
+                        edges.push(ExtractedEdge {
+                            workspace: workspace.to_string(),
+                            source_id: caller_id.to_string(),
+                            target_label: root_receiver.to_string(),
+                            target_id: None,
+                            edge_type: "REFERENCES".to_string(),
+                            category: "EXTRACTED".to_string(),
+                        });
+                    }
                 }
             }
         }

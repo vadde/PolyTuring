@@ -348,6 +348,14 @@ Returns the top modular subsystems discovered via Louvain/Leiden label propagati
   * **$I \to 0.0$ (Extremely Stable Core)**: Foundational services (e.g. `src/db`). Modifying these has a massive blast radius across the entire repo. Exercise maximum caution and verify all tests.
   * **$0.3 \le I \le 0.7$ (Balanced Domain Services)**: Business logic, parsers, and pipeline workers (e.g. `src/ingestion`, `src/api`).
   * **$I \to 1.0$ (Volatile Leaf / Orchestrator)**: CLI entrypoints, UI components, test runners. Easy to modify; changes are isolated with minimal ripple effect on core systems.
+* **Abstractness ($A = \frac{N_{\text{abstract}}}{N_{\text{total}}}$, range 0.0 to 1.0)**:
+  * Ratio of interfaces, traits, and abstract classes to total symbols in the galaxy.
+* **Distance from Main Sequence ($D = |A + I - 1|$, range 0.0 to 1.0)**:
+  * **$D \to 0.0$ (Optimal Architectural Balance)**: Follows Clean Architecture. Highly abstract modules are stable; concrete modules are flexible.
+  * **$D \gg 0.5$ with $A \to 0, I \to 0$ (Zone of Pain)**: Brittle concrete foundation that everything depends on.
+  * **$D \gg 0.5$ with $A \to 1, I \to 1$ (Zone of Uselessness)**: Unimplemented abstractions that nobody depends on.
+* **Scale-Adaptive Cosmology ($K_{\text{adaptive}}$)**:
+  * Galaxies scale sub-linearly with graph complexity $N$: $K = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$ with Affinity-Floor Invariant (zero forced merges of decoupled systems).
 * **`dominant_path` & `sample_symbols`**:
   * Tells you where the subsystem lives on disk and what its 3-5 central hub symbols are. If tasked with exploring a new area, begin with the hub symbols.
 

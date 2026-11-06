@@ -4,6 +4,8 @@
 pub mod worktree;
 #[allow(unused_imports)]
 pub use worktree::{detect_git_worktree, discover_parent_worktrees, WorktreeInfo};
+pub mod symbol_table;
+pub use symbol_table::{SymbolDef, SymbolTable};
 
 use crate::analysis::CommunityDetector;
 use crate::db::DbClient;
@@ -222,6 +224,32 @@ impl IngestionPipeline {
         list
     }
 
+    /// Check if a workspace is actively being scanned, indexed, purged, or clustered (R-080)
+    pub async fn is_indexing(&self, workspace: Option<&str>) -> Option<IngestionJobStatus> {
+        let jobs = self.jobs.read().await;
+        if let Some(ws) = workspace {
+            if let Some(job) = jobs.get(ws) {
+                if !job.completed && matches!(job.phase.as_str(), "queued" | "purging" | "scanning" | "indexing" | "clustering") {
+                    return Some(job.clone());
+                }
+            }
+        } else {
+            for job in jobs.values() {
+                if !job.completed && matches!(job.phase.as_str(), "queued" | "purging" | "scanning" | "indexing" | "clustering") {
+                    return Some(job.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Set or update a job status directly (used for testing and status overrides)
+    #[allow(dead_code)]
+    pub async fn set_job_status(&self, job: IngestionJobStatus) {
+        let mut map = self.jobs.write().await;
+        map.insert(job.workspace.clone(), job);
+    }
+
     /// Dismiss a completed or failed ingestion job from the tracker
     pub async fn dismiss_job(&self, workspace: &str) {
         let mut jobs = self.jobs.write().await;
@@ -388,6 +416,73 @@ impl IngestionPipeline {
     }
 }
 
+struct PendingBatchFile {
+    rel_path: String,
+    hash: String,
+    nodes: Vec<ExtractedNode>,
+    containment_edges: Vec<ExtractedEdge>,
+    text_count: usize,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn flush_vector_batch(
+    workspace_name: &str,
+    pending_files: &mut Vec<PendingBatchFile>,
+    pending_texts: &mut Vec<String>,
+    embedder: &EmbedderClient,
+    db: &DbClient,
+    cache: &FileCache,
+    files_indexed: &mut usize,
+    total_nodes: &mut usize,
+    total_edges: &mut usize,
+) {
+    if pending_files.is_empty() {
+        return;
+    }
+    let text_refs: Vec<&str> = pending_texts.iter().map(|s| s.as_str()).collect();
+    let embeddings = match embedder.embed_batch(&text_refs).await {
+        Ok(embs) => embs,
+        Err(e) => {
+            warn!("Batch embedding generation failed for {} texts: {}", text_refs.len(), e);
+            vec![vec![0.0f32; 384]; pending_texts.len()]
+        }
+    };
+
+    let mut offset = 0;
+    for file in pending_files.drain(..) {
+        let end = offset + file.text_count;
+        let file_embeddings = if end <= embeddings.len() {
+            &embeddings[offset..end]
+        } else {
+            &[]
+        };
+        offset = end;
+
+        // Prune any prior nodes/edges for this file to avoid zombie duplicates
+        let _ = db.delete_file(workspace_name, &file.rel_path).await;
+
+        let mut stored_nodes_ok = false;
+        if let Err(e) = db.store_nodes(&file.nodes, file_embeddings, Some(&file.hash)).await {
+            error!("Failed to store nodes for {}: {}", file.rel_path, e);
+        } else {
+            *total_nodes += file.nodes.len();
+            stored_nodes_ok = true;
+        }
+
+        if let Err(e) = db.store_resolved_edges(&file.containment_edges).await {
+            error!("Failed to store containment edges for {}: {}", file.rel_path, e);
+        } else {
+            *total_edges += file.containment_edges.len();
+        }
+
+        if stored_nodes_ok {
+            cache.update(&file.rel_path, &file.hash).await;
+        }
+        *files_indexed += 1;
+    }
+    pending_texts.clear();
+}
+
 async fn execute_ingest(
     db: &DbClient,
     embedder: &EmbedderClient,
@@ -452,6 +547,9 @@ async fn execute_ingest(
         let mut total_nodes = 0;
         let mut total_edges = 0;
         let mut discovered_dirs: HashSet<String> = HashSet::new();
+        let mut symbol_table = SymbolTable::new();
+        let mut pending_files: Vec<PendingBatchFile> = Vec::new();
+        let mut pending_texts: Vec<String> = Vec::new();
 
         let root_path_buf = PathBuf::from(root);
         let gitignore = crate::watcher::load_workspace_gitignore(&root_path_buf);
@@ -619,45 +717,55 @@ async fn execute_ingest(
                     category: "CONTAINMENT".to_string(),
                 });
 
-                // Batch vector embeddings via TEI with context-enriched header (R-004, R-037)
-                let enriched_texts: Vec<String> = all_nodes
+                // Register nodes in in-memory symbol table (R-078 Pass 1)
+                symbol_table.register_file_nodes(&all_nodes);
+
+                // Register explicit imports for SAIR Tier 2 (R-082)
+                let imported_symbols: Vec<String> = all_edges
                     .iter()
-                    .map(|n| format!("[{}] {} {} in {}\n{}", n.language, n.kind, n.label, n.file_path, n.text))
+                    .filter(|e| e.edge_type == "IMPORTS")
+                    .map(|e| e.target_label.clone())
                     .collect();
-                let text_refs: Vec<&str> = enriched_texts.iter().map(|s| s.as_str()).collect();
-                let embeddings = match embedder.embed_batch(&text_refs).await {
-                    Ok(embs) => embs,
-                    Err(e) => {
-                        warn!("Embedding generation failed for {}: {}", rel_path, e);
-                        // Zero vector fallback if TEI is busy or degraded
-                        vec![vec![0.0f32; 384]; all_nodes.len()]
+                symbol_table.register_file_imports(workspace_name, &rel_path, &imported_symbols);
+
+                // Separate containment edges (immediate) from cross-file edges (deferred to Pass 2)
+                let mut containment_edges = Vec::new();
+                let mut cross_file_edges = Vec::new();
+                for edge in all_edges {
+                    if edge.target_id.is_some() {
+                        containment_edges.push(edge);
+                    } else {
+                        cross_file_edges.push(edge);
                     }
-                };
-
-                // Prune any prior nodes/edges for this file to avoid zombie duplicates across shifted lines (R-047)
-                let _ = db.delete_file(workspace_name, &rel_path).await;
-
-                let mut stored_nodes_ok = false;
-                // Store nodes with workspace namespace and file hash (R-005, Finding #4)
-                if let Err(e) = db.store_nodes(&all_nodes, &embeddings, Some(&hash)).await {
-                    error!("Failed to store nodes for {}: {}", rel_path, e);
-                } else {
-                    total_nodes += all_nodes.len();
-                    stored_nodes_ok = true;
                 }
+                symbol_table.queue_edges(cross_file_edges);
 
-                // Store edges with workspace namespace (R-006)
-                if let Err(e) = db.store_edges(&all_edges).await {
-                    error!("Failed to store edges for {}: {}", rel_path, e);
-                } else {
-                    total_edges += all_edges.len();
+                // Batch vector embeddings across files into chunks of up to 256 (R-081)
+                let text_count = all_nodes.len();
+                for n in &all_nodes {
+                    pending_texts.push(format!("[{}] {} {} in {}\n{}", n.language, n.kind, n.label, n.file_path, n.text));
                 }
+                pending_files.push(PendingBatchFile {
+                    rel_path,
+                    hash,
+                    nodes: all_nodes,
+                    containment_edges,
+                    text_count,
+                });
 
-                if stored_nodes_ok {
-                    cache.update(&rel_path, &hash).await;
+                if pending_texts.len() >= 256 {
+                    flush_vector_batch(
+                        workspace_name,
+                        &mut pending_files,
+                        &mut pending_texts,
+                        embedder,
+                        db,
+                        cache,
+                        &mut files_indexed,
+                        &mut total_nodes,
+                        &mut total_edges,
+                    ).await;
                 }
-
-                files_indexed += 1;
 
                 if files_scanned % 5 == 0 || files_indexed % 2 == 0 {
                     let mut j_map = jobs.write().await;
@@ -673,6 +781,19 @@ async fn execute_ingest(
                 }
             }
         }
+
+        // Flush any remaining pending files in vector batch (R-081)
+        flush_vector_batch(
+            workspace_name,
+            &mut pending_files,
+            &mut pending_texts,
+            embedder,
+            db,
+            cache,
+            &mut files_indexed,
+            &mut total_nodes,
+            &mut total_edges,
+        ).await;
 
         // Store Topological Containment Backbone: Workspace root, directories, and CONTAINS_DIR edges (R-063)
         let ws_root_node = ExtractedNode {
@@ -738,6 +859,27 @@ async fn execute_ingest(
             total_edges += dir_edges.len();
         }
 
+        // PASS 2: DEFERRED LINKAGE PASS (R-078)
+        // Resolve all cross-file forward references in-memory against complete SymbolTable
+        info!(
+            "Starting Pass 2 (Deferred SAIR Linkage) for '{}': {} symbols declared, {} cross-file edges queued",
+            workspace_name, symbol_table.total_symbols(), symbol_table.total_unresolved_queued()
+        );
+        let (resolved_edges, resolved_count, dropped_count) = symbol_table.resolve_all_queued_edges();
+        info!(
+            "Pass 2 in-memory resolution completed for '{}': {} edges resolved, {} unresolvable dropped",
+            workspace_name, resolved_count, dropped_count
+        );
+
+        if !resolved_edges.is_empty() {
+            if let Err(e) = db.store_resolved_edges(&resolved_edges).await {
+                error!("Failed to bulk store Pass 2 resolved edges for '{}': {}", workspace_name, e);
+            } else {
+                total_edges += resolved_count;
+                info!("Pass 2 successfully stored {} cross-file edges for '{}'", resolved_count, workspace_name);
+            }
+        }
+
         // Auto-cluster upon ingestion: Compute Louvain/Leiden modularity communities
         {
             let mut j_map = jobs.write().await;
@@ -769,7 +911,9 @@ async fn execute_ingest(
                         None
                     };
 
-                    let assignments = CommunityDetector::detect_with_seeds(&all_nodes, &all_links, 15, seeds.as_ref());
+                    let mut assignments = CommunityDetector::detect_with_seeds(&all_nodes, &all_links, 15, seeds.as_ref());
+                    CommunityDetector::consolidate_communities(&all_nodes, &all_links, &mut assignments, 3);
+                    CommunityDetector::coarsen_to_macro_galaxies(&all_nodes, &all_links, &mut assignments, 0);
                     let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(workspace_name, &all_nodes, &all_links, &assignments);
                     clusters_computed = summaries.len();
                     if let Err(e) = db.update_communities(&assignments).await {

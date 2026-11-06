@@ -1,5 +1,5 @@
 // Axum REST API handlers
-// Implements: R-008, R-009, R-010, R-022, R-023, R-028
+// Implements: R-008, R-009, R-010, R-022, R-023, R-028, R-080
 
 use crate::analysis::{CommunityDetector, GraphRagEngine};
 use crate::analytics::AnalyticsEngine;
@@ -117,6 +117,8 @@ pub struct WatchStopPayload {
 pub struct ClusterPayload {
     pub workspace: Option<String>,
     pub min_size: Option<usize>,
+    #[serde(alias = "limit")]
+    pub max_galaxies: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -323,12 +325,44 @@ pub fn inject_watcher_status(
     }
 }
 
+/// Transactional Read-Fencing helper (R-080): Returns HTTP 423 LOCKED if workspace is indexing
+async fn check_read_fence(
+    state: &AppState,
+    ws: Option<&str>,
+) -> Option<axum::response::Response> {
+    if let Some(job) = state.pipeline.is_indexing(ws).await {
+        Some(
+            (
+                StatusCode::LOCKED,
+                Json(serde_json::json!({
+                    "status": "indexing_in_progress",
+                    "workspace": job.workspace,
+                    "phase": job.phase,
+                    "files_indexed": job.files_indexed,
+                    "total_files": job.total_files,
+                    "retry_after_ms": 2000,
+                    "message": format!(
+                        "Workspace '{}' is actively {} ({} / {} files). Read requests are locked until ingestion completes.",
+                        job.workspace, job.phase, job.files_indexed, job.total_files
+                    )
+                })),
+            )
+                .into_response(),
+        )
+    } else {
+        None
+    }
+}
+
 /// GET /api/graph (R-008, AC-006)
 async fn graph_handler(
     State(state): State<AppState>,
     Query(params): Query<GraphParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     match state.db.get_graph(ws.as_deref()).await {
         Ok((nodes, links)) => {
             let total_nodes = nodes.len();
@@ -376,6 +410,11 @@ async fn galaxies_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock reads if workspace is actively indexing
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+
     // 1. Try pre-computed galaxy table records first (R-042)
     if let Ok(records) = state.db.get_galaxies_records(ws.as_deref()).await {
         if !records.is_empty() {
@@ -389,6 +428,8 @@ async fn galaxies_handler(
                     "node_count": g.node_count,
                     "role": g.role,
                     "instability": g.instability,
+                    "abstractness": g.abstractness,
+                    "distance": g.distance,
                     "afferent_coupling": g.afferent_coupling,
                     "efferent_coupling": g.efferent_coupling,
                     "languages": g.languages,
@@ -403,8 +444,11 @@ async fn galaxies_handler(
             });
 
             let total_matched = galaxies.len();
-            if limit > 0 && galaxies.len() > limit {
-                galaxies.truncate(limit);
+            // R-084: Only truncate if client explicitly specified limit parameter
+            if let Some(explicit_limit) = params.limit {
+                if explicit_limit > 0 && galaxies.len() > explicit_limit {
+                    galaxies.truncate(explicit_limit);
+                }
             }
 
             return Json(serde_json::json!({
@@ -538,6 +582,10 @@ async fn search_handler(
     State(state): State<AppState>,
     Query(params): Query<SearchParams>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let k = params.k.unwrap_or(10);
     let start = std::time::Instant::now();
 
@@ -554,7 +602,6 @@ async fn search_handler(
     };
 
     // 2. Perform HNSW cosine similarity search
-    let ws = normalize_workspace(params.workspace.as_deref());
     let include_docs = params.include_docs.unwrap_or(false);
     let res = state.db.search_vector(&query_vec, k, ws.as_deref(), include_docs).await;
     let duration_ms = start.elapsed().as_millis() as i64;
@@ -599,9 +646,12 @@ async fn condense_handler(
     State(state): State<AppState>,
     Query(params): Query<CondenseParams>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let start = std::time::Instant::now();
     let hops = params.hops.unwrap_or(2);
-    let ws = normalize_workspace(params.workspace.as_deref());
     let res = state.db.get_symbol_subgraph(&params.symbol, ws.as_deref(), hops).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -797,8 +847,11 @@ async fn symbol_handler(
     State(state): State<AppState>,
     Query(params): Query<SymbolParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let res = state.db.find_symbols(&params.name, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -841,8 +894,11 @@ async fn references_handler(
     State(state): State<AppState>,
     Query(params): Query<ReferenceParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let res = state.db.find_references(&params.symbol, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -885,8 +941,11 @@ async fn relationships_handler(
     State(state): State<AppState>,
     Json(payload): Json<RelationshipPayload>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(Some(&payload.workspace)).unwrap_or_else(|| payload.workspace.clone());
+    if let Some(fence) = check_read_fence(&state, Some(&ws)).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
 
     if payload.source_symbol.trim().is_empty() || payload.target_symbol.trim().is_empty() {
         return (
@@ -954,9 +1013,12 @@ async fn query_handler(
     State(state): State<AppState>,
     Json(payload): Json<GraphRagPayload>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(payload.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let start = std::time::Instant::now();
     let top_k = payload.top_k.unwrap_or(5);
-    let ws = normalize_workspace(payload.workspace.as_deref());
     let include_docs = payload.include_docs.unwrap_or(false);
     let res = GraphRagEngine::query(
         &state.db,
@@ -1002,6 +1064,7 @@ async fn cluster_handler(
     let start = std::time::Instant::now();
     let raw_ws = payload_opt.as_ref().and_then(|p| p.workspace.clone());
     let min_size = payload_opt.as_ref().and_then(|p| p.min_size).unwrap_or(1);
+    let target_ceiling = payload_opt.as_ref().and_then(|p| p.max_galaxies).unwrap_or(0);
     let workspace = normalize_workspace(raw_ws.as_deref());
 
     // Record telemetry asynchronously
@@ -1019,11 +1082,17 @@ async fn cluster_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock reclustering if workspace is actively indexing
+    if let Some(fence) = check_read_fence(&state, workspace.as_deref()).await {
+        return fence;
+    }
+
     match state.db.get_graph(workspace.as_deref()).await {
         Ok((nodes, links)) => {
             let ws_name = workspace.clone().unwrap_or_else(|| "default".to_string());
             let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
-            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, target_ceiling);
             let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
             let filtered_summaries: Vec<_> = summaries.into_iter().filter(|s| s.node_count >= min_size).collect();
             let total_communities = filtered_summaries.len();
@@ -1064,8 +1133,11 @@ async fn galaxy_boundary_handler(
     State(state): State<AppState>,
     Query(params): Query<GalaxyBoundaryParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let sym = params.symbol.trim();
 
     // Record telemetry asynchronously
@@ -1125,6 +1197,11 @@ async fn galaxy_topology_handler(
         ).await;
     });
 
+    // Transactional Read-Fencing (R-080): Lock topology if workspace is actively indexing
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+
     let mut records = state.db.get_galaxies_records(ws.as_deref()).await.unwrap_or_default();
     if records.is_empty() {
         // If galaxy table empty, compute on the fly
@@ -1132,7 +1209,8 @@ async fn galaxy_topology_handler(
             if !nodes.is_empty() {
                 let ws_name = ws.clone().unwrap_or_else(|| "default".to_string());
                 let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
-                CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
+                CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+                CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 0);
                 let (_, computed_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
                 let _ = state.db.update_communities(&assignments).await;
                 let _ = state.db.store_galaxies(&ws_name, &computed_records).await;

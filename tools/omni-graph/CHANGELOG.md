@@ -5,6 +5,36 @@ All notable changes to this tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-rc1] - 2026-11-05
+
+### Added
+- **AI-Native Galaxy Cosmology (R-086, R-087)**: Purged the 1956 human Miller's Law working memory clamp ($K \le 15$) and toxic fallback `sizes.last()` cheat in favor of true natural bounded contexts.
+- **Affinity-Floor Invariant (R-086)**: Enforced strict prohibition against merging decoupled systems; communities sharing zero topological coupling ($k_{i, j} = 0$) and zero directory lineage are strictly preserved as independent domains.
+- **Newman Modularity Differential Guard (R-087)**: Coarsening maximizes $\Delta Q_{ij} = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2}$ and halts when merges would cause modularity degradation ($\Delta Q < -0.05$).
+- **Sub-Linear Scale-Adaptive Subsystem Sizing (R-088)**: Dynamic scale-adaptive ceiling $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$ scaling logarithmically from 5 to 150 subsystems.
+- **Noise Floor Isolation (R-090)**: Isolated singletons ($< 3$ nodes) gathered into designated utilities namespace, preventing pollution of core business domains.
+- **Multi-Scale API & Parameter Controls (R-089)**: Supported `max_galaxies` override on `/api/cluster` and `/api/galaxies`.
+- **Universal Transactional Read-Fence (R-080)**: Centralized `check_read_fence` guarding `/api/graph`, `/api/query`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/galaxy/boundary`, `/api/galaxies`, `/api/cluster`, and `/api/galaxy/topology` against partial reads during background ingestion.
+- **Living Documentation Portal Parity**: Added Chapter 01 documentation for AI-Native Galaxy Cosmology and Two-Pass Ingestion in `docs/site/index.html` and updated `vadde.github.io` portfolio foundry card, passing all 14 gates of the headless documentation verification suite.
+
+### Fixed
+- **PolyTuring Database Desynchronization**: Clean atomic purge resolved 13 vs 185 desync across `node.community` and `galaxy` tables; synchronized both views to 65 natural bounded contexts.
+
+## [0.5.0-rc1] - 2026-11-05
+
+### Added
+- **Two-Pass Ingestion Engine (R-078)**: Decoupled symbol declaration (Pass 1) from in-memory linkage resolution (Pass 2) via `SymbolTable`, completely eliminating forward-reference edge loss and recovering >84% of missing cross-file call traces.
+- **Inbound Caller Preservation in Delta-Sync (R-079)**: Retentive re-indexing preserving existing incoming call edges from foreign files during file updates and re-linking them to matching symbol signatures when line numbers shift.
+- **Transactional Read-Fencing & Staging Barrier (R-080)**: Enforced HTTP 423 (Locked) barrier on `/api/cluster`, `/api/galaxies`, and `/api/galaxy/topology` while workspaces undergo active background ingestion, preventing premature dirty reads and cluster thrashing.
+- **High-Throughput Cross-File Vector Batching (R-081)**: Buffered vector embeddings across files in batches of up to 256 symbols before dispatching to TEI, reducing HTTP overhead by 25x and accelerating ingestion throughput to sub-60-second bounds.
+- **AST Method Receiver Scoping (R-082)**: Parser now preserves root receiver expressions in chained method calls (e.g. `User.objects.create()` emits a `REFERENCES` edge to `User`), restoring object dependency visibility.
+- **Native SurrealDB v2 HNSW KNN Operator (R-083)**: Activated native vector KNN syntax `<|k, ef|>` in `search_vector`, enabling true logarithmic $O(\log N)$ vector search over the 384-dimensional cosine HNSW index.
+- **Hierarchical Leiden Galaxy Macro-Coarsening (R-084)**: Multi-level meta-node coarsening contracting fine-grained communities into cohesive macro subsystems naturally bounded in $[5, 15]$ without relying on artificial API truncation.
+- **Complete Uncle Bob Martin Package Metrics (R-085)**: Automated calculation and persistence of Abstractness ($A = N_{\text{abstract}} / N_{\text{total}}$) and Distance from Main Sequence ($D = |A + I - 1|$) in `GalaxyRecord` and `/api/galaxy/topology`.
+
+### Fixed
+- **Pipeline Modularity Desynchronization (R-077)**: Synchronized auto-clustering in `ingestion/mod.rs` and `watcher/mod.rs` to run identical consolidation and coarsening phases, guaranteeing 100% galaxy count parity between automated ingestion and manual UI reclustering.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added

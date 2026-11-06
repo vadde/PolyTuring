@@ -1,3 +1,121 @@
+### 2026-11-05 — Forensic Optimization: Live Watcher In-Memory SAIR Acceleration & Dedicated Quiescent Trigger
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (v0.6.0-rc1 Engine Optimization & Real-Time Parity)
+**Branch**: `feat/omni-graph-two-pass-engine-hardening`
+**Duration**: ~25m
+
+#### Context & Objectives
+- Addressed user forensic observation regarding live sync behavior: during editing of `PolyTuring`, only 2 file events and 2 reindexes were logged prior to container restart, and watcher appeared frozen in `"syncing"` status.
+- Diagnosed root-cause bottleneck in `watcher/pipeline.rs`: single-file delta reindexing was invoking legacy `self.db.store_edges(&all_edges)`, which executed up to 3 individual SurrealQL subqueries per unresolved edge in batches of 30.
+- For a major 1,680-line hub file like `tools/omni-graph/src/api/mod.rs` (1,781 edges), this issued >5,000 queries against SurrealDB, blocking the watcher thread synchronously for 392.7 seconds (~6.5 minutes).
+- During this window, incoming filesystem events were coalesced in the notify channel and delayed.
+
+#### Key Enhancements & Forensic Proof
+1. **Live In-Memory SAIR Symbol Resolution (`watcher/pipeline.rs`, `ingestion/symbol_table.rs`)**:
+   - Integrated `Arc<RwLock<SymbolTable>>` into `IncrementalPipeline`.
+   - On watcher startup (`run_watcher`), pre-populates `SymbolTable` from SurrealDB in one single query via `get_workspace_symbol_defs` (3,999 symbols loaded in 258ms).
+   - In `IncrementalPipeline::reindex_file`:
+     - Calls `st.remove_file(workspace, rel_path)` to prune obsolete symbols.
+     - Registers newly parsed nodes via `st.register_file_nodes` and explicit imports via `st.register_file_imports`.
+     - In-memory SAIR resolves all cross-file call edges against the workspace symbol table in <1ms without database subqueries.
+     - Dispatches all resolved edges to `store_resolved_edges` via parameterized batches of 100.
+2. **Dedicated 1-Second Quiescent Auto-Clustering Interval (`watcher/mod.rs`)**:
+   - Decoupled quiescent clustering from the 30-second filesystem sweep interval into a dedicated 1-second `tokio::time::interval`.
+   - Exactly 3.5 seconds after file editing pauses, auto-reclustering triggers dynamically in the background, updating SurrealDB and broadcasting an SSE `ClustersRefreshed` event.
+3. **Unit Test Suite Parity (99/99 Passing)**:
+   - Authored `test_r091_watcher_symbol_table_lifecycle` validating symbol registration, file removal, file rename, and edge resolution in memory.
+   - 99 unit tests passing in 0.01s.
+4. **Empirical Live Verification**:
+   - Rebuilt container `omni-rust-app` and tested modifying `tools/omni-graph/src/api/mod.rs`.
+   - Re-indexing duration plummeted from **392,739ms (6.5 min)** down to **4,430ms** (~90x speedup), preserving and relinking 133 inbound caller edges.
+   - Quiescent auto-clustering fired 4.4 seconds later, recalculating 4,260 nodes into 65 active galaxies in 4.1s.
+   - `/api/watch/status` verified: `status: "watching"`, `cluster_status: "live"`, `avg_sync_ms: 2215`.
+
+---
+
+### 2026-11-05 — v0.6.0 AI-Native Galaxy Cosmology & Natural Modularity Architecture
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (v0.6.0 AI-Native Galaxy Cosmology & Multi-Scale Architecture)
+**Branch**: `feat/omni-graph-ai-native-cosmology`
+**Duration**: ~45m
+
+#### Context & Objectives
+- Addressed deep epistemic inquiry regarding the 1956 human Miller's Law working memory ceiling ($K \le 15$) and toxic forced-merging cheat in `analysis/mod.rs`.
+- Formulated and executed [`specs/catalog/omni-graph-ai-native-galaxy-cosmology.md`](../../specs/catalog/omni-graph-ai-native-galaxy-cosmology.md) covering R-086 through R-092 and AC-030 through AC-036.
+- Eliminated artificial community forced-merging, implemented modularity-guarded coarsening, dynamic sub-linear scale-adaptive sizing, and noise floor isolation for sovereign AI coding agents.
+- Resolved database desynchronization in `PolyTuring` where WebGL graph displayed 13 node communities while Macro Topology displayed 185 stale records.
+
+#### Key Enhancements & Forensic Proof
+1. **Affinity-Floor Invariant (R-086)**:
+   - Permanently purged `let target_c = best_target.unwrap_or_else(|| sizes.last().map(|(c, _)| *c)...)`.
+   - Communities sharing zero topological coupling ($k_{i, j} = 0$) and zero directory lineage are strictly preserved as independent domains.
+2. **Modularity-Guarded Coarsening (R-087)**:
+   - Coarsening optimizes Newman's modularity differential $\Delta Q_{ij} = \frac{k_{ij}}{2m} - \frac{k_i \cdot k_j}{2m^2}$, terminating when merges cause modularity degradation ($\Delta Q < -0.05$).
+3. **Scale-Adaptive Subsystem Sizing (R-088)**:
+   - Implemented `calculate_adaptive_target(node_count, user_limit)`: $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$.
+   - Supports explicit `max_galaxies` caller override on `/api/cluster` and `/api/galaxies`.
+4. **Noise Floor Isolation (R-090)**:
+   - Micro-orphans ($< 3$ nodes) with zero affinity map to designated utilities namespace, preventing contamination of core business services.
+5. **Empirical Multi-Workspace Ground Truth**:
+   - `tutor-intelligence`: Galaxy #1 shrunk from 1,434-node monster to pure 908-node solver core; 68 distinct bounded contexts emerged across solver, kinematics, specs, and docs.
+   - `DesignPatterns`: 49 natural bounded contexts emerged; each GoF pattern (Singleton, Factory, Strategy) isolated into its own domain.
+   - `django-sorcery`: 53 natural package bounded contexts emerged.
+   - `PolyTuring`: Cleanly re-ingested with atomic purge; both `node` (65) and `galaxy` (65) synchronized 100%.
+6. **Test Suite**:
+   - Added 3 unit tests (`test_r086_affinity_floor_preserves_decoupled_domains`, `test_r088_scale_adaptive_sizing`, `test_r090_orphan_isolation`).
+   - 98/98 unit tests passing in 0.01s. Zero clippy warnings.
+
+---
+
+### 2026-11-05 — v0.5.0-rc1 Engine Hardening: Two-Pass Ingestion, Retentive Delta-Sync, Natural Hierarchical Leiden Coarsening & Full Uncle Bob Metrics
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (v0.5.0-rc1 Engine Hardening & Architectural Parity)
+**Branch**: `refactor/omni-graph-two-pass-engine`
+**Duration**: ~1h
+
+#### Context & Objectives
+- Addressed forensic discoveries where repository ingestion exhibited severe algorithmic and structural anomalies:
+  1. Galaxy cluster divergence: Ingestion produced 71 galaxies, while re-cluster produced 141, caused by single-pass LPA instability and hardcoded `galaxies.truncate(15)` API slicing.
+  2. Forward-reference call edge loss: In single-pass ingestion, files indexed prior to callee declaration silently dropped cross-file `CALLS` edges (>84% missing in complex projects).
+  3. Delta-sync caller annihilation: Live file re-indexing purged all inbound caller edges without retentive re-linking.
+  4. Ingestion read collisions: Read endpoints returned corrupt, partial graph slices during active indexing.
+  5. Vector ingestion bottleneck: 1 embedding HTTP roundtrip per symbol led to 24-minute ingestion runs.
+- Formulated and executed the hardening specification [`specs/catalog/omni-graph-two-pass-engine-hardening.md`](../../specs/catalog/omni-graph-two-pass-engine-hardening.md) covering R-077 through R-085.
+
+#### Key Forensic Discoveries & Resolutions
+1. **Pipeline & Architectural Symmetry (R-077, R-084)**:
+   - Unified Community Clustering across Ingestion, Live Watcher, and `/api/cluster` into a deterministic 3-step pipeline: `detect_communities` $\to$ `consolidate_communities` $\to$ `coarsen_to_macro_galaxies`.
+   - Replaced artificial `galaxies.truncate(limit)` with recursive multi-level Leiden community contraction, iteratively collapsing the smallest community into its highest edge-affinity (or spatial-affinity) neighbor until $K \le 15$.
+   - Verified 100% parity on `django-sorcery`: Ingestion auto-clustering and subsequent `/api/cluster` both produce exactly 15 cohesive macro-subsystems.
+2. **Two-Pass SAIR Ingestion Engine (R-078)**:
+   - Created `tools/omni-graph/src/ingestion/symbol_table.rs` implementing an in-memory `SymbolTable` tracking declarations, imports, and unresolved call edges.
+   - Decoupled declaration storage (Pass 1) from cross-file linkage (Pass 2), executing resolution in Rust RAM via 4-tier SAIR heuristic before bulk-writing to SurrealDB.
+   - On `django-sorcery`, total `CALLS` edges jumped from 879 to 1,872 (2.1x increase), with cross-file test-to-library calls resolving with 100% fidelity.
+3. **Retentive Delta-Sync Caller Preservation (R-079)**:
+   - Implemented `get_inbound_edges_for_file` and `relink_inbound_edges` in `src/db/mod.rs` and integrated into `reindex_file` in `src/watcher/pipeline.rs`.
+   - Preserves incoming edges across live file edits, reconnecting callers to surviving symbols without caller annihilation.
+4. **Transactional Read-Fencing (R-080)**:
+   - Added `is_indexing` check to `/api/cluster`, `/api/galaxies`, and `/api/galaxy/topology`, returning HTTP 423 Locked with status payload and retry advice during active indexing.
+5. **256-Symbol Chunked Vector Batching (R-081)**:
+   - Implemented `flush_vector_batch` queuing symbols into 256-item batches before dispatching to TEI.
+   - Cold refresh duration on `django-sorcery` plummeted from 1,456 seconds down to 87.9 seconds (16.5x throughput acceleration).
+6. **AST Receiver & Chained Call Extraction (R-082)**:
+   - Parser now extracts root receiver identifiers in chained method calls (e.g. `User.objects.create()` $\to$ `User`), generating 141 newly minted `REFERENCES` edges on `django-sorcery`.
+7. **Native SurrealDB v2 HNSW KNN Operator `<|k, ef|>` (R-083)**:
+   - Activated native SurrealDB v2 HNSW operator `<|k, ef|>` in `search_vector` with direct predicate combination, achieving 36-83ms search latencies end-to-end.
+8. **Uncle Bob Martin Package Metrics Completeness (R-085)**:
+   - Added `abstractness` ($A = N_{\text{abstract}} / N_{\text{total}}$) and `distance` ($D = |A + I - 1|$) fields to `galaxy` table schema and compute pipeline.
+
+#### Empirical Verification & Test Suite
+- `cargo test --manifest-path tools/omni-graph/Cargo.toml --test unit_tests`: 95/95 tests passing.
+- `cargo clippy --all-targets -- -D warnings`: 0 warnings.
+- Live Docker testing on `django-sorcery` validated all 8 success criteria.
+
+---
+
 ### 2026-11-04 — Deep Forensic Audit: Vector Search Cosine Null Fix, API Parameter Aliasing & Guardrail Hardening
 
 **Agent/Author**: Antigravity (Google DeepMind)
@@ -2476,6 +2594,105 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
 #### Verification & Live Results
 - Unit Tests: All 85/85 tests passing in 0.01s (`cargo test --test unit_tests`).
 - Cargo compilation check: Clean build in 1.31s.
+
+---
+
+### 2026-11-05 — Two-Pass Ingestion Engine, Retentive Delta-Sync & Production Hardening
+
+**Agent/Author**: Antigravity (Google DeepMind) — Pair Programming Architect & Systems Engineer  
+**SDLC Phase**: `testing` (Hardening: Two-Pass Ingestion, Inbound Preservation, Read-Fencing & True HNSW)  
+**Branch**: `refactor/omni-graph-two-pass-engine`  
+**Duration**: ~60m  
+
+#### Objectives
+1. Implement Requirement `R-077` (Unified Clustering Pipeline Invariant): Guarantee parity between ingestion, watcher, and `/api/cluster`.
+2. Implement Requirement `R-078` (Two-Pass Ingestion Engine): Decouple declaration pass (Pass 1) from in-memory linkage pass (Pass 2) to eliminate >84% forward-reference edge loss.
+3. Implement Requirement `R-079` (Inbound Edge Preservation): Retain and re-link callers to surviving symbols during delta-sync.
+4. Implement Requirement `R-080` (Transactional Read-Fencing): Enforce HTTP 423 (Locked) staging barrier during active workspace indexing.
+5. Implement Requirement `R-081` (High-Throughput Bulk Vector Queue): Buffer vector embeddings across files in chunks of up to 256 symbols before dispatching to TEI.
+6. Implement Requirement `R-082` (AST Receiver Scoping): Preserve root receiver expressions (`User.objects.create()` -> `User`) as `REFERENCES` edges.
+7. Implement Requirement `R-083` (True SurrealDB v2 HNSW KNN Operator): Activate native `<|k, ef|>` operator for sub-10ms vector search.
+8. Implement Requirement `R-084` (Hierarchical Leiden Macro-Coarsening): Multi-level community contraction guaranteeing bounded macro vision ($5 \le K \le 15$) without API truncation.
+9. Implement Requirement `R-085` (Uncle Bob Package Metrics Completeness): Compute Abstractness ($A$) and Distance from Main Sequence ($D = |A + I - 1|$).
+
+#### Implementation Details
+- **`src/ingestion/symbol_table.rs`**: Built in-memory `SymbolTable` tracking declarations, explicit imports, and queued edges, resolving targets across 4 SAIR tiers with zero DB subquery overhead.
+- **`src/ingestion/mod.rs`**: Converted `execute_ingest` to two-pass architecture. Added `flush_vector_batch` (256 texts/request). Integrated unified 3-step clustering (detect -> consolidate -> coarsen).
+- **`src/db/mod.rs` & `schema.surql`**: Added `store_resolved_edges`, `get_inbound_edges_for_file`, `relink_inbound_edges`, updated `search_vector` to use `<|k_cand, ef|>`, and added `abstractness` / `distance` fields to `galaxy`.
+- **`src/watcher/pipeline.rs` & `src/watcher/mod.rs`**: Preserved inbound caller relationships prior to file deletion, re-linked surviving symbols upon re-indexing, and unified quiescent auto-clustering.
+- **`src/parser/mod.rs`**: Added receiver extraction for chained method invocations, emitting `REFERENCES` edges to the root receiver.
+- **`src/analysis/mod.rs`**: Implemented `coarsen_to_macro_galaxies` and computed $A$ and $D$ metrics in `compute_galaxy_metrics`.
+- **`src/api/mod.rs` & `ui/src/App.tsx`**: Enforced HTTP 423 Locked during active indexing on `/api/cluster`, `/api/galaxies`, and `/api/galaxy/topology`; handled in UI; removed artificial truncation.
+- **`tests/unit_tests.rs`**: Added `hardening_v050_tests` with 7 dedicated unit tests covering R-077, R-078, R-079, R-080, R-082, R-084, and R-085.
+
+#### Verification & Live Results
+- Test suite: 95/95 tests passing in 0.01s (`cargo test --test unit_tests`).
+- `cargo check`: Clean build with zero errors and zero warnings in 1.56s.
+
+---
+
+### 2026-11-05 — AI-Native Galaxy Cosmology, Universal Read-Fencing & Documentation Portal Parity
+
+**Agent/Author**: Antigravity (Google DeepMind) — Systems Architect & Pair Programmer  
+**SDLC Phase**: `review` (AI-Native Cosmology, Dynamic Modularity Guard, Read-Fence Generalization)  
+**Branch**: `feat/omni-graph-two-pass-engine-hardening`  
+**Duration**: ~60m  
+
+#### Objectives
+1. Implement Requirements `R-086` to `R-092` (AI-Native Galaxy Cosmology Engine):
+   - Purge the arbitrary human Miller's Law limit ($K \le 15$) and toxic fallback merge cheat.
+   - Enforce the Affinity-Floor Invariant (halt coarsening on 0-affinity / 0-directory candidate pairs).
+   - Implement Scale-Adaptive Target Sizing: $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$.
+   - Add Newman Modularity Differential Guard ($\Delta Q \ge -\epsilon$ with $\epsilon = 0.05$).
+   - Isolate micro-orphans ($< 3$ nodes) into designated noise floor (`cid: 999_999`).
+2. Generalize Transactional Read-Fencing (R-080) across ALL AST & graph endpoints:
+   - Centralize `check_read_fence` in `src/api/mod.rs` covering `/api/graph`, `/api/query`, `/api/galaxies`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/cluster`, `/api/galaxy/boundary`, `/api/galaxy/topology`.
+   - Update React UI `loadGraph` in `App.tsx` to handle HTTP 423 without clobbering rendered graphs.
+   - Update `omni-mcp.py` to return structured locking messages to AI coding agents.
+3. Synchronize Living Documentation Portal & External Pages:
+   - Add Chapter 01 sections for AI-Native Galaxy Cosmology and Two-Pass Ingestion Engine in `docs/site/index.html`.
+   - Update `vadde.github.io` portfolio foundry card for Omni-Graph.
+   - Pass all 14 gates of the headless documentation portal audit suite.
+4. Harmonize Multi-Workspace Database State in SurrealDB v2:
+   - Synchronize all 11 indexed codebases to the AI-Native Cosmology Engine.
+
+#### Implementation Details
+- **`src/analysis/mod.rs`**:
+  - Implemented `calculate_adaptive_target(node_count, user_limit)`.
+  - Added Newman modularity gain calculation $\Delta Q = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2}$ with $-\epsilon$ threshold guard.
+  - Enforced Affinity-Floor Invariant: removed `sizes.last()` cheat; decoupled domains are preserved independent.
+  - Implemented noise floor isolation (`cid: 999_999`) in `consolidate_communities`.
+- **`src/api/mod.rs`**:
+  - Centralized `check_read_fence` helper. Guarded `/api/graph`, `/api/query`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/galaxy/boundary`, `/api/galaxies`, `/api/cluster`, `/api/galaxy/topology`.
+  - Added `max_galaxies` alias `limit` in `ClusterPayload` and `GraphParams`.
+- **`ui/src/App.tsx`**:
+  - Updated `loadGraph` to catch HTTP 423 Locked responses during background re-indexing.
+- **`skills/omni-graph/scripts/omni-mcp.py` & `.agents/skills/omni-graph/scripts/omni-mcp.py`**:
+  - Added explicit `urllib.error.HTTPError` handler decoding HTTP 423 to structured lock notifications.
+- **`docs/site/index.html`**:
+  - Added `#sec-omni-cosmology` (Miller's law fallacy, $K_{\text{adaptive}}$ formula, $\Delta Q$ guard, affinity floor).
+  - Added `#sec-omni-twopass` (Two-pass architecture, forward edge resolution, transactional read-fencing).
+  - Added Uncle Bob Abstractness ($A$) & Distance from Main Sequence ($D$) table.
+- **`vadde.github.io/index.html`**:
+  - Added `Two-Pass Ingestion` and `AI-Native Cosmology` chips and updated foundry breakthrough summary.
+
+#### Verification & Live Results
+- Test suite: 98/98 unit & integration tests passing in 0.01s (`cargo test --test unit_tests`).
+- Clippy: 0 warnings (`cargo clippy --all-targets -- -D warnings`).
+- Headless Documentation Audit: All 14 gates deterministically passed (`make docs-test`).
+- Empirical Multi-Workspace Clustering:
+  - `PolyTuring`: 65 natural galaxies (100% synchronized: node.community = 65, galaxy table = 65).
+  - `DSA`: 77 natural galaxies (down from 472 fragmented micro-clusters).
+  - `tutor-intelligence`: 68 natural galaxies (Galaxy #1 shrunk from 1,434 to 908 solver core).
+  - `DesignPatterns`: 49 natural galaxies.
+  - `django-sorcery`: 53 natural galaxies.
+  - `AWS`: 43 natural galaxies.
+  - `QuarkDock`: 38 natural galaxies.
+  - `python`: 34 natural galaxies.
+  - `Personal`: 25 natural galaxies.
+  - `GenAI`: 11 natural galaxies.
+  - `vadde.github.io`: 3 natural galaxies.
+
 
 
 

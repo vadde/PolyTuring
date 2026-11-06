@@ -181,6 +181,10 @@ pub struct GalaxyRecord {
     pub afferent_coupling: usize, // Ca
     pub efferent_coupling: usize, // Ce
     pub instability: f64,         // Ce / (Ca + Ce)
+    #[serde(default)]
+    pub abstractness: f64,        // A = N_abstract / N_total (R-085)
+    #[serde(default)]
+    pub distance: f64,            // D = |A + I - 1| (R-085)
     pub role: String,             // Core Foundation, Domain Service, Orchestrator
     pub key_symbols: Vec<String>,
     pub languages: Vec<String>,
@@ -195,6 +199,14 @@ pub struct GalaxySubsystemRef {
     pub dominant_path: String,
     pub instability: f64,
     pub role: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct InboundEdgeRef {
+    pub caller_id: String,
+    pub target_label: String,
+    pub edge_type: String,
+    pub category: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -551,7 +563,68 @@ impl DbClient {
         Ok(())
     }
 
-    /// Semantic search using vector cosine similarity on HNSW index (R-007, R-009, R-067)
+    /// Bulk store resolved edges in parameterized batches (R-078 Pass 2)
+    pub async fn store_resolved_edges(&self, edges: &[ExtractedEdge]) -> Result<usize, String> {
+        if edges.is_empty() {
+            return Ok(0);
+        }
+        let mut stored = 0;
+        for chunk in edges.chunks(100) {
+            let mut query = String::new();
+            for edge in chunk {
+                if let Some(target_id) = &edge.target_id {
+                    let clean_src = clean_record_id(&edge.source_id);
+                    let clean_tgt = clean_record_id(target_id);
+                    query.push_str(&format!(
+                        "LET $s = type::thing('node', '{src}');\n\
+                         LET $t = type::thing('node', '{tgt}');\n\
+                         RELATE $s->linked_to->$t SET workspace = '{ws}', type = '{t}', category = '{cat}';\n",
+                        src = surql_escape(clean_src),
+                        tgt = surql_escape(clean_tgt),
+                        ws = surql_escape(&edge.workspace),
+                        t = surql_escape(&edge.edge_type),
+                        cat = surql_escape(&edge.category)
+                    ));
+                    stored += 1;
+                }
+            }
+            if !query.is_empty() {
+                self.query_sql(&query).await?;
+            }
+        }
+        Ok(stored)
+    }
+
+    /// Fetch symbol definitions for a workspace to populate in-memory SymbolTable (R-078)
+    pub async fn get_workspace_symbol_defs(&self, workspace: &str) -> Result<Vec<(String, crate::ingestion::SymbolDef)>, String> {
+        let escaped = surql_escape(workspace);
+        let q = format!(
+            "SELECT id, label, kind, file_path, line_start FROM node WHERE workspace = '{}' AND kind != 'workspace' AND kind != 'directory' AND kind != 'file';",
+            escaped
+        );
+        let resp = self.query_sql(&q).await?;
+        let mut defs = Vec::new();
+        if let Some(arr) = resp.as_array().and_then(|r| r.first()).and_then(|r| r.get("result")).and_then(|v| v.as_array()) {
+            for item in arr {
+                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let label = item.get("label").and_then(|v| v.as_str()).unwrap_or("");
+                let kind = item.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+                let file_path = item.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+                let line_start = item.get("line_start").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                if !label.is_empty() && !id.is_empty() {
+                    defs.push((label.to_string(), crate::ingestion::SymbolDef {
+                        id: clean_record_id(id).to_string(),
+                        file_path: file_path.to_string(),
+                        kind: kind.to_string(),
+                        line_start,
+                    }));
+                }
+            }
+        }
+        Ok(defs)
+    }
+
+    /// Semantic search using native SurrealDB v2 HNSW KNN operator (R-007, R-009, R-067, R-083)
     pub async fn search_vector(
         &self,
         query_vec: &[f32],
@@ -568,28 +641,29 @@ impl DbClient {
         }
         conditions.push("kind NOT IN ['workspace', 'directory']".to_string());
         if !include_docs {
-            conditions.push("language != 'markdown' AND !string::ends_with(file_path, '.md')".to_string());
+            conditions.push("language != 'markdown'".to_string());
         }
-        conditions.push(format!("vector::similarity::cosine(embedding, {}) <= 1.0 AND vector::similarity::cosine(embedding, {}) > 0.0", vec_json, vec_json));
 
-        let where_clause = if conditions.is_empty() {
-            String::new()
-        } else {
-            format!("WHERE {}", conditions.join(" AND "))
-        };
+        let ef = (k * 4).max(40);
+        conditions.push(format!("embedding <|{}, {}|> $qvec", k, ef));
+
+        let where_clause = format!("WHERE {}", conditions.join(" AND "));
 
         let q = format!(
-            "SELECT id, workspace, label, kind, file_path, language, text, community, line_start, line_end, \
-             vector::similarity::cosine(embedding, {}) AS similarity \
-             FROM node {} ORDER BY similarity DESC LIMIT {};",
-            vec_json, where_clause, k
+            "LET $qvec = {vec};\n\
+             SELECT id, workspace, label, kind, file_path, language, text, community, line_start, line_end, \
+             vector::similarity::cosine(embedding, $qvec) AS similarity \
+             FROM node {where_clause} ORDER BY similarity DESC LIMIT {limit};",
+            vec = vec_json,
+            where_clause = where_clause,
+            limit = k
         );
 
         let resp = self.query_sql(&q).await?;
         let mut results = Vec::new();
-
-        if let Some(arr) = resp.as_array().and_then(|a| a.first()).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
-            for item in arr {
+        let arrays = extract_sql_arrays(&resp);
+        if let Some(arr) = arrays.first() {
+            for item in *arr {
                 if let Ok(res) = serde_json::from_value::<SearchResult>(item.clone()) {
                     results.push(res);
                 }
@@ -1261,6 +1335,98 @@ impl DbClient {
         Ok(())
     }
 
+    /// Retrieve all inbound caller edges pointing to symbols in a specific file (R-079)
+    pub async fn get_inbound_edges_for_file(
+        &self,
+        workspace: &str,
+        file_path: &str,
+    ) -> Result<Vec<InboundEdgeRef>, String> {
+        let esc_ws = surql_escape(workspace);
+        let esc_path = surql_escape(file_path);
+        let q = format!(
+            "LET $nodes = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{path}');\n\
+             SELECT in, out.label AS target_label, type, category FROM linked_to WHERE out IN $nodes AND in NOT IN $nodes AND category != 'CONTAINMENT';",
+            ws = esc_ws,
+            path = esc_path
+        );
+        let resp = self.query_sql(&q).await?;
+        let mut inbound = Vec::new();
+        let arrays = extract_sql_arrays(&resp);
+        if let Some(arr) = arrays.first() {
+            for item in *arr {
+                if let (Some(caller_id), Some(target_label)) = (
+                    item.get("in").and_then(|v| v.as_str()),
+                    item.get("target_label").and_then(|v| v.as_str()),
+                ) {
+                    let edge_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("CALLS").to_string();
+                    let category = item.get("category").and_then(|v| v.as_str()).unwrap_or("EXTRACTED").to_string();
+                    inbound.push(InboundEdgeRef {
+                        caller_id: caller_id.to_string(),
+                        target_label: target_label.to_string(),
+                        edge_type,
+                        category,
+                    });
+                }
+            }
+        }
+        Ok(inbound)
+    }
+
+    /// Re-link surviving inbound caller edges to newly parsed nodes by symbol label (R-079)
+    pub async fn relink_inbound_edges(
+        &self,
+        workspace: &str,
+        inbound_edges: &[InboundEdgeRef],
+        surviving_nodes: &[ExtractedNode],
+    ) -> Result<usize, String> {
+        let (query, count) = Self::build_relink_inbound_sql(workspace, inbound_edges, surviving_nodes);
+        if count > 0 {
+            self.query_sql(&query).await?;
+        }
+        Ok(count)
+    }
+
+    /// Pure function to build the SQL for relinking inbound caller edges (unit-testable)
+    pub fn build_relink_inbound_sql(
+        workspace: &str,
+        inbound_edges: &[InboundEdgeRef],
+        surviving_nodes: &[ExtractedNode],
+    ) -> (String, usize) {
+        if inbound_edges.is_empty() || surviving_nodes.is_empty() {
+            return (String::new(), 0);
+        }
+
+        let mut label_to_id: HashMap<&str, &str> = HashMap::new();
+        for node in surviving_nodes {
+            if node.kind != "file" {
+                label_to_id.insert(node.label.as_str(), node.id.as_str());
+            }
+        }
+
+        let mut query = String::new();
+        let mut relinked_count = 0;
+        let esc_ws = surql_escape(workspace);
+
+        for edge in inbound_edges {
+            if let Some(&new_target_id) = label_to_id.get(edge.target_label.as_str()) {
+                let clean_src = clean_record_id(&edge.caller_id);
+                let clean_tgt = clean_record_id(new_target_id);
+                query.push_str(&format!(
+                    "LET $s = type::thing('node', '{src}');\n\
+                     LET $t = type::thing('node', '{tgt}');\n\
+                     RELATE $s->linked_to->$t SET workspace = '{ws}', type = '{t}', category = '{cat}';\n",
+                    src = surql_escape(clean_src),
+                    tgt = surql_escape(clean_tgt),
+                    ws = esc_ws,
+                    t = surql_escape(&edge.edge_type),
+                    cat = surql_escape(&edge.category)
+                ));
+                relinked_count += 1;
+            }
+        }
+        (query, relinked_count)
+    }
+
     /// Atomic purge of ALL nodes, edges, and galaxy records for a workspace.
     /// Used by refresh-ingestion to clear zombie nodes before a clean re-scan.
     pub async fn purge_workspace(&self, workspace: &str) -> Result<u64, String> {
@@ -1408,11 +1574,13 @@ impl DbClient {
                     workspace: '{}', galaxy_id: {}, name: '{}', dominant_path: '{}', \
                     node_count: {}, internal_edges: {}, external_edges: {}, \
                     afferent_coupling: {}, efferent_coupling: {}, instability: {}, \
+                    abstractness: {}, distance: {}, \
                     role: '{}', key_symbols: {}, languages: {}, updated_at: time::now() \
                 }};\n",
                 esc_id, esc_ws, g.galaxy_id, esc_name, esc_dom,
                 g.node_count, g.internal_edges, g.external_edges,
                 g.afferent_coupling, g.efferent_coupling, g.instability,
+                g.abstractness, g.distance,
                 esc_role, key_syms_json, langs_json
             ));
         }

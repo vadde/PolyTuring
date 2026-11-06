@@ -94,6 +94,8 @@ DEFINE FIELD IF NOT EXISTS external_edges    ON TABLE galaxy TYPE int;
 DEFINE FIELD IF NOT EXISTS afferent_coupling ON TABLE galaxy TYPE int;  -- Ca (incoming cross-galaxy calls)
 DEFINE FIELD IF NOT EXISTS efferent_coupling ON TABLE galaxy TYPE int;  -- Ce (outgoing cross-galaxy calls)
 DEFINE FIELD IF NOT EXISTS instability       ON TABLE galaxy TYPE float; -- Ce / (Ca + Ce)
+DEFINE FIELD IF NOT EXISTS abstractness      ON TABLE galaxy TYPE option<float>; -- A = N_abstract / N_total (R-085)
+DEFINE FIELD IF NOT EXISTS distance          ON TABLE galaxy TYPE option<float>; -- D = |A + I - 1| (R-085)
 DEFINE FIELD IF NOT EXISTS role              ON TABLE galaxy TYPE string; -- Core Foundation, Domain Service, Orchestrator
 DEFINE FIELD IF NOT EXISTS key_symbols       ON TABLE galaxy TYPE array<string>;
 DEFINE FIELD IF NOT EXISTS languages         ON TABLE galaxy TYPE array<string>;
