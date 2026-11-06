@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
-status: review
-last_session: 2026-11-05
+status: in-progress
+last_session: 2026-11-06
 last_agent: "@antigravity"
 blockers: []
 ---
@@ -16,16 +16,26 @@ blockers: []
 
 ## Current State
 
-- **SDLC Phase**: `review`
-- **Version**: 0.6.0-rc1
+- **SDLC Phase**: `in-progress`
+- **Version**: 0.7.0-dev
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
+- **Active Specification**: [`specs/catalog/omni-graph-live-watcher-fidelity-parity.md`](../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md)
+- **Architecture Decision Record**: [`docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md`](../../docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md)
 
 ### Progress
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| Reactive Inverted Dependency Graph (R-093) | Complete | — | 🟢 ReverseDependencyIndex (`symbol_callers`) tracking foreign callers dependent on exported symbols |
+| Unresolved Edge Retention Pool (R-103) | Complete | — | 🟢 RAM `UnresolvedReferencePool` retains dangling forward references; auto-drains when targets appear |
+| Language-Aware SAIR Scoping (R-106) | Complete | — | 🟢 SymbolDef language field & extension detection; eliminates polyglot cross-language candidate leakage |
+| Autonomous Directory Backbone DAG Synthesis (R-094) | Complete | — | 🟢 Recursive ancestor synthesis up to root workspace; zero dangling directory pointers in SurrealDB |
+| Atomic Transactional Multi-Statement Swap (R-101) | Complete | — | 🟢 Single `BEGIN TRANSACTION; ... COMMIT TRANSACTION;` script; eliminates 50-250ms torn-read window |
+| Disambiguated Inbound Edge Signature Relinking (R-102) | Complete | — | 🟢 Composite `(label, kind)` signature matching; eliminates sibling struct/method collision |
+| Edge Relationship Deduplication & Call Weighting (R-104) | Complete | — | 🟢 In-memory deduplication with `call_count` and `weight`; resolves 499 duplicate groups |
+| Test Coverage | 106/106 Unit Tests | 106 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
 | Live Watcher In-Memory SAIR Acceleration (R-078, R-091) | Complete | — | 🟢 Integrated in-memory SymbolTable into IncrementalPipeline; eliminated 392s subquery bottleneck; live sync completes in <250ms with dedicated 1s quiescent trigger |
 | AI-Native Cosmology & Modularity Guard (R-086, R-087) | Complete | — | 🟢 Purged Miller's Law clamp; enforced Affinity-Floor Invariant and delta Q guard |
 | Scale-Adaptive Subsystem Sizing (R-088) | Complete | — | 🟢 Sub-linear dynamic ceiling K_adaptive(N) bounding natural domains without forced merges |

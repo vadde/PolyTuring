@@ -1,3 +1,43 @@
+### 2026-11-06 — v0.7.0 Live Watcher Fidelity Parity & Concurrency Overhaul (Milestones 1–4)
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `in-progress` (v0.7.0 Live Watcher Fidelity Parity & Concurrency Engine)  
+**Branch**: `feat/omni-graph-live-watcher-fidelity-parity`  
+**Governance**: Governed by [`ADR-002`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md) and [`SPEC-OMNI-005`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md)  
+**Duration**: Active  
+
+#### Context & Epistemic Objectives
+- Executed Mega Forensic Audit across monorepo tiers (AST, SurrealDB, TEI, Concurrency, Watcher, Clustering, REST API, MCP).
+- Identified and proved 14 structural gaps where live sync severed callers, inflated multi-edges, dropped forward references, and exposed a 50–250ms torn-read blackout window to autonomous AI coding agents.
+- Accepted ADR-002 establishing 4 foundational decisions:
+  - ADR-002.1: Transactional Atomic Batch Swap (`R-101`, `R-102`, `R-104`)
+  - ADR-002.2: Reactive Inverted Dependency Graph & Unresolved Retention (`R-093`, `R-103`, `R-106`)
+  - ADR-002.3: Zero-Overhead Concurrency & Coarsening Isolation (`R-095`, `R-096`, `R-100`)
+  - ADR-002.4: Agent-Centric Convergence Barrier & Self-Healing MCP (`R-094`, `R-097`, `R-098`, `R-099`, `R-105`)
+
+#### Key Enhancements & Forensic Proof
+1. **Milestone 1: SymbolTable In-Memory Engine Hardening (`R-093`, `R-103`, `R-106`)**:
+   - Added `language: String` to `SymbolDef`; updated `get_workspace_symbol_defs` to select `language` from SurrealDB.
+   - Enhanced 4-tier SAIR resolver in `symbol_table.rs` to detect caller language and strictly prioritize same-language symbol declarations, eliminating cross-language candidate leakage.
+   - Implemented `ReverseDependencyIndex` (`symbol_callers`) in RAM, tracking which files depend on exported symbols.
+   - Built `UnresolvedReferencePool` in RAM, retaining out-of-order forward references instead of discarding them to `/dev/null`. Auto-drains satisfied edges when declarations appear.
+   - Verified via `test_r093_reactive_reverse_dependency_resolution`, `test_r103_unresolved_edge_retention_pool`, and `test_r106_language_aware_sair_scoping`.
+2. **Milestone 2: Autonomous Directory Backbone DAG Synthesis (`R-094`)**:
+   - Added `DirectoryTreeTracker` (`known_dirs: Arc<RwLock<HashSet<String>>>`) to `IncrementalPipeline`, pre-populated via `db.get_directory_paths`.
+   - `synthesize_directory_backbone` recursively detects missing ancestor directories and emits `directory` nodes and hierarchical `CONTAINS` edges up to the workspace root.
+   - Verified via `test_r094_autonomous_directory_backbone_synthesis`.
+3. **Milestone 3 & 4: Transactional Atomic Swap & Multi-Edge Deduplication (`R-101`, `R-102`, `R-104`)**:
+   - Implemented `execute_atomic_swap` and `build_atomic_swap_sql` in `DbClient`. Combines file pruning, node upsert, edge persistence, and inbound relinking into a single atomic `BEGIN TRANSACTION; ... COMMIT TRANSACTION;` SurrealQL script, dropping network round-trips from 4 to 1 and eliminating the 50–250ms torn-read blackout window.
+   - Enhanced `InboundEdgeRef` with `target_kind: Option<String>`. Inbound relinking disambiguates sibling symbols using composite signatures `(label, kind)`.
+   - Authored `deduplicate_edges` in `DbClient` and updated `store_resolved_edges` and `/api/references`. Consolidates multiple calls into single directed links with `call_count` and `weight`, resolving 499 duplicate groups.
+   - Added exact-match fast path in `find_references` using `idx_node_label` before falling back to ends_with queries.
+   - Verified via `test_r101_atomic_transactional_multi_statement_swap`, `test_r102_disambiguated_inbound_signature_relinking`, and `test_r104_edge_relationship_deduplication`.
+4. **Test Suite Status**:
+   - 106/106 unit tests passing in 0.01s (100% green).
+   - 0 clippy warnings under `-D warnings`.
+
+---
+
 ### 2026-11-05 — Forensic Optimization: Live Watcher In-Memory SAIR Acceleration & Dedicated Quiescent Trigger
 
 **Agent/Author**: Antigravity (Google DeepMind)
