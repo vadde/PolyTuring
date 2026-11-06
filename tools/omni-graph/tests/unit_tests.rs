@@ -2653,12 +2653,14 @@ mod hardening_v050_tests {
                 id: "test-ws:src/auth.rs:UserAuth:10".to_string(),
                 file_path: "src/auth.rs".to_string(),
                 kind: "struct".to_string(),
+                language: "rust".to_string(),
                 line_start: 10,
             }),
             ("OldHelper".to_string(), SymbolDef {
                 id: "test-ws:src/old_file.rs:OldHelper:5".to_string(),
                 file_path: "src/old_file.rs".to_string(),
                 kind: "function".to_string(),
+                language: "rust".to_string(),
                 line_start: 5,
             }),
         ]);
@@ -3112,6 +3114,152 @@ def create_account():
             assignments.get("core_1").unwrap(),
             assignments.get("orphan_1").unwrap(),
             "Orphan must not pollute core cluster"
+        );
+    }
+
+    #[test]
+    fn test_r093_reactive_reverse_dependency_resolution() {
+        use omni_graph::ingestion::SymbolTable;
+
+        let mut st = SymbolTable::new();
+        let ws = "test-ws";
+
+        // Register two separate callers for TargetService
+        st.record_caller_dependency(ws, "src/caller_a.rs", "TargetService");
+        st.record_caller_dependency(ws, "src/caller_b.rs", "TargetService");
+
+        let callers = st.get_dependent_files(ws, "TargetService");
+        assert_eq!(callers.len(), 2);
+        assert!(callers.contains("src/caller_a.rs"));
+        assert!(callers.contains("src/caller_b.rs"));
+
+        // When caller_b is removed / reindexed, caller_b is pruned from dependencies
+        st.remove_file(ws, "src/caller_b.rs");
+        let remaining_callers = st.get_dependent_files(ws, "TargetService");
+        assert_eq!(remaining_callers.len(), 1);
+        assert!(remaining_callers.contains("src/caller_a.rs"));
+        assert!(!remaining_callers.contains("src/caller_b.rs"));
+    }
+
+    #[test]
+    fn test_r103_unresolved_edge_retention_pool() {
+        use omni_graph::ingestion::SymbolTable;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let mut st = SymbolTable::new();
+        let ws = "test-ws";
+
+        // 1. File A calls calculate_tax() before it is defined anywhere
+        let caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "test-ws:src/billing.rs:checkout:15".to_string(),
+            target_label: "calculate_tax".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        st.queue_edges(vec![caller_edge]);
+
+        // Resolve pass: calculate_tax cannot be resolved yet
+        let (resolved, resolved_count, dropped_count) = st.resolve_all_queued_edges();
+        assert_eq!(resolved_count, 0);
+        assert_eq!(dropped_count, 1);
+        assert_eq!(resolved.len(), 0);
+
+        // Crucial invariant (R-103): Edge is retained in pool, NOT lost!
+        assert_eq!(st.total_unresolved_retained(), 1);
+
+        // 2. Later, calculate_tax is defined in src/tax.rs
+        let tax_node = ExtractedNode {
+            id: "test-ws:src/tax.rs:calculate_tax:50".to_string(),
+            workspace: ws.to_string(),
+            label: "calculate_tax".to_string(),
+            kind: "function".to_string(),
+            file_path: "src/tax.rs".to_string(),
+            language: "rust".to_string(),
+            line_start: 50,
+            line_end: 65,
+            text: "fn calculate_tax() -> f64 { 0.08 }".to_string(),
+        };
+        st.register_file_nodes(&[tax_node]);
+
+        // 3. Drain satisfied edges for calculate_tax
+        let satisfied = st.drain_satisfied(ws, "calculate_tax");
+        assert_eq!(satisfied.len(), 1, "Drained satisfied edges must return retained edge");
+        assert_eq!(st.total_unresolved_retained(), 0, "Pool should now be empty");
+
+        // The drained edge can now resolve immediately
+        let resolved_target = st.resolve_edge(&satisfied[0]);
+        assert_eq!(
+            resolved_target,
+            Some("test-ws:src/tax.rs:calculate_tax:50".to_string()),
+            "Retained edge must resolve to the newly declared symbol"
+        );
+    }
+
+    #[test]
+    fn test_r106_language_aware_sair_scoping() {
+        use omni_graph::ingestion::SymbolTable;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let mut st = SymbolTable::new();
+        let ws = "polyglot-ws";
+
+        // Polyglot workspace defines parse_config in both Rust and Python
+        let rust_node = ExtractedNode {
+            id: "polyglot-ws:src/config.rs:parse_config:10".to_string(),
+            workspace: ws.to_string(),
+            label: "parse_config".to_string(),
+            kind: "function".to_string(),
+            file_path: "src/config.rs".to_string(),
+            language: "rust".to_string(),
+            line_start: 10,
+            line_end: 25,
+            text: "fn parse_config() {}".to_string(),
+        };
+        let python_node = ExtractedNode {
+            id: "polyglot-ws:scripts/config.py:parse_config:20".to_string(),
+            workspace: ws.to_string(),
+            label: "parse_config".to_string(),
+            kind: "function".to_string(),
+            file_path: "scripts/config.py".to_string(),
+            language: "python".to_string(),
+            line_start: 20,
+            line_end: 35,
+            text: "def parse_config(): pass".to_string(),
+        };
+        st.register_file_nodes(&[rust_node, python_node]);
+
+        // Caller 1: Rust file calls parse_config
+        let rust_caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "polyglot-ws:src/main.rs:run:5".to_string(),
+            target_label: "parse_config".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let rust_target = st.resolve_edge(&rust_caller_edge);
+        assert_eq!(
+            rust_target,
+            Some("polyglot-ws:src/config.rs:parse_config:10".to_string()),
+            "Rust caller must link to Rust candidate"
+        );
+
+        // Caller 2: Python file calls parse_config
+        let python_caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "polyglot-ws:scripts/run.py:execute:8".to_string(),
+            target_label: "parse_config".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let python_target = st.resolve_edge(&python_caller_edge);
+        assert_eq!(
+            python_target,
+            Some("polyglot-ws:scripts/config.py:parse_config:20".to_string()),
+            "Python caller must link to Python candidate"
         );
     }
 }

@@ -599,7 +599,7 @@ impl DbClient {
     pub async fn get_workspace_symbol_defs(&self, workspace: &str) -> Result<Vec<(String, crate::ingestion::SymbolDef)>, String> {
         let escaped = surql_escape(workspace);
         let q = format!(
-            "SELECT id, label, kind, file_path, line_start FROM node WHERE workspace = '{}' AND kind != 'workspace' AND kind != 'directory' AND kind != 'file';",
+            "SELECT id, label, kind, file_path, language, line_start FROM node WHERE workspace = '{}' AND kind != 'workspace' AND kind != 'directory' AND kind != 'file';",
             escaped
         );
         let resp = self.query_sql(&q).await?;
@@ -610,12 +610,14 @@ impl DbClient {
                 let label = item.get("label").and_then(|v| v.as_str()).unwrap_or("");
                 let kind = item.get("kind").and_then(|v| v.as_str()).unwrap_or("");
                 let file_path = item.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+                let language = item.get("language").and_then(|v| v.as_str()).unwrap_or("");
                 let line_start = item.get("line_start").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
                 if !label.is_empty() && !id.is_empty() {
                     defs.push((label.to_string(), crate::ingestion::SymbolDef {
                         id: clean_record_id(id).to_string(),
                         file_path: file_path.to_string(),
                         kind: kind.to_string(),
+                        language: language.to_string(),
                         line_start,
                     }));
                 }

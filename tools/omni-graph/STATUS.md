@@ -1,21 +1,22 @@
 ---
 tool: omni-graph
-status: review
-version: 0.6.0-rc1
+status: in-progress
+version: 0.7.0-dev
 language: rust
 category: GenAI
 created: 2026-09-24
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
 nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 hardening_spec: ../../specs/catalog/omni-graph-two-pass-engine-hardening.md
 cosmology_spec: ../../specs/catalog/omni-graph-ai-native-galaxy-cosmology.md
+fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 ---
 
 # SDLC Status
 
-## Current Phase: `review`
+## Current Phase: `in-progress`
 
 ### Status Definitions
 
@@ -50,6 +51,7 @@ cosmology_spec: ../../specs/catalog/omni-graph-ai-native-galaxy-cosmology.md
 | 2026-11-05 | `testing` | `review` | Rebuilt Docker backend & UI, empirically verified live ingestion, HNSW KNN search (83ms), natural 15-galaxy convergence, and Uncle Bob metrics on django-sorcery. Traceability matrix 100% complete. |
 | 2026-11-05 | `review` | `review` | Implement AI-Native Galaxy Cosmology (R-086 to R-092): Purge Miller's Law clamp, enforce Affinity-Floor Invariant, modularity differential guard, sub-linear scale-adaptive sizing, and noise floor isolation. Synchronized PolyTuring (65 galaxies) and verified tutor-intelligence (68), DesignPatterns (49), and django-sorcery (53). 98 unit tests pass. |
 | 2026-11-05 | `review` | `review` | Forensic resolution of watcher 392s subquery bottleneck: Integrated in-memory SymbolTable (R-078/R-091) into IncrementalPipeline with parameterized batch edge resolution, dedicated 1s quiescent auto-cluster trigger, and test_r091 (99 unit tests pass). |
+| 2026-11-06 | `review` | `in-progress` | Launch v0.7.0 Live Watcher Fidelity Parity & Concurrency Overhaul (ADR-002, SPEC-OMNI-005, R-093 to R-109): Closing 14 forensic loopholes across transactional atomic batch swap, reactive reverse dependencies, unresolved retention pool, deduplication, and non-blocking Louvain actor. |
 
 ---
 
