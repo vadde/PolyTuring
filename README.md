@@ -83,8 +83,8 @@ make status
 
 | Tool | Category | Language | Status | Description |
 |------|----------|----------|--------|-------------|
-| [omni-graph](tools/omni-graph/) | GenAI & ML | Rust / React | `in-progress` v0.4.0 | 100% local semantic knowledge hub modeling codebases as AST graphs + vector embeddings with FIFO task queue, OpenAPI 3.0 explorer, and strict &lt;1500 token Graph-RAG SLA. |
-| [session-explorer](tools/session-explorer/) | GenAI & ML | Go / Bun | `review` v0.3.0 | High-performance, single-binary conversation intelligence browser and real-time observability cockpit for agent coding transcripts. |
+| [omni-graph](tools/omni-graph/) | GenAI & ML | Rust / React | `in-progress` | 100% local semantic knowledge hub modeling codebases as AST graphs + vector embeddings with real-time live sync, 3D galaxy clustering, and strict &lt;1500 token Graph-RAG SLA. |
+| [session-explorer](tools/session-explorer/) | GenAI & ML | Go / Bun | `released` v0.3.6 | High-performance, single-binary conversation intelligence browser and real-time observability cockpit for agent coding transcripts. |
 
 📖 **Living Documentation Portal**: [https://vadde.github.io/PolyTuring/](https://vadde.github.io/PolyTuring/) · Or run `make docs-serve` locally.
 
