@@ -97,6 +97,7 @@ Use this table to translate any codebase reconnaissance intent across MCP, CLI, 
 | **List Workspaces & Stats**| *(Via CLI or REST)* | `./scripts/omni workspaces` | `curl -s "http://localhost:8080/api/workspaces"` |
 | **Git Worktrees List/Sync** | *(Via CLI or REST)* | `./scripts/omni worktrees sync` | `curl -s -X POST http://localhost:8080/api/worktrees/sync -H "Content-Type: application/json" -d '{}'` |
 | **Watcher Telemetry** | *(Via CLI or REST)* | `./scripts/omni watch status` | `curl -s "http://localhost:8080/api/watch/status"` |
+| **Nanometer Fidelity Diagnostics** | *(Via CLI or REST)* | `./scripts/omni watch fidelity` | `curl -s "http://localhost:8080/api/watch/fidelity?workspace=PolyTuring"` |
 | **System Health Check** | *(Via CLI or REST)* | `./scripts/omni health` | `curl -s "http://localhost:8080/api/health"` |
 
 ---
@@ -291,7 +292,7 @@ Returns all inbound references, callers, and structural relationships pointing t
 ```
 
 * **The Blast-Radius Risk Matrix**:
-  * `type: "CALLS"`: **Active Execution Callers**. Modifying the target's parameters, return type, or side effects will break these functions.
+  * `type: "CALLS"`: **Active Execution Callers**. Modifying the target's parameters, return type, or side effects will break these functions. In v0.7.0+, duplicate calls are deduplicated into distinct caller entities with exact `call_count` and cumulative `weight` (R-104).
   * `type: "IMPORTS"`: **Module Dependents**. Renaming or moving the target symbol requires updating import statements in these files.
   * `type: "CONTAINS"`: **Parent / Child Containment**.
     * Querying a symbol: points up to its enclosing `file` node.
@@ -299,6 +300,10 @@ Returns all inbound references, callers, and structural relationships pointing t
   * `type: "CONTAINS_FILE"`: **Directory File Membership**. Points from parent directory to the child file.
   * `type: "CONTAINS_DIR"`: **Directory Tree Hierarchy**. Points from parent directory down to child directory.
   * `type: "IMPLEMENTS"` / `"EXTENDS"`: **Polymorphic Hierarchy**. Identifies structs or classes inheriting from this interface/base class.
+* **Transactional Convergence & Generational Cache (v0.7.0+)**:
+  * **Zero Torn-Reads (`wait_for_sync=true`)**: MCP and CLI automatically pass `wait_for_sync=true`, awaiting internal live-watcher convergence up to 3,000ms. Endpoints return guaranteed fresh AST ground truth without race conditions during live file edits.
+  * **Generational Cache Invalidation (`X-Graph-Generation`)**: Every database mutation increments a lock-free 64-bit atomic counter (`X-Graph-Generation`). Inspect this header to detect state mutations without polling.
+  * **Nanometer Fidelity Diagnostics**: Run `./scripts/omni watch fidelity` or query `GET /api/watch/fidelity?workspace=PolyTuring` to verify 100% topological parity (`fidelity_score: 1.0`, `dangling_directory_edges: 0`).
 * **Hierarchical Traversal (Files & Directories)**:
   * To list all symbols in a file without reading disk: `omni_references(symbol="src/watcher/mod.rs")` (filters `type: CONTAINS`).
   * To inspect directory structure: `omni_references(symbol="watcher")` (reveals parent directory and contained files).

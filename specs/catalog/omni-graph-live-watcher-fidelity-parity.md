@@ -1,7 +1,7 @@
 # ⚡ Omni-Graph Spec: Live Watcher Fidelity Parity & Reactive Concurrency Engine
 
 > **Document ID**: `SPEC-OMNI-005`  
-> **Status**: `spec-review`  
+> **Status**: `implemented`  
 > **Target Version**: `v0.7.0`  
 > **Author**: Antigravity (Google DeepMind) & `@vadde`  
 > **Date**: 2026-11-06  
