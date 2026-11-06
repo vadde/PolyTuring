@@ -403,12 +403,20 @@ async fn run_watcher(
     if let Ok(hashes) = db.get_file_hashes(&workspace).await {
         cache.populate(hashes).await;
     }
-    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache);
+    let symbol_table = Arc::new(tokio::sync::RwLock::new(crate::ingestion::SymbolTable::new()));
+    if let Ok(raw_symbols) = db.get_workspace_symbol_defs(&workspace).await {
+        let count = raw_symbols.len();
+        symbol_table.write().await.register_raw_symbols(&workspace, raw_symbols);
+        info!("Initialized watcher symbol table with {} symbols for '{}'", count, workspace);
+    }
+    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache, symbol_table);
     let debounce_duration = Duration::from_millis(debounce_ms);
     let mut pending_events: Vec<Event> = Vec::new();
     let mut last_batch_time = Instant::now();
     let mut sweep_interval = tokio::time::interval(Duration::from_secs(30));
     sweep_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut quiescence_interval = tokio::time::interval(Duration::from_millis(1000));
+    quiescence_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let root_path = PathBuf::from(&path);
     let mut gitignore = load_workspace_gitignore(&root_path);
     let mut total_sync_ms: u64 = 0;
@@ -634,9 +642,11 @@ async fn run_watcher(
                     }
                     info!("Periodic sweep pruned {} missing files in '{}'", pruned.len(), workspace);
                 }
+            }
 
-                // Quiescent auto-clustering: If files have changed and editing has paused for >= 3.5 seconds,
-                // automatically recompute communities in memory, update DB, and emit SSE notification.
+            // Quiescent auto-clustering: If files have changed and editing has paused for >= 3.5 seconds,
+            // automatically recompute communities in memory, update DB, and emit SSE notification.
+            _ = quiescence_interval.tick() => {
                 if files_changed_since_cluster > 0 && last_event_processed_time.elapsed() >= Duration::from_millis(3500) {
                     info!("Quiescent period detected for '{}' ({} pending changes) -> auto-reclustering galaxies...", workspace, files_changed_since_cluster);
                     if let Ok((nodes, links)) = db.get_graph(Some(&workspace)).await {
@@ -659,6 +669,7 @@ async fn run_watcher(
 
                                 let mut s = status.write().await;
                                 s.cluster_status = "live".to_string();
+                                s.last_cluster_at = Some(chrono::Utc::now().to_rfc3339());
                                 let _ = event_tx.send(WatchEvent {
                                     workspace: workspace.clone(),
                                     kind: "ClustersRefreshed".to_string(),

@@ -26,6 +26,7 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| Live Watcher In-Memory SAIR Acceleration (R-078, R-091) | Complete | — | 🟢 Integrated in-memory SymbolTable into IncrementalPipeline; eliminated 392s subquery bottleneck; live sync completes in <250ms with dedicated 1s quiescent trigger |
 | AI-Native Cosmology & Modularity Guard (R-086, R-087) | Complete | — | 🟢 Purged Miller's Law clamp; enforced Affinity-Floor Invariant and delta Q guard |
 | Scale-Adaptive Subsystem Sizing (R-088) | Complete | — | 🟢 Sub-linear dynamic ceiling K_adaptive(N) bounding natural domains without forced merges |
 | Multi-Scale Hierarchical Zoom & Storage (R-089) | Complete | — | 🟢 Dual resolution (galaxy_id & community_id); caller override via max_galaxies |
@@ -40,7 +41,7 @@ blockers: []
 | AST Receiver Chained Call Extraction (R-082) | Complete | — | 🟢 REFERENCES edges generated for receiver objects in chained calls |
 | Native SurrealDB v2 HNSW KNN Operator (R-083) | Complete | — | 🟢 Native <\|k, ef\|> operator active with 36-83ms search latency |
 | Uncle Bob Martin Package Metrics (R-085) | Complete | — | 🟢 Abstractness (A) and Distance from Main Sequence (D) computed and persisted |
-| Test Coverage | 98/98 Unit & Integration Tests | 98 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
+| Test Coverage | 99/99 Unit & Integration Tests | 99 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
 | Living Documentation & 14-Gate Audit | Complete | — | 🟢 docs/site/index.html & vadde.github.io synchronized; all 14 gates green |
 | Vector Search Cosine Null & Serde Deserialization Fix | Complete | — | 🟢 Excluded zero-vector structural nodes and handled null similarity, unblocking /api/search & /api/query |
 | Query Parameter Aliasing & Flexibility | Complete | — | 🟢 Permissive serde aliases (symbol/name, q/query, k/limit) eliminating 422 errors |

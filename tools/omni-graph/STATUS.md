@@ -49,6 +49,7 @@ cosmology_spec: ../../specs/catalog/omni-graph-ai-native-galaxy-cosmology.md
 | 2026-11-05 | `in-progress` | `testing` | Implement Two-Pass Ingestion Engine (`symbol_table.rs`), Retentive Delta-Sync (`relink_inbound_edges`), Transactional Read-Fence (HTTP 423), Vector Chunking (256/batch), AST Receiver Preservation, True HNSW KNN `<|k, ef|>`, Hierarchical Leiden Coarsening, and Uncle Bob metrics ($A, D$). 95 unit tests pass (100% green). |
 | 2026-11-05 | `testing` | `review` | Rebuilt Docker backend & UI, empirically verified live ingestion, HNSW KNN search (83ms), natural 15-galaxy convergence, and Uncle Bob metrics on django-sorcery. Traceability matrix 100% complete. |
 | 2026-11-05 | `review` | `review` | Implement AI-Native Galaxy Cosmology (R-086 to R-092): Purge Miller's Law clamp, enforce Affinity-Floor Invariant, modularity differential guard, sub-linear scale-adaptive sizing, and noise floor isolation. Synchronized PolyTuring (65 galaxies) and verified tutor-intelligence (68), DesignPatterns (49), and django-sorcery (53). 98 unit tests pass. |
+| 2026-11-05 | `review` | `review` | Forensic resolution of watcher 392s subquery bottleneck: Integrated in-memory SymbolTable (R-078/R-091) into IncrementalPipeline with parameterized batch edge resolution, dedicated 1s quiescent auto-cluster trigger, and test_r091 (99 unit tests pass). |
 
 ---
 

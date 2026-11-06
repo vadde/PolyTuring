@@ -2642,6 +2642,74 @@ mod hardening_v050_tests {
     }
 
     #[test]
+    fn test_r091_watcher_symbol_table_lifecycle() {
+        use omni_graph::ingestion::{SymbolDef, SymbolTable};
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+        let mut st = SymbolTable::new();
+
+        // 1. Populate raw symbols (simulating DB query at watcher startup)
+        st.register_raw_symbols("test-ws", vec![
+            ("UserAuth".to_string(), SymbolDef {
+                id: "test-ws:src/auth.rs:UserAuth:10".to_string(),
+                file_path: "src/auth.rs".to_string(),
+                kind: "struct".to_string(),
+                line_start: 10,
+            }),
+            ("OldHelper".to_string(), SymbolDef {
+                id: "test-ws:src/old_file.rs:OldHelper:5".to_string(),
+                file_path: "src/old_file.rs".to_string(),
+                kind: "function".to_string(),
+                line_start: 5,
+            }),
+        ]);
+
+        assert_eq!(st.total_symbols(), 2);
+
+        // 2. Incremental update: modify src/auth.rs (remove old symbols, register updated node)
+        st.remove_file("test-ws", "src/auth.rs");
+        assert_eq!(st.total_symbols(), 1);
+
+        let updated_auth_node = ExtractedNode {
+            id: "test-ws:src/auth.rs:UserAuth:15".to_string(),
+            workspace: "test-ws".to_string(),
+            label: "UserAuth".to_string(),
+            kind: "struct".to_string(),
+            file_path: "src/auth.rs".to_string(),
+            language: "rust".to_string(),
+            line_start: 15,
+            line_end: 30,
+            text: "pub struct UserAuth;".to_string(),
+        };
+        st.register_file_nodes(&[updated_auth_node]);
+        assert_eq!(st.total_symbols(), 2);
+
+        // 3. Resolve an edge targeting UserAuth
+        let edge = ExtractedEdge {
+            workspace: "test-ws".to_string(),
+            source_id: "test-ws:src/main.rs:run:4".to_string(),
+            target_label: "UserAuth".to_string(),
+            target_id: None,
+            edge_type: "USES".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let target_id = st.resolve_edge(&edge);
+        assert_eq!(target_id, Some("test-ws:src/auth.rs:UserAuth:15".to_string()));
+
+        // 4. File rename lifecycle
+        st.rename_file("test-ws", "src/old_file.rs", "src/new_file.rs");
+        let helper_edge = ExtractedEdge {
+            workspace: "test-ws".to_string(),
+            source_id: "test-ws:src/main.rs:run:4".to_string(),
+            target_label: "OldHelper".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let resolved_helper = st.resolve_edge(&helper_edge);
+        assert_eq!(resolved_helper, Some("test-ws:src/old_file.rs:OldHelper:5".to_string()));
+    }
+
+    #[test]
     fn test_r082_ast_receiver_preservation() {
         use omni_graph::parser::CodeParser;
 

@@ -3,25 +3,34 @@
 
 use crate::db::DbClient;
 use crate::embedder::EmbedderClient;
-use crate::ingestion::FileCache;
+use crate::ingestion::{FileCache, SymbolTable};
 use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 pub struct IncrementalPipeline {
     db: DbClient,
     embedder: EmbedderClient,
     cache: FileCache,
+    symbol_table: Arc<RwLock<SymbolTable>>,
 }
 
 impl IncrementalPipeline {
-    pub fn new(db: DbClient, embedder: EmbedderClient, cache: FileCache) -> Self {
+    pub fn new(
+        db: DbClient,
+        embedder: EmbedderClient,
+        cache: FileCache,
+        symbol_table: Arc<RwLock<SymbolTable>>,
+    ) -> Self {
         Self {
             db,
             embedder,
             cache,
+            symbol_table,
         }
     }
 
@@ -163,12 +172,46 @@ impl IncrementalPipeline {
             return Err(e);
         }
 
-        // 5. Store new edges
-        if let Err(e) = self.db.store_edges(&all_edges).await {
-            warn!("Failed to store edges during live sync for '{}': {}", rel_path, e);
+        // 5. In-Memory SAIR Edge Resolution (R-078)
+        let mut containment_edges = Vec::new();
+        let mut cross_file_edges = Vec::new();
+        for edge in all_edges {
+            if edge.target_id.is_some() {
+                containment_edges.push(edge);
+            } else {
+                cross_file_edges.push(edge);
+            }
         }
 
-        // 5b. Re-link surviving inbound caller edges to new symbol node IDs (R-079)
+        let imported_symbols: Vec<String> = cross_file_edges
+            .iter()
+            .filter(|e| e.edge_type == "IMPORTS")
+            .map(|e| e.target_label.clone())
+            .collect();
+
+        let mut resolved_edges = containment_edges;
+        {
+            let mut st = self.symbol_table.write().await;
+            st.remove_file(workspace, rel_path);
+            st.register_file_nodes(&all_nodes);
+            st.register_file_imports(workspace, rel_path, &imported_symbols);
+
+            for mut edge in cross_file_edges {
+                if let Some(target_id) = st.resolve_edge(&edge) {
+                    edge.target_id = Some(target_id);
+                    resolved_edges.push(edge);
+                }
+            }
+        }
+
+        // 5b. Bulk store resolved edges (parameterized batch insert, zero SurrealQL subqueries)
+        if !resolved_edges.is_empty() {
+            if let Err(e) = self.db.store_resolved_edges(&resolved_edges).await {
+                warn!("Failed to store resolved edges during live sync for '{}': {}", rel_path, e);
+            }
+        }
+
+        // 5c. Re-link surviving inbound caller edges to new symbol node IDs (R-079)
         if !inbound_edges.is_empty() {
             if let Ok(relinked) = self.db.relink_inbound_edges(workspace, &inbound_edges, &all_nodes).await {
                 if relinked > 0 {
@@ -177,7 +220,7 @@ impl IncrementalPipeline {
             }
         }
 
-        // 5. Update staleness cache
+        // 6. Update staleness cache
         self.cache.update(rel_path, &hash).await;
 
         info!(
@@ -185,7 +228,7 @@ impl IncrementalPipeline {
             rel_path,
             workspace,
             all_nodes.len(),
-            all_edges.len()
+            resolved_edges.len()
         );
 
         Ok(())
@@ -194,6 +237,10 @@ impl IncrementalPipeline {
     /// Prune nodes and relations for a deleted file
     pub async fn delete_file(&self, workspace: &str, rel_path: &str) -> Result<(), String> {
         info!("Pruning deleted file '{}' from workspace '{}'", rel_path, workspace);
+        {
+            let mut st = self.symbol_table.write().await;
+            st.remove_file(workspace, rel_path);
+        }
         self.db.delete_file(workspace, rel_path).await?;
         self.cache.remove(rel_path).await;
         Ok(())
@@ -210,6 +257,10 @@ impl IncrementalPipeline {
             "Renaming file '{}' -> '{}' in workspace '{}'",
             old_path, new_path, workspace
         );
+        {
+            let mut st = self.symbol_table.write().await;
+            st.rename_file(workspace, old_path, new_path);
+        }
         self.db.rename_file(workspace, old_path, new_path).await?;
         self.cache.rename(old_path, new_path).await;
         Ok(())

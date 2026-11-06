@@ -595,6 +595,35 @@ impl DbClient {
         Ok(stored)
     }
 
+    /// Fetch symbol definitions for a workspace to populate in-memory SymbolTable (R-078)
+    pub async fn get_workspace_symbol_defs(&self, workspace: &str) -> Result<Vec<(String, crate::ingestion::SymbolDef)>, String> {
+        let escaped = surql_escape(workspace);
+        let q = format!(
+            "SELECT id, label, kind, file_path, line_start FROM node WHERE workspace = '{}' AND kind != 'workspace' AND kind != 'directory' AND kind != 'file';",
+            escaped
+        );
+        let resp = self.query_sql(&q).await?;
+        let mut defs = Vec::new();
+        if let Some(arr) = resp.as_array().and_then(|r| r.first()).and_then(|r| r.get("result")).and_then(|v| v.as_array()) {
+            for item in arr {
+                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let label = item.get("label").and_then(|v| v.as_str()).unwrap_or("");
+                let kind = item.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+                let file_path = item.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+                let line_start = item.get("line_start").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                if !label.is_empty() && !id.is_empty() {
+                    defs.push((label.to_string(), crate::ingestion::SymbolDef {
+                        id: clean_record_id(id).to_string(),
+                        file_path: file_path.to_string(),
+                        kind: kind.to_string(),
+                        line_start,
+                    }));
+                }
+            }
+        }
+        Ok(defs)
+    }
+
     /// Semantic search using native SurrealDB v2 HNSW KNN operator (R-007, R-009, R-067, R-083)
     pub async fn search_vector(
         &self,

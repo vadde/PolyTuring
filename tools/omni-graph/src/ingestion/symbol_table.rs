@@ -57,6 +57,45 @@ impl SymbolTable {
         }
     }
 
+    /// Register raw symbol definitions (used to populate SymbolTable from database on watcher boot)
+    pub fn register_raw_symbols(&mut self, workspace: &str, raw_symbols: Vec<(String, SymbolDef)>) {
+        for (label, def) in raw_symbols {
+            self.symbols
+                .entry((workspace.to_string(), label))
+                .or_default()
+                .push(def);
+        }
+    }
+
+    /// Remove all symbol definitions and imports associated with a specific file (incremental update)
+    pub fn remove_file(&mut self, workspace: &str, file_path: &str) {
+        self.symbols.retain(|(ws, _), defs| {
+            if ws == workspace {
+                defs.retain(|d| d.file_path != file_path);
+                !defs.is_empty()
+            } else {
+                true
+            }
+        });
+        self.file_imports.remove(&(workspace.to_string(), file_path.to_string()));
+    }
+
+    /// Update file path references when a file is renamed
+    pub fn rename_file(&mut self, workspace: &str, old_path: &str, new_path: &str) {
+        for ((ws, _), defs) in self.symbols.iter_mut() {
+            if ws == workspace {
+                for def in defs.iter_mut() {
+                    if def.file_path == old_path {
+                        def.file_path = new_path.to_string();
+                    }
+                }
+            }
+        }
+        if let Some(imports) = self.file_imports.remove(&(workspace.to_string(), old_path.to_string())) {
+            self.file_imports.insert((workspace.to_string(), new_path.to_string()), imports);
+        }
+    }
+
     /// Queue unresolved cross-file edges for deferred resolution in Pass 2
     pub fn queue_edges(&mut self, edges: Vec<ExtractedEdge>) {
         for edge in edges {
