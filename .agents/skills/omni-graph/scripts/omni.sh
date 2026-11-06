@@ -29,7 +29,7 @@ Commands:
   cluster [workspace]        Run Louvain/Leiden community detection clustering
   galaxies [workspace]       Inspect architectural galaxy subsystems
   ingest <path> [project]    Index a codebase/directory into SurrealDB
-  watch <start|stop|status>  Dynamic live delta sync and file watching
+  watch <start|stop|status|fidelity|events> Dynamic live delta sync, watching & fidelity diagnostics
   stats                      Show aggregated graph stats
 EOF
   exit 1
@@ -438,12 +438,45 @@ except Exception as e:
     print(f'❌ Error: {e}')
 "
         ;;
+      fidelity)
+        WS="$(norm_ws "${1:-}")"
+        python3 -c "
+import urllib.request, urllib.parse, json, sys
+url = '${ENDPOINT}/api/watch/fidelity'
+if sys.argv[1]:
+    url += '?' + urllib.parse.urlencode({'workspace': sys.argv[1]})
+req = urllib.request.Request(url)
+try:
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read().decode())
+        ws = data.get('workspace') or 'All Workspaces'
+        score = data.get('fidelity_score', 1.0)
+        state = data.get('convergence_state', 'converged')
+        gen = data.get('graph_generation', 0)
+        nodes = data.get('node_count', 0)
+        edges = data.get('edge_count', 0)
+        dangling = data.get('dangling_directory_edges', 0)
+        unresolved = data.get('unresolved_edges', 0)
+        rev_inval = data.get('reverse_invalidation_count', 0)
+        print(f'🔬 Nanometer Fidelity Diagnostics for [{ws}]:\n')
+        print(f'  • Fidelity Score:            {score:.4f} ({\"100% Relational Parity\" if score == 1.0 else \"Degraded\"})')
+        print(f'  • Convergence State:         {state.upper()}')
+        print(f'  • Graph Generation:          #{gen}')
+        print(f'  • Total Graph Nodes:         {nodes:,}')
+        print(f'  • Total Graph Edges:         {edges:,}')
+        print(f'  • Dangling Directory Edges:  {dangling}')
+        print(f'  • Unresolved Forward Edges:  {unresolved}')
+        print(f'  • Reverse Invalidations:     {rev_inval}')
+except Exception as e:
+    print(f'❌ Error querying fidelity: {e}')
+" "${WS}"
+        ;;
       events)
         echo "📡 Streaming live delta events from ${ENDPOINT}/api/watch/events (Ctrl+C to stop)..."
         curl -N -s "${ENDPOINT}/api/watch/events"
         ;;
       *)
-        echo "Usage: omni.sh watch <start|stop|status|events>"
+        echo "Usage: omni.sh watch <start|stop|status|fidelity|events>"
         exit 1
         ;;
     esac

@@ -58,6 +58,20 @@ All specs MUST have:
 
 ---
 
+## Active Specifications Catalog
+
+| Spec File | Tool / Domain | Target Version | Status | Governing ADR |
+|:---|:---|:---|:---|:---|
+| [`catalog/omni-graph.md`](catalog/omni-graph.md) | Omni-Graph | `v0.1.0` | `implemented` | — |
+| [`catalog/omni-graph-nextgen.md`](catalog/omni-graph-nextgen.md) | Omni-Graph | `v0.3.0` | `implemented` | — |
+| [`catalog/omni-graph-two-pass-engine-hardening.md`](catalog/omni-graph-two-pass-engine-hardening.md) | Omni-Graph | `v0.5.0` | `implemented` | — |
+| [`catalog/omni-graph-ai-native-galaxy-cosmology.md`](catalog/omni-graph-ai-native-galaxy-cosmology.md) | Omni-Graph | `v0.6.0` | `implemented` | — |
+| [`catalog/omni-graph-live-watcher-fidelity-parity.md`](catalog/omni-graph-live-watcher-fidelity-parity.md) | Omni-Graph | `v0.7.0` | `implemented` | [`ADR-002`](../docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md), [`ADR-003`](../docs/architecture/adr-003-matlab-simulink-mbse-graph-ingestion.md) |
+| [`catalog/omni-graph-ingestion-openapi-ux.md`](catalog/omni-graph-ingestion-openapi-ux.md) | Omni-Graph | `v0.4.0` | `implemented` | — |
+| [`catalog/session-explorer.md`](catalog/session-explorer.md) | Session Explorer | `v0.1.0` | `implemented` | — |
+
+---
+
 ## Quick Links
 
 - [Tool Spec Template](_templates/tool-spec.md)

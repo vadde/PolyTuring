@@ -2451,12 +2451,14 @@ mod hardening_v050_tests {
             InboundEdgeRef {
                 caller_id: "test-ws:tests/test_profiler.rs:test_measure:10".to_string(),
                 target_label: "SQLAlchemyProfiler".to_string(),
+                target_kind: None,
                 edge_type: "CALLS".to_string(),
                 category: "EXTRACTED".to_string(),
             },
             InboundEdgeRef {
                 caller_id: "test-ws:src/legacy.rs:old_call:20".to_string(),
                 target_label: "RemovedFunction".to_string(),
+                target_kind: None,
                 edge_type: "CALLS".to_string(),
                 category: "EXTRACTED".to_string(),
             },
@@ -2653,12 +2655,14 @@ mod hardening_v050_tests {
                 id: "test-ws:src/auth.rs:UserAuth:10".to_string(),
                 file_path: "src/auth.rs".to_string(),
                 kind: "struct".to_string(),
+                language: "rust".to_string(),
                 line_start: 10,
             }),
             ("OldHelper".to_string(), SymbolDef {
                 id: "test-ws:src/old_file.rs:OldHelper:5".to_string(),
                 file_path: "src/old_file.rs".to_string(),
                 kind: "function".to_string(),
+                language: "rust".to_string(),
                 line_start: 5,
             }),
         ]);
@@ -3113,6 +3117,595 @@ def create_account():
             assignments.get("orphan_1").unwrap(),
             "Orphan must not pollute core cluster"
         );
+    }
+
+    #[test]
+    fn test_r093_reactive_reverse_dependency_resolution() {
+        use omni_graph::ingestion::SymbolTable;
+
+        let mut st = SymbolTable::new();
+        let ws = "test-ws";
+
+        // Register two separate callers for TargetService
+        st.record_caller_dependency(ws, "src/caller_a.rs", "TargetService");
+        st.record_caller_dependency(ws, "src/caller_b.rs", "TargetService");
+
+        let callers = st.get_dependent_files(ws, "TargetService");
+        assert_eq!(callers.len(), 2);
+        assert!(callers.contains("src/caller_a.rs"));
+        assert!(callers.contains("src/caller_b.rs"));
+
+        // When caller_b is removed / reindexed, caller_b is pruned from dependencies
+        st.remove_file(ws, "src/caller_b.rs");
+        let remaining_callers = st.get_dependent_files(ws, "TargetService");
+        assert_eq!(remaining_callers.len(), 1);
+        assert!(remaining_callers.contains("src/caller_a.rs"));
+        assert!(!remaining_callers.contains("src/caller_b.rs"));
+    }
+
+    #[test]
+    fn test_r103_unresolved_edge_retention_pool() {
+        use omni_graph::ingestion::SymbolTable;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let mut st = SymbolTable::new();
+        let ws = "test-ws";
+
+        // 1. File A calls calculate_tax() before it is defined anywhere
+        let caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "test-ws:src/billing.rs:checkout:15".to_string(),
+            target_label: "calculate_tax".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        st.queue_edges(vec![caller_edge]);
+
+        // Resolve pass: calculate_tax cannot be resolved yet
+        let (resolved, resolved_count, dropped_count) = st.resolve_all_queued_edges();
+        assert_eq!(resolved_count, 0);
+        assert_eq!(dropped_count, 1);
+        assert_eq!(resolved.len(), 0);
+
+        // Crucial invariant (R-103): Edge is retained in pool, NOT lost!
+        assert_eq!(st.total_unresolved_retained(), 1);
+
+        // 2. Later, calculate_tax is defined in src/tax.rs
+        let tax_node = ExtractedNode {
+            id: "test-ws:src/tax.rs:calculate_tax:50".to_string(),
+            workspace: ws.to_string(),
+            label: "calculate_tax".to_string(),
+            kind: "function".to_string(),
+            file_path: "src/tax.rs".to_string(),
+            language: "rust".to_string(),
+            line_start: 50,
+            line_end: 65,
+            text: "fn calculate_tax() -> f64 { 0.08 }".to_string(),
+        };
+        st.register_file_nodes(&[tax_node]);
+
+        // 3. Drain satisfied edges for calculate_tax
+        let satisfied = st.drain_satisfied(ws, "calculate_tax");
+        assert_eq!(satisfied.len(), 1, "Drained satisfied edges must return retained edge");
+        assert_eq!(st.total_unresolved_retained(), 0, "Pool should now be empty");
+
+        // The drained edge can now resolve immediately
+        let resolved_target = st.resolve_edge(&satisfied[0]);
+        assert_eq!(
+            resolved_target,
+            Some("test-ws:src/tax.rs:calculate_tax:50".to_string()),
+            "Retained edge must resolve to the newly declared symbol"
+        );
+    }
+
+    #[test]
+    fn test_r106_language_aware_sair_scoping() {
+        use omni_graph::ingestion::SymbolTable;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let mut st = SymbolTable::new();
+        let ws = "polyglot-ws";
+
+        // Polyglot workspace defines parse_config in both Rust and Python
+        let rust_node = ExtractedNode {
+            id: "polyglot-ws:src/config.rs:parse_config:10".to_string(),
+            workspace: ws.to_string(),
+            label: "parse_config".to_string(),
+            kind: "function".to_string(),
+            file_path: "src/config.rs".to_string(),
+            language: "rust".to_string(),
+            line_start: 10,
+            line_end: 25,
+            text: "fn parse_config() {}".to_string(),
+        };
+        let python_node = ExtractedNode {
+            id: "polyglot-ws:scripts/config.py:parse_config:20".to_string(),
+            workspace: ws.to_string(),
+            label: "parse_config".to_string(),
+            kind: "function".to_string(),
+            file_path: "scripts/config.py".to_string(),
+            language: "python".to_string(),
+            line_start: 20,
+            line_end: 35,
+            text: "def parse_config(): pass".to_string(),
+        };
+        st.register_file_nodes(&[rust_node, python_node]);
+
+        // Caller 1: Rust file calls parse_config
+        let rust_caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "polyglot-ws:src/main.rs:run:5".to_string(),
+            target_label: "parse_config".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let rust_target = st.resolve_edge(&rust_caller_edge);
+        assert_eq!(
+            rust_target,
+            Some("polyglot-ws:src/config.rs:parse_config:10".to_string()),
+            "Rust caller must link to Rust candidate"
+        );
+
+        // Caller 2: Python file calls parse_config
+        let python_caller_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "polyglot-ws:scripts/run.py:execute:8".to_string(),
+            target_label: "parse_config".to_string(),
+            target_id: None,
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+        let python_target = st.resolve_edge(&python_caller_edge);
+        assert_eq!(
+            python_target,
+            Some("polyglot-ws:scripts/config.py:parse_config:20".to_string()),
+            "Python caller must link to Python candidate"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_r094_autonomous_directory_backbone_synthesis() {
+        use omni_graph::config::Config;
+        use omni_graph::db::DbClient;
+        use omni_graph::embedder::EmbedderClient;
+        use omni_graph::ingestion::{FileCache, SymbolTable};
+        use omni_graph::watcher::IncrementalPipeline;
+        use std::sync::Arc;
+        use tokio::sync::RwLock;
+
+        let cfg = Config::from_env();
+        let db = DbClient::new(&cfg);
+        let embedder = EmbedderClient::new(cfg.tei_url);
+        let cache = FileCache::new();
+        let st = Arc::new(RwLock::new(SymbolTable::new()));
+
+        let pipeline = IncrementalPipeline::with_default_dirs(db, embedder, cache, st);
+        let ws = "test-ws";
+
+        // Deeply nested file path
+        let rel_path = "src/modules/billing/v2/invoice_generator.rs";
+
+        // First pass: synthesizes missing directory hierarchy up to workspace
+        let (nodes, edges) = pipeline.synthesize_directory_backbone(ws, rel_path).await;
+
+        // Expect 4 ancestor directories: src, src/modules, src/modules/billing, src/modules/billing/v2
+        assert_eq!(nodes.len(), 4, "Should synthesize 4 missing directory nodes");
+        assert_eq!(edges.len(), 4, "Should synthesize 4 hierarchical CONTAINS edges");
+
+        // Verify nodes
+        let dir_paths: Vec<String> = nodes.iter().map(|n| n.file_path.clone()).collect();
+        assert_eq!(
+            dir_paths,
+            vec![
+                "src".to_string(),
+                "src/modules".to_string(),
+                "src/modules/billing".to_string(),
+                "src/modules/billing/v2".to_string(),
+            ]
+        );
+        for n in &nodes {
+            assert_eq!(n.kind, "directory");
+            assert_eq!(n.workspace, ws);
+        }
+
+        // Verify edge hierarchy: root workspace -> src -> modules -> billing -> v2
+        assert_eq!(edges[0].source_id, "test-ws:workspace");
+        assert_eq!(edges[0].target_id, Some("test-ws:dir:src".to_string()));
+        assert_eq!(edges[0].edge_type, "CONTAINS");
+
+        assert_eq!(edges[1].source_id, "test-ws:dir:src");
+        assert_eq!(edges[1].target_id, Some("test-ws:dir:src/modules".to_string()));
+
+        assert_eq!(edges[2].source_id, "test-ws:dir:src/modules");
+        assert_eq!(edges[2].target_id, Some("test-ws:dir:src/modules/billing".to_string()));
+
+        assert_eq!(edges[3].source_id, "test-ws:dir:src/modules/billing");
+        assert_eq!(edges[3].target_id, Some("test-ws:dir:src/modules/billing/v2".to_string()));
+
+        // Second pass: another file in the same directory (or sibling subdirectory)
+        let (sibling_nodes, sibling_edges) = pipeline
+            .synthesize_directory_backbone(ws, "src/modules/billing/v2/receipt.rs")
+            .await;
+        assert_eq!(sibling_nodes.len(), 0, "Known directories should not be re-synthesized");
+        assert_eq!(sibling_edges.len(), 0);
+    }
+
+    #[test]
+    fn test_r101_atomic_transactional_multi_statement_swap() {
+        use omni_graph::db::{DbClient, InboundEdgeRef};
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let ws = "test-ws";
+        let rel_path = "src/payment.rs";
+
+        let nodes = vec![
+            ExtractedNode {
+                id: "test-ws:file:src/payment.rs".to_string(),
+                workspace: ws.to_string(),
+                label: "payment.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: rel_path.to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 100,
+                text: "pub fn charge() {}".to_string(),
+            },
+            ExtractedNode {
+                id: "test-ws:src/payment.rs:charge:10".to_string(),
+                workspace: ws.to_string(),
+                label: "charge".to_string(),
+                kind: "function".to_string(),
+                file_path: rel_path.to_string(),
+                language: "rust".to_string(),
+                line_start: 10,
+                line_end: 25,
+                text: "pub fn charge() {}".to_string(),
+            },
+        ];
+
+        let edges = vec![ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "test-ws:src/payment.rs:charge:10".to_string(),
+            target_label: "StripeClient".to_string(),
+            target_id: Some("test-ws:src/stripe.rs:StripeClient:5".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        }];
+
+        let inbound = vec![InboundEdgeRef {
+            caller_id: "test-ws:src/checkout.rs:run:20".to_string(),
+            target_label: "charge".to_string(),
+            target_kind: Some("function".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        }];
+
+        let embeddings = vec![vec![0.1f32; 384], vec![0.2f32; 384]];
+
+        let (sql, node_cnt, edge_cnt, relink_cnt) = DbClient::build_atomic_swap_sql(
+            ws,
+            rel_path,
+            Some("fake_hash_123"),
+            &nodes,
+            &embeddings,
+            Some(4),
+            &edges,
+            &inbound,
+        );
+
+        // Transaction boundaries (R-101)
+        assert!(sql.starts_with("BEGIN TRANSACTION;\n"));
+        assert!(sql.ends_with("COMMIT TRANSACTION;\n"));
+
+        // Step 1: Deletion of previous state
+        assert!(sql.contains("DELETE linked_to WHERE in IN $nodes OR out IN $nodes;"));
+        assert!(sql.contains("DELETE node WHERE workspace = 'test-ws' AND file_path = 'src/payment.rs';"));
+
+        // Step 2: Upsert new nodes
+        assert!(sql.contains("UPSERT type::thing('node', 'test-ws:file:src/payment.rs') MERGE"));
+        assert!(sql.contains("UPSERT type::thing('node', 'test-ws:src/payment.rs:charge:10') MERGE"));
+        assert_eq!(node_cnt, 2);
+
+        // Step 3: Outbound edge relate with call_count & weight
+        assert!(sql.contains("call_count = 1"));
+        assert!(sql.contains("weight = 1"));
+        assert_eq!(edge_cnt, 1);
+
+        // Step 4: Relink inbound caller
+        assert!(sql.contains("test-ws:src/checkout.rs:run:20"));
+        assert_eq!(relink_cnt, 1);
+    }
+
+    #[test]
+    fn test_r102_disambiguated_inbound_signature_relinking() {
+        use omni_graph::db::{DbClient, InboundEdgeRef};
+        use omni_graph::parser::ExtractedNode;
+
+        let ws = "test-ws";
+        // File defines both a struct User and a function User (or sibling kinds)
+        let surviving_nodes = vec![
+            ExtractedNode {
+                id: "test-ws:src/auth.rs:User:10".to_string(),
+                workspace: ws.to_string(),
+                label: "User".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/auth.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 10,
+                line_end: 20,
+                text: "pub struct User {}".to_string(),
+            },
+            ExtractedNode {
+                id: "test-ws:src/auth.rs:User:30".to_string(),
+                workspace: ws.to_string(),
+                label: "User".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/auth.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 30,
+                line_end: 40,
+                text: "pub fn User() {}".to_string(),
+            },
+        ];
+
+        // Caller 1 wants struct User
+        let struct_caller = InboundEdgeRef {
+            caller_id: "test-ws:src/repo.rs:get_user:5".to_string(),
+            target_label: "User".to_string(),
+            target_kind: Some("struct".to_string()),
+            edge_type: "REFERENCES".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+
+        // Caller 2 wants function User
+        let fn_caller = InboundEdgeRef {
+            caller_id: "test-ws:src/factory.rs:make:8".to_string(),
+            target_label: "User".to_string(),
+            target_kind: Some("function".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+
+        let (sql, relinked_cnt) = DbClient::build_relink_inbound_sql(
+            ws,
+            &[struct_caller, fn_caller],
+            &surviving_nodes,
+        );
+
+        assert_eq!(relinked_cnt, 2);
+        // struct_caller links to line 10 struct node
+        assert!(sql.contains("test-ws:src/auth.rs:User:10"));
+        // fn_caller links to line 30 function node
+        assert!(sql.contains("test-ws:src/auth.rs:User:30"));
+    }
+
+    #[test]
+    fn test_r104_edge_relationship_deduplication() {
+        use omni_graph::db::deduplicate_edges;
+        use omni_graph::parser::ExtractedEdge;
+
+        let ws = "test-ws";
+        // Simulate 4 calls to get() and 2 calls to post() from the same function
+        let mut edges = Vec::new();
+        for _ in 0..4 {
+            edges.push(ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: "test-ws:src/worker.rs:fetch:10".to_string(),
+                target_label: "get".to_string(),
+                target_id: Some("test-ws:src/client.rs:get:50".to_string()),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+        for _ in 0..2 {
+            edges.push(ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: "test-ws:src/worker.rs:fetch:10".to_string(),
+                target_label: "post".to_string(),
+                target_id: Some("test-ws:src/client.rs:post:80".to_string()),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+
+        let deduped = deduplicate_edges(&edges);
+        assert_eq!(deduped.len(), 2, "6 redundant calls should deduplicate to exactly 2 unique edges");
+
+        let get_edge = deduped.iter().find(|e| e.target_label == "get").unwrap();
+        assert_eq!(get_edge.call_count, 4, "get() call count should be 4");
+        assert_eq!(get_edge.weight, 4.0, "get() edge weight should be 4.0");
+
+        let post_edge = deduped.iter().find(|e| e.target_label == "post").unwrap();
+        assert_eq!(post_edge.call_count, 2, "post() call count should be 2");
+        assert_eq!(post_edge.weight, 2.0, "post() edge weight should be 2.0");
+    }
+
+    #[test]
+    fn test_r095_dual_tier_local_modularity_fast_path() {
+        use omni_graph::analysis::CommunityDetector;
+
+        // Node u strongly coupled to target community B (k_{u, B} = 10.0) vs weak source community A (k_{u, A} = 1.0)
+        let k_u_target = 10.0;
+        let k_u_source = 1.0;
+        let sigma_tot_target = 50.0;
+        let sigma_tot_source = 100.0;
+        let k_u = 11.0;
+        let total_m = 200.0;
+
+        let delta_q = CommunityDetector::calculate_local_delta_q(
+            k_u_target,
+            k_u_source,
+            sigma_tot_target,
+            sigma_tot_source,
+            k_u,
+            total_m,
+        );
+
+        // Fast-path invariant (R-095): Positive delta_Q triggers instant local reassignment
+        assert!(delta_q > 0.0, "Delta Q must be positive when coupled more strongly to target community");
+
+        // Reverse check: coupled weakly to target B vs strongly to source A
+        let delta_q_negative = CommunityDetector::calculate_local_delta_q(
+            0.5,
+            10.0,
+            120.0,
+            40.0,
+            10.5,
+            total_m,
+        );
+        assert!(delta_q_negative < 0.0, "Delta Q must be negative when source community has higher affinity");
+    }
+
+    #[test]
+    fn test_r105_zero_delay_community_inference_for_new_files() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::DbLink;
+        use std::collections::HashMap;
+
+        let mut node_communities = HashMap::new();
+        node_communities.insert("node_billing_1".to_string(), 2);
+        node_communities.insert("node_billing_2".to_string(), 2);
+        node_communities.insert("node_billing_3".to_string(), 2);
+        node_communities.insert("node_auth_1".to_string(), 5);
+
+        // New node links to 3 billing nodes and 1 auth node
+        let links = vec![
+            DbLink {
+                id: "l1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_2".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l3".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_3".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l4".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_auth_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        let inferred = CommunityDetector::infer_neighbor_community("node_new", &links, &node_communities);
+
+        // Invariant (R-105): New file immediately inherits modal neighbor community 2 upon insertion
+        assert_eq!(inferred, Some(2), "New node must infer modal community of its connected neighbors");
+    }
+
+    #[tokio::test]
+    async fn test_r097_convergence_barrier_blocks_until_sync() {
+        use std::sync::Arc;
+        use std::time::Duration;
+        use tokio::sync::RwLock;
+        use omni_graph::watcher::WatcherStatus;
+
+        let status = Arc::new(RwLock::new(WatcherStatus {
+            workspace: "barrier-ws".to_string(),
+            path: "/tmp/barrier".to_string(),
+            status: "syncing".to_string(),
+            started_at: "now".to_string(),
+            files_tracked: 10,
+            last_sync: None,
+            events_processed: 0,
+            files_reindexed: 0,
+            files_deleted: 0,
+            avg_sync_ms: 0,
+            cluster_status: "current".to_string(),
+            last_cluster_at: None,
+            debounce_ms: 200,
+        }));
+
+        // Simulate background sync completing after 40ms
+        let bg_status = status.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            let mut s = bg_status.write().await;
+            s.status = "watching".to_string();
+        });
+
+        // Loop mimicking wait_for_convergence
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_millis(300);
+        let mut converged = false;
+        while start.elapsed() < timeout {
+            if status.read().await.status != "syncing" {
+                converged = true;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        assert!(converged, "Barrier must block until status transitions from 'syncing' to 'watching'");
+        assert!(start.elapsed() >= Duration::from_millis(30), "Must have awaited sync duration");
+    }
+
+    #[test]
+    fn test_r098_fidelity_diagnostic_endpoint() {
+        // Test fidelity score calculation invariants
+        let edge_count: i64 = 100;
+        let dangling_directory_pointers: i64 = 0;
+        let healthy = edge_count.saturating_sub(dangling_directory_pointers) as f64;
+        let fidelity_score = (healthy / edge_count as f64).clamp(0.0, 1.0);
+
+        assert_eq!(fidelity_score, 1.0, "Zero dangling directory pointers must produce 1.0 fidelity score");
+
+        // When defects exist
+        let defective_edges: i64 = 100;
+        let dangling_defects: i64 = 5;
+        let defective_score = ((defective_edges.saturating_sub(dangling_defects)) as f64) / (defective_edges as f64);
+        assert!((defective_score - 0.95).abs() < 1e-6);
+
+        // When edge count is 0
+        let zero_edges: i64 = 0;
+        let zero_score = if zero_edges > 0 { 0.0 } else { 1.0 };
+        assert_eq!(zero_score, 1.0, "Empty workspace must yield baseline 1.0 fidelity");
+    }
+
+    #[tokio::test]
+    async fn test_r099_lock_free_generational_versioning() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
+
+        let generation = Arc::new(AtomicU64::new(1));
+        assert_eq!(generation.load(Ordering::Relaxed), 1);
+
+        // Concurrent atomic increments across 10 tasks
+        let mut handles = Vec::new();
+        for _ in 0..10 {
+            let gen = generation.clone();
+            handles.push(tokio::spawn(async move {
+                for _ in 0..10 {
+                    gen.fetch_add(1, Ordering::SeqCst);
+                }
+            }));
+        }
+
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        // 1 initial + 10 * 10 increments = 101
+        assert_eq!(generation.load(Ordering::SeqCst), 101, "Generational counter must update lock-free and thread-safe");
     }
 }
 

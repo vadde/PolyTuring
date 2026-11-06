@@ -6,17 +6,19 @@ use crate::embedder::EmbedderClient;
 use crate::ingestion::{FileCache, SymbolTable};
 use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 pub struct IncrementalPipeline {
     db: DbClient,
     embedder: EmbedderClient,
     cache: FileCache,
     symbol_table: Arc<RwLock<SymbolTable>>,
+    known_dirs: Arc<RwLock<HashSet<String>>>,
 }
 
 impl IncrementalPipeline {
@@ -25,13 +27,117 @@ impl IncrementalPipeline {
         embedder: EmbedderClient,
         cache: FileCache,
         symbol_table: Arc<RwLock<SymbolTable>>,
+        known_dirs: Arc<RwLock<HashSet<String>>>,
     ) -> Self {
         Self {
             db,
             embedder,
             cache,
             symbol_table,
+            known_dirs,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_default_dirs(
+        db: DbClient,
+        embedder: EmbedderClient,
+        cache: FileCache,
+        symbol_table: Arc<RwLock<SymbolTable>>,
+    ) -> Self {
+        Self::new(
+            db,
+            embedder,
+            cache,
+            symbol_table,
+            Arc::new(RwLock::new(HashSet::new())),
+        )
+    }
+
+    /// Ensure all ancestor directory nodes and hierarchy edges exist for rel_path (R-094)
+    pub async fn synthesize_directory_backbone(
+        &self,
+        workspace: &str,
+        rel_path: &str,
+    ) -> (Vec<ExtractedNode>, Vec<ExtractedEdge>) {
+        let mut cur_dir = Path::new(rel_path).parent();
+        let mut missing_dirs = Vec::new();
+
+        {
+            let known = self.known_dirs.read().await;
+            while let Some(dir) = cur_dir {
+                let dir_str = dir.to_string_lossy().to_string();
+                if dir_str.is_empty() || dir_str == "." {
+                    break;
+                }
+                if !known.contains(&dir_str) {
+                    missing_dirs.push(dir_str);
+                }
+                cur_dir = dir.parent();
+            }
+        }
+
+        if missing_dirs.is_empty() {
+            return (Vec::new(), Vec::new());
+        }
+
+        // Sort from shallowest to deepest directory so hierarchy is built top-down
+        missing_dirs.sort_by_key(|d| d.len());
+
+        let mut synth_nodes = Vec::with_capacity(missing_dirs.len());
+        let mut synth_edges = Vec::with_capacity(missing_dirs.len());
+
+        {
+            let mut known = self.known_dirs.write().await;
+            for dir_str in &missing_dirs {
+                if known.insert(dir_str.clone()) {
+                    let dir_name = Path::new(dir_str)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| dir_str.clone());
+
+                    synth_nodes.push(ExtractedNode {
+                        id: format!("{}:dir:{}", workspace, dir_str),
+                        workspace: workspace.to_string(),
+                        label: dir_name.clone(),
+                        kind: "directory".to_string(),
+                        file_path: dir_str.clone(),
+                        language: String::new(),
+                        line_start: 0,
+                        line_end: 0,
+                        text: format!("Directory: {}", dir_str),
+                    });
+
+                    let parent_of_dir = Path::new(dir_str)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    let parent_id = if parent_of_dir.is_empty() || parent_of_dir == "." {
+                        format!("{}:workspace", workspace)
+                    } else {
+                        format!("{}:dir:{}", workspace, parent_of_dir)
+                    };
+
+                    synth_edges.push(ExtractedEdge {
+                        workspace: workspace.to_string(),
+                        source_id: parent_id,
+                        target_label: dir_name,
+                        target_id: Some(format!("{}:dir:{}", workspace, dir_str)),
+                        edge_type: "CONTAINS".to_string(),
+                        category: "CONTAINMENT".to_string(),
+                    });
+                }
+            }
+        }
+
+        (synth_nodes, synth_edges)
+    }
+
+    /// Access the known directory cache (R-094)
+    #[allow(dead_code)]
+    pub fn known_dirs(&self) -> Arc<RwLock<HashSet<String>>> {
+        Arc::clone(&self.known_dirs)
     }
 
     /// Re-index a single created or modified file incrementally
@@ -141,11 +247,48 @@ impl IncrementalPipeline {
             category: "CONTAINMENT".to_string(),
         });
 
-        // 1. Look up existing community for this file before pruning to preserve community assignment
-        let existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
+        // 0. Ensure directory backbone DAG exists up to root (R-094)
+        let (synth_dir_nodes, synth_dir_edges) = self
+            .synthesize_directory_backbone(workspace, rel_path)
+            .await;
+        if !synth_dir_nodes.is_empty() {
+            let (store_nodes_res, store_edges_res) = tokio::join!(
+                self.db.store_nodes(&synth_dir_nodes, &[], None),
+                self.db.store_edges(&synth_dir_edges)
+            );
+            if let Err(e) = store_nodes_res {
+                warn!("Failed to store synthesized directory backbone nodes for '{}': {}", rel_path, e);
+            }
+            if let Err(e) = store_edges_res {
+                warn!("Failed to store synthesized directory backbone edges for '{}': {}", rel_path, e);
+            }
+        }
 
-        // 1b. Capture existing inbound caller edges (R-079) before pruning old nodes
-        let inbound_edges = self.db.get_inbound_edges_for_file(workspace, rel_path).await.unwrap_or_default();
+        // 1. Look up existing community & inbound edges concurrently (R-100)
+        let (comm_res, inbound_res) = tokio::join!(
+            self.db.get_file_community(workspace, rel_path),
+            self.db.get_inbound_edges_for_file(workspace, rel_path)
+        );
+        let mut existing_comm = comm_res.unwrap_or(None);
+        let inbound_edges = inbound_res.unwrap_or_default();
+
+        // 1a. Zero-delay community inference for brand-new files (R-105)
+        // If file is brand-new (existing_comm is None), infer modal community from neighbor connections or directory siblings
+        if existing_comm.is_none() {
+            let target_ids: Vec<String> = all_edges
+                .iter()
+                .filter_map(|e| e.target_id.clone())
+                .collect();
+            if !target_ids.is_empty() {
+                existing_comm = self.db.infer_community_from_targets(workspace, &target_ids).await.unwrap_or(None);
+            }
+            if existing_comm.is_none() {
+                let parent_dir = Path::new(rel_path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                if !parent_dir.is_empty() && parent_dir != "." {
+                    existing_comm = self.db.get_directory_modal_community(workspace, &parent_dir).await.unwrap_or(None);
+                }
+            }
+        }
 
         // 2. Generate vector embeddings for newly parsed nodes FIRST (eliminates 404 blackout window)
         let enriched_texts: Vec<String> = all_nodes
@@ -161,18 +304,7 @@ impl IncrementalPipeline {
             }
         };
 
-        // 3. Atomic swap: prune previous nodes immediately before storing new ones
-        if let Err(e) = self.db.delete_file(workspace, rel_path).await {
-            warn!("Failed to prune previous nodes for '{}': {}", rel_path, e);
-        }
-
-        // 4. Store new nodes with inherited community
-        if let Err(e) = self.db.store_nodes_with_community(&all_nodes, &embeddings, Some(&hash), existing_comm).await {
-            error!("Failed to store nodes during live sync for '{}': {}", rel_path, e);
-            return Err(e);
-        }
-
-        // 5. In-Memory SAIR Edge Resolution (R-078)
+        // 3. In-Memory SAIR Edge Resolution & Unresolved Pool Retention (R-078, R-093, R-103)
         let mut containment_edges = Vec::new();
         let mut cross_file_edges = Vec::new();
         for edge in all_edges {
@@ -197,30 +329,52 @@ impl IncrementalPipeline {
             st.register_file_imports(workspace, rel_path, &imported_symbols);
 
             for mut edge in cross_file_edges {
+                let caller_file = edge.source_id.split(':').nth(1).unwrap_or("").to_string();
+                if !caller_file.is_empty() {
+                    st.record_caller_dependency(workspace, &caller_file, &edge.target_label);
+                }
                 if let Some(target_id) = st.resolve_edge(&edge) {
                     edge.target_id = Some(target_id);
                     resolved_edges.push(edge);
+                } else {
+                    // Retain unresolved forward reference in pool (R-103)
+                    st.retain_unresolved(edge);
+                }
+            }
+
+            // Drain any pending unsatisfied edges from other files now satisfied by our new symbols (R-103)
+            for node in &all_nodes {
+                let satisfied = st.drain_satisfied(workspace, &node.label);
+                for mut sat_edge in satisfied {
+                    if let Some(target_id) = st.resolve_edge(&sat_edge) {
+                        sat_edge.target_id = Some(target_id);
+                        resolved_edges.push(sat_edge);
+                    }
                 }
             }
         }
 
-        // 5b. Bulk store resolved edges (parameterized batch insert, zero SurrealQL subqueries)
-        if !resolved_edges.is_empty() {
-            if let Err(e) = self.db.store_resolved_edges(&resolved_edges).await {
-                warn!("Failed to store resolved edges during live sync for '{}': {}", rel_path, e);
-            }
+        // 4. Atomic Multi-Statement Swap (R-101, R-102, R-104)
+        // Combines file pruning, node upsert, edge persistence, and inbound relinking into a single transaction.
+        let (_node_cnt, _edge_cnt, relink_cnt) = self
+            .db
+            .execute_atomic_swap(
+                workspace,
+                rel_path,
+                Some(&hash),
+                &all_nodes,
+                &embeddings,
+                existing_comm,
+                &resolved_edges,
+                &inbound_edges,
+            )
+            .await?;
+
+        if relink_cnt > 0 {
+            info!("Preserved and relinked {} inbound caller edges for '{}'", relink_cnt, rel_path);
         }
 
-        // 5c. Re-link surviving inbound caller edges to new symbol node IDs (R-079)
-        if !inbound_edges.is_empty() {
-            if let Ok(relinked) = self.db.relink_inbound_edges(workspace, &inbound_edges, &all_nodes).await {
-                if relinked > 0 {
-                    info!("Preserved and relinked {} inbound caller edges for '{}'", relinked, rel_path);
-                }
-            }
-        }
-
-        // 6. Update staleness cache
+        // 5. Update staleness cache
         self.cache.update(rel_path, &hash).await;
 
         info!(

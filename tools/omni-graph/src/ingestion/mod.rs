@@ -5,7 +5,8 @@ pub mod worktree;
 #[allow(unused_imports)]
 pub use worktree::{detect_git_worktree, discover_parent_worktrees, WorktreeInfo};
 pub mod symbol_table;
-pub use symbol_table::{SymbolDef, SymbolTable};
+#[allow(unused_imports)]
+pub use symbol_table::{SymbolDef, SymbolTable, UnresolvedReferencePool};
 
 use crate::analysis::CommunityDetector;
 use crate::db::DbClient;

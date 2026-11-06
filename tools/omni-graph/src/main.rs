@@ -81,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pipeline.set_watcher(watch_manager.clone()).await;
 
     let state = AppState {
+        graph_generation: db_client.graph_generation.clone(),
         db: db_client,
         embedder: embedder_client,
         pipeline,

@@ -175,8 +175,25 @@ def make_http_request(url: str, data: dict = None, timeout: int = 15):
     headers = {"Content-Type": "application/json"}
     body = json.dumps(data).encode("utf-8") if data is not None else None
     req = urllib.request.Request(url, data=body, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 423:
+            try:
+                err_data = json.loads(e.read().decode("utf-8"))
+                return {
+                    "error": "HTTP 423 Locked",
+                    "message": err_data.get("message", "Workspace is actively synchronizing graph topology."),
+                    "locked": True,
+                }
+            except Exception:
+                return {
+                    "error": "HTTP 423 Locked",
+                    "message": "Workspace is actively synchronizing graph topology. Please retry in a moment.",
+                    "locked": True,
+                }
+        raise
 
 def handle_tool_call(name: str, args: dict) -> dict:
     workspace = args.get("workspace") or get_default_workspace()
@@ -184,8 +201,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
     try:
         if name == "omni_definition":
             symbol = args["symbol"]
-            params = urllib.parse.urlencode({"name": symbol, "workspace": workspace})
+            params = urllib.parse.urlencode({"name": symbol, "workspace": workspace, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/symbol?{params}")
+            if res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             matches = res.get("matches", [])
             if not matches:
                 return {"content": [{"type": "text", "text": f"Symbol '{symbol}' not found in workspace '{workspace}'."}]}
@@ -200,8 +219,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "omni_references":
             symbol = args["symbol"]
-            params = urllib.parse.urlencode({"symbol": symbol, "workspace": workspace})
+            params = urllib.parse.urlencode({"symbol": symbol, "workspace": workspace, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/references?{params}")
+            if res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             raw_refs = res.get("references", [])
             # Also check legacy callers/importers as fallback if present
             if not raw_refs and ("callers" in res or "importers" in res):
@@ -260,8 +281,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
         elif name == "omni_condense":
             symbol = args["symbol"]
             hops = args.get("hops", 2)
-            params = urllib.parse.urlencode({"symbol": symbol, "workspace": workspace, "hops": hops})
+            params = urllib.parse.urlencode({"symbol": symbol, "workspace": workspace, "hops": hops, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/condense?{params}")
+            if res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             formatted_md = res.get("formatted_markdown", "")
             tokens = res.get("token_estimate", 0)
             text = f"{formatted_md}\n\n*(Token estimate: ~{tokens} tokens)*"
@@ -271,8 +294,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
             query = args["query"]
             k = args.get("k", 10)
             include_docs = "true" if args.get("include_docs", False) else "false"
-            params = urllib.parse.urlencode({"q": query, "workspace": workspace, "k": k, "include_docs": include_docs})
+            params = urllib.parse.urlencode({"q": query, "workspace": workspace, "k": k, "include_docs": include_docs, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/search?{params}")
+            if isinstance(res, dict) and res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             hits = res.get("results", []) if isinstance(res, dict) else res
             if not hits:
                 return {"content": [{"type": "text", "text": f"No matches found for query: '{query}'"}]}
@@ -289,8 +314,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "omni_galaxies":
             limit = args.get("limit", 15)
-            params = urllib.parse.urlencode({"workspace": workspace, "limit": limit})
+            params = urllib.parse.urlencode({"workspace": workspace, "limit": limit, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/galaxies?{params}")
+            if res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             galaxies = res.get("galaxies", [])
             total = res.get("total_galaxies", len(galaxies))
             
@@ -311,8 +338,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
             prompt = args["prompt"]
             include_docs = args.get("include_docs", False)
             top_k = args.get("top_k", 5)
-            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs, "top_k": top_k}
+            payload = {"prompt": prompt, "workspace": workspace, "include_docs": include_docs, "top_k": top_k, "wait_for_sync": True}
             res = make_http_request(f"{API_URL}/api/query", data=payload)
+            if res.get("locked"):
+                return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}
             macro = res.get("macroscopic_summary", "")
             subgraph = res.get("expanded_subgraph", "")
             return {"content": [{"type": "text", "text": f"{macro}\n\n{subgraph}"}]}

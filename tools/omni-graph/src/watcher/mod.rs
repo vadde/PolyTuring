@@ -18,7 +18,7 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use pipeline::IncrementalPipeline;
+pub use pipeline::IncrementalPipeline;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -322,6 +322,33 @@ impl WatchManager {
             None
         }
     }
+
+    /// Await until live watcher convergence occurs for workspace, up to timeout (R-097)
+    pub async fn wait_for_convergence(&self, workspace: Option<&str>, timeout: Duration) -> bool {
+        let start = Instant::now();
+        loop {
+            let is_syncing = if let Some(ws) = workspace {
+                if let Some(st) = self.get_workspace_status(ws).await {
+                    st.status == "syncing"
+                } else {
+                    false
+                }
+            } else {
+                let statuses = self.get_status().await;
+                statuses.iter().any(|s| s.status == "syncing")
+            };
+
+            if !is_syncing {
+                return true;
+            }
+
+            if start.elapsed() >= timeout {
+                return false;
+            }
+
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
 }
 
 /// Count files in a directory (excluding noise and gitignored files)
@@ -409,7 +436,10 @@ async fn run_watcher(
         symbol_table.write().await.register_raw_symbols(&workspace, raw_symbols);
         info!("Initialized watcher symbol table with {} symbols for '{}'", count, workspace);
     }
-    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache, symbol_table);
+    let known_dirs = Arc::new(tokio::sync::RwLock::new(
+        db.get_directory_paths(&workspace).await.unwrap_or_default()
+    ));
+    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache, symbol_table, known_dirs);
     let debounce_duration = Duration::from_millis(debounce_ms);
     let mut pending_events: Vec<Event> = Vec::new();
     let mut last_batch_time = Instant::now();
@@ -644,43 +674,58 @@ async fn run_watcher(
                 }
             }
 
-            // Quiescent auto-clustering: If files have changed and editing has paused for >= 3.5 seconds,
-            // automatically recompute communities in memory, update DB, and emit SSE notification.
+            // Quiescent auto-clustering (R-095, R-096): Decoupled from reactor loop via spawn_blocking
             _ = quiescence_interval.tick() => {
                 if files_changed_since_cluster > 0 && last_event_processed_time.elapsed() >= Duration::from_millis(3500) {
-                    info!("Quiescent period detected for '{}' ({} pending changes) -> auto-reclustering galaxies...", workspace, files_changed_since_cluster);
-                    if let Ok((nodes, links)) = db.get_graph(Some(&workspace)).await {
-                        if !nodes.is_empty() {
-                            let mut seeds = HashMap::new();
-                            for n in &nodes {
-                                if let Some(c) = n.community {
-                                    seeds.insert(n.id.clone(), c);
+                    let changed_count = files_changed_since_cluster;
+                    files_changed_since_cluster = 0;
+                    info!("Quiescent period detected for '{}' ({} pending changes) -> triggering non-blocking background clustering...", workspace, changed_count);
+
+                    let db_clone = db.clone();
+                    let ws_clone = workspace.clone();
+                    let status_clone = Arc::clone(&status);
+                    let event_tx_clone = event_tx.clone();
+
+                    tokio::spawn(async move {
+                        if let Ok((nodes, links)) = db_clone.get_graph(Some(&ws_clone)).await {
+                            if !nodes.is_empty() {
+                                let ws_inner = ws_clone.clone();
+                                let compute_res = tokio::task::spawn_blocking(move || {
+                                    let mut seeds = HashMap::new();
+                                    for n in &nodes {
+                                        if let Some(c) = n.community {
+                                            seeds.insert(n.id.clone(), c);
+                                        }
+                                    }
+                                    let mut assignments = CommunityDetector::detect_with_seeds(&nodes, &links, 15, Some(&seeds));
+                                    CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+                                    CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 0);
+                                    let (_, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&ws_inner, &nodes, &links, &assignments);
+                                    (assignments, galaxy_records)
+                                }).await;
+
+                                if let Ok((assignments, galaxy_records)) = compute_res {
+                                    if let Err(e) = db_clone.update_communities(&assignments).await {
+                                        warn!("Failed to update communities during live auto-recluster for '{}': {}", ws_clone, e);
+                                    } else {
+                                        let _ = db_clone.store_galaxies(&ws_clone, &galaxy_records).await;
+                                        info!("Auto-reclustered '{}' into {} active galaxies in background (non-blocking)", ws_clone, galaxy_records.len());
+
+                                        let mut s = status_clone.write().await;
+                                        s.cluster_status = "live".to_string();
+                                        s.last_cluster_at = Some(chrono::Utc::now().to_rfc3339());
+                                        let _ = event_tx_clone.send(WatchEvent {
+                                            workspace: ws_clone,
+                                            kind: "ClustersRefreshed".to_string(),
+                                            file_path: format!("{} galaxies computed", galaxy_records.len()),
+                                            timestamp: chrono::Utc::now().to_rfc3339(),
+                                            sync_ms: Some(0),
+                                        });
+                                    }
                                 }
                             }
-                            let mut assignments = CommunityDetector::detect_with_seeds(&nodes, &links, 15, Some(&seeds));
-                            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
-                            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 0);
-                            let (_, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&workspace, &nodes, &links, &assignments);
-                            if let Err(e) = db.update_communities(&assignments).await {
-                                warn!("Failed to update communities during live auto-recluster for '{}': {}", workspace, e);
-                            } else {
-                                let _ = db.store_galaxies(&workspace, &galaxy_records).await;
-                                info!("Auto-reclustered '{}' into {} active galaxies in background", workspace, galaxy_records.len());
-
-                                let mut s = status.write().await;
-                                s.cluster_status = "live".to_string();
-                                s.last_cluster_at = Some(chrono::Utc::now().to_rfc3339());
-                                let _ = event_tx.send(WatchEvent {
-                                    workspace: workspace.clone(),
-                                    kind: "ClustersRefreshed".to_string(),
-                                    file_path: format!("{} galaxies computed", galaxy_records.len()),
-                                    timestamp: chrono::Utc::now().to_rfc3339(),
-                                    sync_ms: Some(0),
-                                });
-                            }
                         }
-                    }
-                    files_changed_since_cluster = 0;
+                    });
                 }
             }
         }

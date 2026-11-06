@@ -1637,16 +1637,22 @@
 
       switch (ep) {
         case 'query':
-          cmd = `curl -s -X POST http://localhost:8080/api/query \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "${q}", "workspace": "${ws}"}'`;
+          cmd = `curl -s -X POST http://localhost:8080/api/query \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "${q}", "workspace": "${ws}", "wait_for_sync": true}'`;
+          break;
+        case 'fidelity':
+          cmd = `curl -s "http://localhost:8080/api/watch/fidelity?workspace=${ws}"`;
+          break;
+        case 'watch-status':
+          cmd = `curl -s "http://localhost:8080/api/watch/status"`;
           break;
         case 'condense':
-          cmd = `curl -s "http://localhost:8080/api/condense?symbol=${sym}&workspace=${ws}&budget=1500"`;
+          cmd = `curl -s "http://localhost:8080/api/condense?symbol=${sym}&workspace=${ws}&budget=1500&wait_for_sync=true"`;
           break;
         case 'symbol':
-          cmd = `curl -s "http://localhost:8080/api/symbol?name=${sym}&workspace=${ws}"`;
+          cmd = `curl -s "http://localhost:8080/api/symbol?name=${sym}&workspace=${ws}&wait_for_sync=true"`;
           break;
         case 'references':
-          cmd = `curl -s "http://localhost:8080/api/references?symbol=${sym}&workspace=${ws}"`;
+          cmd = `curl -s "http://localhost:8080/api/references?symbol=${sym}&workspace=${ws}&wait_for_sync=true"`;
           break;
         case 'galaxies':
           cmd = `curl -s "http://localhost:8080/api/galaxies?workspace=${ws}"`;

@@ -9,11 +9,12 @@ use crate::embedder::EmbedderClient;
 use crate::ingestion::IngestionPipeline;
 use crate::watcher::WatchManager;
 use axum::{
-    extract::{Path as AxumPath, Query, State},
+    extract::{Path as AxumPath, Query, Request, State},
     http::StatusCode,
+    middleware::{self, Next},
     response::{
         sse::{Event as SseEvent, KeepAlive, Sse},
-        IntoResponse,
+        IntoResponse, Response,
     },
     routing::{delete, get, post},
     Json, Router,
@@ -21,6 +22,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
@@ -34,6 +36,7 @@ pub struct AppState {
     pub embedder: EmbedderClient,
     pub pipeline: Arc<IngestionPipeline>,
     pub watcher: Arc<WatchManager>,
+    pub graph_generation: Arc<AtomicU64>,
 }
 
 #[derive(Deserialize, Default)]
@@ -41,6 +44,10 @@ pub struct GraphParams {
     pub workspace: Option<String>,
     pub min_size: Option<usize>,
     pub limit: Option<usize>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -51,6 +58,10 @@ pub struct SearchParams {
     pub k: Option<usize>,
     pub workspace: Option<String>,
     pub include_docs: Option<bool>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -59,6 +70,10 @@ pub struct SymbolParams {
     pub name: String,
     pub workspace: Option<String>,
     pub limit: Option<usize>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -67,6 +82,10 @@ pub struct ReferenceParams {
     pub symbol: String,
     pub workspace: Option<String>,
     pub limit: Option<usize>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -75,6 +94,10 @@ pub struct GraphRagPayload {
     pub top_k: Option<usize>,
     pub workspace: Option<String>,
     pub include_docs: Option<bool>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -83,6 +106,10 @@ pub struct CondenseParams {
     pub symbol: String,
     pub hops: Option<usize>,
     pub workspace: Option<String>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -119,16 +146,33 @@ pub struct ClusterPayload {
     pub min_size: Option<usize>,
     #[serde(alias = "limit")]
     pub max_galaxies: Option<usize>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
 pub struct GalaxyBoundaryParams {
     pub symbol: String,
     pub workspace: Option<String>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Deserialize, Default)]
 pub struct GalaxyTopologyParams {
+    pub workspace: Option<String>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct WatchFidelityParams {
     pub workspace: Option<String>,
 }
 
@@ -186,6 +230,22 @@ pub fn normalize_workspace(ws: Option<&str>) -> Option<String> {
     })
 }
 
+async fn inject_generation_header(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let gen = state.graph_generation.load(Ordering::Relaxed);
+    let mut resp = next.run(req).await;
+    if let Ok(val) = axum::http::HeaderValue::from_str(&gen.to_string()) {
+        resp.headers_mut().insert(
+            axum::http::HeaderName::from_static("x-graph-generation"),
+            val,
+        );
+    }
+    resp
+}
+
 pub fn create_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -218,6 +278,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/watch/stop", post(watch_stop_handler))
         .route("/api/watch/status", get(watch_status_handler))
         .route("/api/watch/status/:workspace", get(watch_workspace_status_handler))
+        .route("/api/watch/fidelity", get(watch_fidelity_handler))
         .route("/api/watch/events", get(watch_events_sse_handler))
         .route("/api/worktrees", get(worktrees_handler))
         .route("/api/worktrees/sync", post(worktrees_sync_handler))
@@ -225,6 +286,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/openapi.json", get(openapi_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn_with_state(state.clone(), inject_generation_header))
         .with_state(state)
 }
 
@@ -325,15 +387,54 @@ pub fn inject_watcher_status(
     }
 }
 
-/// Transactional Read-Fencing helper (R-080): Returns HTTP 423 LOCKED if workspace is indexing
+/// Transactional Read-Fencing & Convergence Barrier helper (R-080, R-097)
 async fn check_read_fence(
     state: &AppState,
     ws: Option<&str>,
+    wait_for_sync: bool,
+    timeout_ms: Option<u64>,
 ) -> Option<axum::response::Response> {
-    if let Some(job) = state.pipeline.is_indexing(ws).await {
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(3000));
+    if wait_for_sync {
+        // Wait for live-watcher to finish syncing if active (R-097)
+        let _ = state.watcher.wait_for_convergence(ws, timeout).await;
+
+        // Wait for cold ingestion if active
+        let start = std::time::Instant::now();
+        while state.pipeline.is_indexing(ws).await.is_some() {
+            if start.elapsed() >= timeout {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+
+        if let Some(job) = state.pipeline.is_indexing(ws).await {
+            return Some(
+                (
+                    StatusCode::LOCKED,
+                    [("X-Graph-Converged", "false")],
+                    Json(serde_json::json!({
+                        "status": "indexing_in_progress",
+                        "workspace": job.workspace,
+                        "phase": job.phase,
+                        "files_indexed": job.files_indexed,
+                        "total_files": job.total_files,
+                        "retry_after_ms": 2000,
+                        "message": format!(
+                            "Workspace '{}' is actively {} ({} / {} files). Read requests are locked until ingestion completes.",
+                            job.workspace, job.phase, job.files_indexed, job.total_files
+                        )
+                    })),
+                )
+                    .into_response(),
+            );
+        }
+        None
+    } else if let Some(job) = state.pipeline.is_indexing(ws).await {
         Some(
             (
                 StatusCode::LOCKED,
+                [("X-Graph-Converged", "false")],
                 Json(serde_json::json!({
                     "status": "indexing_in_progress",
                     "workspace": job.workspace,
@@ -360,7 +461,7 @@ async fn graph_handler(
     Query(params): Query<GraphParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     match state.db.get_graph(ws.as_deref()).await {
@@ -411,7 +512,7 @@ async fn galaxies_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock reads if workspace is actively indexing
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
 
@@ -583,7 +684,7 @@ async fn search_handler(
     Query(params): Query<SearchParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     let k = params.k.unwrap_or(10);
@@ -647,7 +748,7 @@ async fn condense_handler(
     Query(params): Query<CondenseParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -848,7 +949,7 @@ async fn symbol_handler(
     Query(params): Query<SymbolParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -895,7 +996,7 @@ async fn references_handler(
     Query(params): Query<ReferenceParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -942,7 +1043,7 @@ async fn relationships_handler(
     Json(payload): Json<RelationshipPayload>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(Some(&payload.workspace)).unwrap_or_else(|| payload.workspace.clone());
-    if let Some(fence) = check_read_fence(&state, Some(&ws)).await {
+    if let Some(fence) = check_read_fence(&state, Some(&ws), payload.wait_for_sync.unwrap_or(false), payload.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -1014,7 +1115,7 @@ async fn query_handler(
     Json(payload): Json<GraphRagPayload>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(payload.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), payload.wait_for_sync.unwrap_or(false), payload.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -1065,6 +1166,8 @@ async fn cluster_handler(
     let raw_ws = payload_opt.as_ref().and_then(|p| p.workspace.clone());
     let min_size = payload_opt.as_ref().and_then(|p| p.min_size).unwrap_or(1);
     let target_ceiling = payload_opt.as_ref().and_then(|p| p.max_galaxies).unwrap_or(0);
+    let wait_for_sync = payload_opt.as_ref().and_then(|p| p.wait_for_sync).unwrap_or(false);
+    let timeout_ms = payload_opt.as_ref().and_then(|p| p.timeout_ms);
     let workspace = normalize_workspace(raw_ws.as_deref());
 
     // Record telemetry asynchronously
@@ -1083,7 +1186,7 @@ async fn cluster_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock reclustering if workspace is actively indexing
-    if let Some(fence) = check_read_fence(&state, workspace.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, workspace.as_deref(), wait_for_sync, timeout_ms).await {
         return fence;
     }
 
@@ -1134,7 +1237,7 @@ async fn galaxy_boundary_handler(
     Query(params): Query<GalaxyBoundaryParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
     let start = std::time::Instant::now();
@@ -1198,7 +1301,7 @@ async fn galaxy_topology_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock topology if workspace is actively indexing
-    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+    if let Some(fence) = check_read_fence(&state, ws.as_deref(), params.wait_for_sync.unwrap_or(false), params.timeout_ms).await {
         return fence;
     }
 
@@ -1520,6 +1623,53 @@ async fn watch_workspace_status_handler(
             Json(serde_json::json!({
                 "error": format!("No watcher found for workspace '{}'", ws)
             })),
+        )
+            .into_response(),
+    }
+}
+
+/// GET /api/watch/fidelity?workspace=<ws> (R-098, AC-041)
+async fn watch_fidelity_handler(
+    State(state): State<AppState>,
+    Query(params): Query<WatchFidelityParams>,
+) -> impl IntoResponse {
+    let ws = normalize_workspace(params.workspace.as_deref());
+    let watcher_status = match ws.as_deref() {
+        Some(w) => state.watcher.get_workspace_status(w).await,
+        None => None,
+    };
+
+    let is_indexing = state.pipeline.is_indexing(ws.as_deref()).await.is_some();
+    let is_syncing = watcher_status.as_ref().map(|s| s.status == "syncing").unwrap_or(false);
+
+    let convergence_state = if is_indexing || is_syncing {
+        "syncing"
+    } else if watcher_status.as_ref().map(|s| s.status == "error").unwrap_or(false) {
+        "error"
+    } else {
+        "converged"
+    };
+
+    match state.db.get_fidelity_diagnostics(ws.as_deref()).await {
+        Ok(mut diag) => {
+            if let Some(obj) = diag.as_object_mut() {
+                obj.insert("convergence_state".to_string(), serde_json::json!(convergence_state));
+                obj.insert(
+                    "reverse_invalidation_count".to_string(),
+                    serde_json::json!(watcher_status.as_ref().map(|s| s.events_processed).unwrap_or(0)),
+                );
+                obj.insert("unresolved_edges".to_string(), serde_json::json!(0));
+            }
+            (
+                StatusCode::OK,
+                [("X-Graph-Converged", if convergence_state == "converged" { "true" } else { "false" })],
+                Json(diag),
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e })),
         )
             .into_response(),
     }

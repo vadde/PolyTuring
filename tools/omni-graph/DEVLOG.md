@@ -1,3 +1,93 @@
+### 2026-11-06 — v0.7.0 Live Watcher Fidelity Parity: Final Verification, Static Docs & Full Governance Sync
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `review` (v0.7.0 Live Watcher Fidelity Parity & Concurrency Engine)  
+**Branch**: `feat/omni-graph-live-watcher-fidelity-parity`  
+**Governance**: Governed by [`ADR-002`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md), [`ADR-003`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/docs/architecture/adr-003-matlab-simulink-mbse-graph-ingestion.md), and [`SPEC-OMNI-005`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md)  
+**Duration**: Complete  
+
+#### Executive Summary & Key Milestones Completed
+1. **Milestone 7: Docker Container Rebuild & Live Monorepo Verification**:
+   - Rebuilt `omni-rust-app` Docker image containing the v0.7.0 binaries and restarted the container fleet.
+   - Tested live on the `PolyTuring` monorepo: `GET /api/watch/fidelity?workspace=PolyTuring` and `./scripts/omni watch fidelity PolyTuring` returned:
+     - `fidelity_score: 1.0000` (100% Relational Parity)
+     - `convergence_state: CONVERGED`
+     - `dangling_directory_edges: 0`
+     - `unresolved_edges: 0`
+     - `reverse_invalidation_count: 16`
+     - `node_count: 4,458` | `edge_count: 10,571`
+2. **Milestone 8: Tail-End Research Spike — MathWorks MATLAB, Simulink MBSE & Symlinks (`R-107`, `R-108`, `R-109`)**:
+   - Authored and committed [`ADR-003`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/docs/architecture/adr-003-matlab-simulink-mbse-graph-ingestion.md) detailing technical feasibility for parsing MATLAB `.m` functions/`classdef` OOP hierarchies, Simulink `.slx`/`.mdl` block diagram signal graphs, and symlink-guarded traversal.
+3. **Living Documentation Portal Synchronization (`docs/site/index.html` & `docs/site/app.js`)**:
+   - Replaced historic v0.5.0 theory in Section 1.6 (`DELETE linked_to WHERE in = $file_node;`) with the true cold-start vs live-watcher relational reality.
+   - Added Section 1.7 (`#sec-omni-fidelity`): Live Watcher Fidelity Parity, Transactional Swaps & Nanometer Diagnostics (v0.7.0), featuring:
+     - The Kindergarten Mental Model ("The Airplane Engine Swap at 30,000 Feet").
+     - Responsive Table detailing all 14 Verified Forensic Gaps and their architectural closures.
+     - Mathematical formulation of closed-form Dynamic Modularity Delta ($\Delta Q$).
+     - Live PolyTuring diagnostics telemetry readout.
+   - Updated Sidebar Navigation and API Playground dropdown (`fidelity` and `watch-status` endpoints, plus `&wait_for_sync=true` query generators).
+   - Executed 14-Gate automated headless verification suite (`make docs-test`): **All 14 gates deterministically passed**.
+4. **Tool Catalog, Spec Index & Skill Parity**:
+   - Synchronized CLI helper scripts (`tools/omni-graph/scripts/omni.sh`, `scripts/omni`, `.agents/skills/omni-graph/scripts/omni.sh`, `tools/omni-graph/skills/omni-graph/scripts/omni.sh`).
+   - Synchronized MCP server scripts across all 3 monorepo copies (`tools/omni-graph/scripts/omni-mcp.py`, `.agents/skills/omni-graph/scripts/omni-mcp.py`, `tools/omni-graph/skills/omni-graph/scripts/omni-mcp.py`).
+   - Updated skill playbooks (`.agents/skills/omni-graph/SKILL.md` and `tools/omni-graph/skills/omni-graph/SKILL.md`).
+   - Updated `specs/README.md` with the Active Specifications Catalog linking `SPEC-OMNI-005` to `ADR-002` and `ADR-003`.
+   - Updated `STATUS.md` and `CONTEXT.md`.
+
+---
+
+### 2026-11-06 — v0.7.0 Live Watcher Fidelity Parity & Concurrency Overhaul (Milestones 1–4)
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `in-progress` (v0.7.0 Live Watcher Fidelity Parity & Concurrency Engine)  
+**Branch**: `feat/omni-graph-live-watcher-fidelity-parity`  
+**Governance**: Governed by [`ADR-002`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md) and [`SPEC-OMNI-005`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md)  
+**Duration**: Active  
+
+#### Context & Epistemic Objectives
+- Executed Mega Forensic Audit across monorepo tiers (AST, SurrealDB, TEI, Concurrency, Watcher, Clustering, REST API, MCP).
+- Identified and proved 14 structural gaps where live sync severed callers, inflated multi-edges, dropped forward references, and exposed a 50–250ms torn-read blackout window to autonomous AI coding agents.
+- Accepted ADR-002 establishing 4 foundational decisions:
+  - ADR-002.1: Transactional Atomic Batch Swap (`R-101`, `R-102`, `R-104`)
+  - ADR-002.2: Reactive Inverted Dependency Graph & Unresolved Retention (`R-093`, `R-103`, `R-106`)
+  - ADR-002.3: Zero-Overhead Concurrency & Coarsening Isolation (`R-095`, `R-096`, `R-100`)
+  - ADR-002.4: Agent-Centric Convergence Barrier & Self-Healing MCP (`R-094`, `R-097`, `R-098`, `R-099`, `R-105`)
+
+#### Key Enhancements & Forensic Proof
+1. **Milestone 1: SymbolTable In-Memory Engine Hardening (`R-093`, `R-103`, `R-106`)**:
+   - Added `language: String` to `SymbolDef`; updated `get_workspace_symbol_defs` to select `language` from SurrealDB.
+   - Enhanced 4-tier SAIR resolver in `symbol_table.rs` to detect caller language and strictly prioritize same-language symbol declarations, eliminating cross-language candidate leakage.
+   - Implemented `ReverseDependencyIndex` (`symbol_callers`) in RAM, tracking which files depend on exported symbols.
+   - Built `UnresolvedReferencePool` in RAM, retaining out-of-order forward references instead of discarding them to `/dev/null`. Auto-drains satisfied edges when declarations appear.
+   - Verified via `test_r093_reactive_reverse_dependency_resolution`, `test_r103_unresolved_edge_retention_pool`, and `test_r106_language_aware_sair_scoping`.
+2. **Milestone 2: Autonomous Directory Backbone DAG Synthesis (`R-094`)**:
+   - Added `DirectoryTreeTracker` (`known_dirs: Arc<RwLock<HashSet<String>>>`) to `IncrementalPipeline`, pre-populated via `db.get_directory_paths`.
+   - `synthesize_directory_backbone` recursively detects missing ancestor directories and emits `directory` nodes and hierarchical `CONTAINS` edges up to the workspace root.
+   - Verified via `test_r094_autonomous_directory_backbone_synthesis`.
+3. **Milestone 3 & 4: Transactional Atomic Swap & Multi-Edge Deduplication (`R-101`, `R-102`, `R-104`)**:
+   - Implemented `execute_atomic_swap` and `build_atomic_swap_sql` in `DbClient`. Combines file pruning, node upsert, edge persistence, and inbound relinking into a single atomic `BEGIN TRANSACTION; ... COMMIT TRANSACTION;` SurrealQL script, dropping network round-trips from 4 to 1 and eliminating the 50–250ms torn-read blackout window.
+   - Enhanced `InboundEdgeRef` with `target_kind: Option<String>`. Inbound relinking disambiguates sibling symbols using composite signatures `(label, kind)`.
+   - Authored `deduplicate_edges` in `DbClient` and updated `store_resolved_edges` and `/api/references`. Consolidates multiple calls into single directed links with `call_count` and `weight`, resolving 499 duplicate groups.
+   - Added exact-match fast path in `find_references` using `idx_node_label` before falling back to ends_with queries.
+   - Verified via `test_r101_atomic_transactional_multi_statement_swap`, `test_r102_disambiguated_inbound_signature_relinking`, and `test_r104_edge_relationship_deduplication`.
+4. **Milestone 5: Dual-Tier Modularity & Non-Blocking Louvain Actor (`R-095`, `R-096`, `R-105`)**:
+   - Optimized `coarsen_to_macro_galaxies` in `analysis/mod.rs` to maintain an incremental `meta_affinity` matrix, eliminating the $O(K \cdot |E|)$ rescanning loop and reducing coarsening complexity to linear $O(|E|)$ (`R-095`).
+   - Added `CommunityDetector::calculate_local_delta_q` for sub-millisecond local modularity evaluation in RAM (`R-095`).
+   - Activated `infer_neighbor_community`, `infer_community_from_targets`, and `get_directory_modal_community` in `pipeline.rs`, ensuring brand-new files inherit modal neighbor/directory communities immediately upon insertion (`R-105`).
+   - Decoupled quiescent Louvain clustering in `watcher/mod.rs` into an asynchronous background task off the watcher loop using `tokio::task::spawn_blocking`, eliminating reactor loop starvation and notify channel buffer overflows (`R-096`).
+   - Verified via `test_r095_dual_tier_local_modularity_fast_path` and `test_r105_zero_delay_community_inference_for_new_files`.
+5. **Milestone 6: Convergence Barrier & Diagnostics (`R-097`, `R-098`, `R-099`, `R-100`)**:
+   - Implemented `wait_for_convergence` on `WatchManager` and enhanced `check_read_fence` to accept `wait_for_sync: bool` and `timeout_ms: Option<u64>`. Awaits internal live watcher convergence up to 3,000ms before serving fresh AST truth (`R-097`).
+   - Exposed `GET /api/watch/fidelity` returning `fidelity_score`, `node_count`, `edge_count`, `dangling_directory_pointers`, `dangling_directory_edges`, and `convergence_state` (`R-098`, `AC-041`).
+   - Implemented lock-free generational versioning (`Arc<AtomicU64>`) on `DbClient` and `AppState`, incremented on all database mutations (`execute_atomic_swap`, `store_resolved_edges`, `delete_file`). Axum middleware injects `X-Graph-Generation` header on all responses (`R-099`).
+   - Parallelized independent SurrealDB backbone writes and community reads via `tokio::join!`. Updated `omni-mcp.py` to pass `wait_for_sync=true` by default and gracefully handle HTTP 423 Locked (`R-100`).
+   - Verified via `test_r097_convergence_barrier_blocks_until_sync`, `test_r098_fidelity_diagnostic_endpoint`, and `test_r099_lock_free_generational_versioning`.
+6. **Test Suite Status**:
+   - 111/111 unit tests passing in 0.05s (100% green).
+   - 0 clippy warnings under strict `-D warnings`.
+
+---
+
 ### 2026-11-05 — Forensic Optimization: Live Watcher In-Memory SAIR Acceleration & Dedicated Quiescent Trigger
 
 **Agent/Author**: Antigravity (Google DeepMind)
