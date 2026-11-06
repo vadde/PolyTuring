@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy manifest files
 COPY Cargo.toml Cargo.lock* ./
 
+# Copy local sub-crate grammars (e.g. tree-sitter-matlab)
+COPY grammars ./grammars
+
 # Copy source tree and tests
 COPY src ./src
 COPY tests ./tests
