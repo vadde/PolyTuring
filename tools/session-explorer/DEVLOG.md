@@ -1534,10 +1534,17 @@
      - Verified `dateFilterMode`: `Today` with `⚡ Last Touched` surfaces 8 sessions (including current session `20dadec4`); `Today` with `🌱 Initiated` surfaces 6 sessions (correctly excluding multi-day sessions initiated on earlier days).
      - Verified 1-click UUID copy on card headers: copies to clipboard with `✓` feedback without navigating away.
      - Verified Session Trail header: displays `[ID] 20dadec4... [📋 Copy]`, `[📁 PolyTuring]`, `[⚡ CLI]`, and `[🟢 ⚡ Active just now | 🌱 Initiated Nov 4, 2026, 02:58:42 PM | ⏳ Multi-Day Span: 2d (2026-11-04 ➔ 2026-11-06)]`.
-     - Saved screenshot artifacts `session-trail-quantum-header.png` and `session-dashboard-tri-modal-matrix.png`.
+     - Saved screenshot artifacts `session-trail-quantum-header.png` and `session-dashboard-tri-modal-matrix.png`.6. **Date Filter UX Simplification & Single-Line Lifespan Pill Refinement**:
+   - Responded to pair programmer feedback regarding the sandwiched date mode control. Removed redundant toolbar buttons, preserving a clean and intuitive `Date: [From] to [To] [Presets]` layout while seamlessly evaluating inclusive lifetime overlap under the hood ($t_{\text{active}} \ge \text{from} \land t_{\text{init}} \le \text{to}$).
+   - Shortened multi-day lifespan pill to `⏳ Xd Span (Nov 4 ➔ Nov 6)` with strict `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;` CSS enforcement, guaranteeing 100% single-line rendering across 5-column grids.
+   - Verified via Playwright headless testing across all 18 rendered multi-day pills.
 
-
-
+7. **Release Finalization (v0.4.0)**:
+   - Updated `STATUS.md` phase to `released` (100% requirements and acceptance criteria verified).
+   - Synchronized `CONTEXT.md` and `CHANGELOG.md` for v0.4.0.
+   - Updated Living Documentation Portal in `docs/site/index.html` (Figure 2.8).
+   - Committed changes as `feat(session-explorer): release v0.4.0 - dual-temporal telemetry, quantum trail capsule, 1-click UUID copy, and single-line lifespan pills` (commit `3b1d90d`) and tagged `session-explorer-v0.4.0`.
+   - Cleanly stopped background daemon task and freed port 9876. Working tree is 100% clean.
 
 
 
