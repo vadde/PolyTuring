@@ -221,7 +221,9 @@
           <a href="#ch1-omni-graph" class="nav-tree-link">System Overview</a>
           <a href="#sec-omni-arch" class="nav-tree-link">4-Tier Container Topology</a>
           <a href="#sec-omni-galaxies" class="nav-tree-link">✨ Galaxy Subsystems &amp; Louvain/Leiden</a>
+          <a href="#sec-omni-cosmology" class="nav-tree-link">🌌 AI-Native Galaxy Cosmology</a>
           <a href="#sec-omni-coupling" class="nav-tree-link">Coupling Metrics &amp; Blast Radius</a>
+          <a href="#sec-omni-twopass" class="nav-tree-link">⚡ Two-Pass Engine &amp; Read-Fence</a>
           <a href="#sec-omni-ebf" class="nav-tree-link">Ephemeral Branch Fabric (EBF)</a>
           <a href="#sec-omni-ast" class="nav-tree-link">Polyglot AST &amp; Struct Fields</a>
           <a href="#sec-omni-budget" class="nav-tree-link">Two-Tier Token Budget Math</a>
@@ -677,6 +679,49 @@ flowchart TB
             </div>
           </div>
 
+          <!-- Section: AI-Native Galaxy Cosmology & Modularity-Guarded Coarsening -->
+          <h3 class="section-h2" id="sec-omni-cosmology">AI-Native Galaxy Cosmology &amp; Modularity-Guarded Coarsening</h3>
+          <p>
+            Traditional graph visualization systems force repositories into an arbitrary human-centric limit: <strong>George Miller's 1956 working memory ceiling ($7 \pm 2$, or $K \le 15$ clusters)</strong>. While human working memory degrades when tracking more than 9 items simultaneously, modern LLMs and autonomous agents navigate codebases with multi-hundred-thousand token contexts. Forcing a 10-million line repository into 15 macro-galaxies causes severe architectural conflation, dumping orthogonal domains into artificial mega-clusters.
+          </p>
+          <p>
+            Omni-Graph overthrows this limitation with an <strong>AI-Native Scale-Adaptive Cosmology Engine</strong> governed by three mathematical invariants:
+          </p>
+
+          <div class="callout callout-theory">
+            <div class="callout-header">Mathematical Formulation: Dynamic Scale-Adaptive Target &amp; Modularity Guard</div>
+            <div class="callout-body">
+              <strong>1. Sub-Linear Scale-Adaptive Target:</strong> Rather than hardcoding $K = 15$, the target galaxy count $K_{\text{adaptive}}$ scales dynamically with total repository AST nodes ($N$):
+              <br><br>
+              $$K_{\text{adaptive}}(N) = \text{clamp}\left(\lfloor 3.5 \cdot N^{0.35} \rfloor, \, 5, \, 150\right)$$
+              <br>
+              • Small tools ($N \approx 100 \implies K \approx 17$)<br>
+              • Mid-tier monorepos ($N \approx 4,200 \implies K \approx 65$)<br>
+              • Large enterprise codebases ($N \ge 100,000 \implies K = 150$)
+              <br><br>
+              <strong>2. Newman Modularity Differential Guard ($\Delta Q$):</strong> Hierarchical agglomerative coarsening only merges two communities $c_i$ and $c_j$ if the merge does not degrade network modularity beyond tolerance $\epsilon = 0.05$:
+              <br><br>
+              $$\Delta Q = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2} \ge -\epsilon$$
+              <br>
+              If $\Delta Q &lt; -\epsilon$, coarsening halts immediately. Decoupled architectural boundaries are preserved rather than forced into unnatural unions.
+            </div>
+          </div>
+
+          <div class="card-grid">
+            <div class="glass-card">
+              <h4>🏛️ Affinity-Floor Invariant (R-086)</h4>
+              <p>Eliminates the legacy fallback cheat where disconnected clusters were blindly merged into the largest community. If candidate communities have zero edge affinity ($k_{ij} = 0$) and zero directory lineage, merging strictly terminates.</p>
+            </div>
+            <div class="glass-card">
+              <h4>🛡️ Micro-Orphan Noise Floor Isolation (R-090)</h4>
+              <p>Isolated nodes and tiny micro-clusters ($&lt; 3$ nodes) that lack structural affinity are quarantined into designated noise-floor cluster <code>cid: 999_999</code>, preventing visual clutter while preserving 100% AST queryability.</p>
+            </div>
+            <div class="glass-card">
+              <h4>🎯 Single Source of Truth Parity</h4>
+              <p>Guarantees strict bidirectional synchrony between individual node assignments (<code>node.community</code>) and macroscopic topology records (<code>galaxy</code> table), completely eliminating desynchronization bugs.</p>
+            </div>
+          </div>
+
           <!-- Section: Robert C. Martin Coupling Metrics & Dynamic Blast Radius Contracts -->
           <h3 class="section-h2" id="sec-omni-coupling">Robert C. Martin Coupling Metrics &amp; Dynamic Blast Radius Contracts</h3>
           <p>
@@ -739,6 +784,94 @@ flowchart TB
               • <strong>Containment Status:</strong> <code>🛡️ Contained Internal</code> (all callers reside in same galaxy), <code>⚠️ Boundary Crossing</code> (foreign callers detected), or <code>🔌 Isolated</code> (leaf / entrypoint).<br>
               • <strong>Caller Provenance:</strong> Exact line numbers, files, and galaxy IDs of every external caller.<br>
               • <strong>Agentic Advice:</strong> Concrete heuristics (e.g., <em>"Symbol is called by 14 external callers in galaxy 'api_gateway'. Do NOT alter parameters without default fallbacks."</em>).
+            </div>
+          </div>
+
+          <div class="callout callout-theory" style="margin-top: 20px;">
+            <div class="callout-header">Mathematical Formulation: Abstractness ($A$) &amp; Distance from Main Sequence ($D$)</div>
+            <div class="callout-body">
+              Robert C. Martin's Package Principles define the balance between abstractness and instability:
+              <br><br>
+              $$A = \frac{N_a}{N_c} \quad (0 \le A \le 1)$$
+              <br>
+              Where $N_a$ is the count of abstract types (interfaces, traits, abstract classes, function signatures) and $N_c$ is total symbol count.
+              <br><br>
+              The normalized <strong>Distance from the Normalized Main Sequence ($D$)</strong> measures architectural health:
+              <br><br>
+              $$D = |A + I - 1| \quad (0 \le D \le 1)$$
+              <br>
+              A galaxy lying on the Main Sequence ($D \approx 0$) balances abstractness and concrete dependency. Subsystems deviating significantly ($D \to 1$) fall into architectural antipattern zones:
+            </div>
+          </div>
+
+          <div class="table-wrapper" style="margin: 20px 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Architectural Zone</th>
+                  <th>Metric Bounds</th>
+                  <th>Subsystem Pathology</th>
+                  <th>Agent Engineering Guidance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>Main Sequence</code></td>
+                  <td>$D \le 0.30$</td>
+                  <td>Optimal architectural equilibrium. Concrete modules are volatile; stable modules are abstract.</td>
+                  <td><strong style="color: #34d399;">IDEAL:</strong> Safe to extend through interfaces or modify leaves.</td>
+                </tr>
+                <tr>
+                  <td><code>Zone of Pain</code></td>
+                  <td>$A \le 0.20, \, I \le 0.20 \implies D \ge 0.60$</td>
+                  <td>Maximum concreteness coupled with maximum incoming dependence. Highly rigid, brittle, hard to refactor.</td>
+                  <td><strong style="color: #fb7185;">HIGH RISK:</strong> Decouple via dependency inversion (introduce interfaces/traits) before modifying.</td>
+                </tr>
+                <tr>
+                  <td><code>Zone of Uselessness</code></td>
+                  <td>$A \ge 0.80, \, I \ge 0.80 \implies D \ge 0.60$</td>
+                  <td>Maximum abstractness with zero incoming dependencies. Dead interfaces, premature over-engineering.</td>
+                  <td><strong style="color: #facc15;">CODE SMELL:</strong> Audit for orphan traits or uninstantiated type hierarchies.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Section: Two-Pass Ingestion Engine & Transactional Read-Fencing -->
+          <h3 class="section-h2" id="sec-omni-twopass">Two-Pass Ingestion Engine, Edge Preservation &amp; Transactional Read-Fencing</h3>
+          <p>
+            During real-world ingestion of large enterprise codebases, single-pass indexing architectures exhibit three critical failure modes:
+            <strong>1. Forward-Reference Edge Loss:</strong> When a file calls functions declared in files visited later in directory traversal order, targets do not yet exist in the database, silently dropping &gt;84% of cross-file call edges.
+            <strong>2. Delta-Sync Inbound Annihilation:</strong> When a developer edits a single file, naive delta watchers drop all incoming call edges from unaffected files across the codebase.
+            <strong>3. Transitional Read Contamination:</strong> Autonomous agents querying the graph or running Graph-RAG while ingestion is active read half-baked, inconsistent intermediate states.
+          </p>
+          <p>
+            Omni-Graph resolves these failure modes with a hardened Two-Pass pipeline and atomic transactional read-fencing:
+          </p>
+
+          <div class="card-grid">
+            <div class="glass-card">
+              <h4>🚀 Pass 1: AST &amp; Vector Ingestion</h4>
+              <p>Scans files via Tree-Sitter, parses polyglot AST declarations, computes 384-dimensional dense embeddings in batches of 32 via TEI, and builds an in-memory Global Symbol Table mapping symbol identifiers to canonical node IDs.</p>
+            </div>
+            <div class="glass-card">
+              <h4>🔗 Pass 2: Forward Edge Resolution</h4>
+              <p>Iterates unresolved caller references against the Global Symbol Table. Because all codebase symbols are known, forward and circular cross-file references resolve with 100% deterministic edge completeness.</p>
+            </div>
+            <div class="glass-card">
+              <h4>🔒 Transactional Read-Fencing (HTTP 423)</h4>
+              <p>All read endpoints (<code>/api/graph</code>, <code>/api/query</code>, <code>/api/galaxies</code>, <code>/api/search</code>, <code>/api/condense</code>, <code>/api/symbol</code>, <code>/api/references</code>) lock during background indexing, returning HTTP 423 with progress and retry advice.</p>
+            </div>
+          </div>
+
+          <div class="callout callout-theory">
+            <div class="callout-header">Inbound Edge Preservation Invariant (R-079)</div>
+            <div class="callout-body">
+              When a file is modified, the incremental live-watch pipeline executes surgical edge pruning:
+              <br><br>
+              <code>DELETE linked_to WHERE in = $file_node;</code>
+              <br><br>
+              By targeting only <em>outbound</em> links originating from the modified file (<code>in = $file_node</code>), all <em>inbound</em> edges (<code>out = $file_node</code>) referencing this file from other unchanged modules across the repository remain intact. Cross-module caller lineages survive live developer edits with 100% stability.
             </div>
           </div>
 

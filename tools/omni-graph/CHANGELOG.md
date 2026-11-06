@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sub-Linear Scale-Adaptive Subsystem Sizing (R-088)**: Dynamic scale-adaptive ceiling $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$ scaling logarithmically from 5 to 150 subsystems.
 - **Noise Floor Isolation (R-090)**: Isolated singletons ($< 3$ nodes) gathered into designated utilities namespace, preventing pollution of core business domains.
 - **Multi-Scale API & Parameter Controls (R-089)**: Supported `max_galaxies` override on `/api/cluster` and `/api/galaxies`.
+- **Universal Transactional Read-Fence (R-080)**: Centralized `check_read_fence` guarding `/api/graph`, `/api/query`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/galaxy/boundary`, `/api/galaxies`, `/api/cluster`, and `/api/galaxy/topology` against partial reads during background ingestion.
+- **Living Documentation Portal Parity**: Added Chapter 01 documentation for AI-Native Galaxy Cosmology and Two-Pass Ingestion in `docs/site/index.html` and updated `vadde.github.io` portfolio foundry card, passing all 14 gates of the headless documentation verification suite.
 
 ### Fixed
 - **PolyTuring Database Desynchronization**: Clean atomic purge resolved 13 vs 185 desync across `node.community` and `galaxy` tables; synchronized both views to 65 natural bounded contexts.

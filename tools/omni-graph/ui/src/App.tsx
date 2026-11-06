@@ -493,6 +493,11 @@ export default function App() {
         : `_t=${Date.now()}`;
       const url = `/api/graph?${qs}`;
       const res = await fetch(url);
+      if (res.status === 423) {
+        const lockInfo = await res.json().catch(() => ({}));
+        console.info('Ingestion active — graph data locked (HTTP 423):', lockInfo);
+        return;
+      }
       if (res.ok) {
         const gJson = await res.json();
         setNodes(gJson.nodes || []);

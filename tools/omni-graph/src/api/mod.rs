@@ -325,12 +325,44 @@ pub fn inject_watcher_status(
     }
 }
 
+/// Transactional Read-Fencing helper (R-080): Returns HTTP 423 LOCKED if workspace is indexing
+async fn check_read_fence(
+    state: &AppState,
+    ws: Option<&str>,
+) -> Option<axum::response::Response> {
+    if let Some(job) = state.pipeline.is_indexing(ws).await {
+        Some(
+            (
+                StatusCode::LOCKED,
+                Json(serde_json::json!({
+                    "status": "indexing_in_progress",
+                    "workspace": job.workspace,
+                    "phase": job.phase,
+                    "files_indexed": job.files_indexed,
+                    "total_files": job.total_files,
+                    "retry_after_ms": 2000,
+                    "message": format!(
+                        "Workspace '{}' is actively {} ({} / {} files). Read requests are locked until ingestion completes.",
+                        job.workspace, job.phase, job.files_indexed, job.total_files
+                    )
+                })),
+            )
+                .into_response(),
+        )
+    } else {
+        None
+    }
+}
+
 /// GET /api/graph (R-008, AC-006)
 async fn graph_handler(
     State(state): State<AppState>,
     Query(params): Query<GraphParams>,
 ) -> impl IntoResponse {
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     match state.db.get_graph(ws.as_deref()).await {
         Ok((nodes, links)) => {
             let total_nodes = nodes.len();
@@ -379,19 +411,8 @@ async fn galaxies_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock reads if workspace is actively indexing
-    if let Some(job) = state.pipeline.is_indexing(ws.as_deref()).await {
-        return (
-            StatusCode::LOCKED,
-            Json(serde_json::json!({
-                "status": "indexing_in_progress",
-                "workspace": job.workspace,
-                "phase": job.phase,
-                "files_indexed": job.files_indexed,
-                "total_files": job.total_files,
-                "retry_after_ms": 2000,
-                "message": format!("Workspace '{}' is actively {} ({} / {} files). Read requests are locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
-            }))
-        ).into_response();
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
     }
 
     // 1. Try pre-computed galaxy table records first (R-042)
@@ -561,6 +582,10 @@ async fn search_handler(
     State(state): State<AppState>,
     Query(params): Query<SearchParams>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let k = params.k.unwrap_or(10);
     let start = std::time::Instant::now();
 
@@ -577,7 +602,6 @@ async fn search_handler(
     };
 
     // 2. Perform HNSW cosine similarity search
-    let ws = normalize_workspace(params.workspace.as_deref());
     let include_docs = params.include_docs.unwrap_or(false);
     let res = state.db.search_vector(&query_vec, k, ws.as_deref(), include_docs).await;
     let duration_ms = start.elapsed().as_millis() as i64;
@@ -622,9 +646,12 @@ async fn condense_handler(
     State(state): State<AppState>,
     Query(params): Query<CondenseParams>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let start = std::time::Instant::now();
     let hops = params.hops.unwrap_or(2);
-    let ws = normalize_workspace(params.workspace.as_deref());
     let res = state.db.get_symbol_subgraph(&params.symbol, ws.as_deref(), hops).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -820,8 +847,11 @@ async fn symbol_handler(
     State(state): State<AppState>,
     Query(params): Query<SymbolParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let res = state.db.find_symbols(&params.name, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -864,8 +894,11 @@ async fn references_handler(
     State(state): State<AppState>,
     Query(params): Query<ReferenceParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let res = state.db.find_references(&params.symbol, ws.as_deref(), params.limit).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
@@ -908,8 +941,11 @@ async fn relationships_handler(
     State(state): State<AppState>,
     Json(payload): Json<RelationshipPayload>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(Some(&payload.workspace)).unwrap_or_else(|| payload.workspace.clone());
+    if let Some(fence) = check_read_fence(&state, Some(&ws)).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
 
     if payload.source_symbol.trim().is_empty() || payload.target_symbol.trim().is_empty() {
         return (
@@ -977,9 +1013,12 @@ async fn query_handler(
     State(state): State<AppState>,
     Json(payload): Json<GraphRagPayload>,
 ) -> impl IntoResponse {
+    let ws = normalize_workspace(payload.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
     let start = std::time::Instant::now();
     let top_k = payload.top_k.unwrap_or(5);
-    let ws = normalize_workspace(payload.workspace.as_deref());
     let include_docs = payload.include_docs.unwrap_or(false);
     let res = GraphRagEngine::query(
         &state.db,
@@ -1044,19 +1083,8 @@ async fn cluster_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock reclustering if workspace is actively indexing
-    if let Some(job) = state.pipeline.is_indexing(workspace.as_deref()).await {
-        return (
-            StatusCode::LOCKED,
-            Json(serde_json::json!({
-                "status": "indexing_in_progress",
-                "workspace": job.workspace,
-                "phase": job.phase,
-                "files_indexed": job.files_indexed,
-                "total_files": job.total_files,
-                "retry_after_ms": 2000,
-                "message": format!("Workspace '{}' is actively {} ({} / {} files). Clustering is locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
-            }))
-        ).into_response();
+    if let Some(fence) = check_read_fence(&state, workspace.as_deref()).await {
+        return fence;
     }
 
     match state.db.get_graph(workspace.as_deref()).await {
@@ -1105,8 +1133,11 @@ async fn galaxy_boundary_handler(
     State(state): State<AppState>,
     Query(params): Query<GalaxyBoundaryParams>,
 ) -> impl IntoResponse {
-    let start = std::time::Instant::now();
     let ws = normalize_workspace(params.workspace.as_deref());
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
+    }
+    let start = std::time::Instant::now();
     let sym = params.symbol.trim();
 
     // Record telemetry asynchronously
@@ -1167,19 +1198,8 @@ async fn galaxy_topology_handler(
     });
 
     // Transactional Read-Fencing (R-080): Lock topology if workspace is actively indexing
-    if let Some(job) = state.pipeline.is_indexing(ws.as_deref()).await {
-        return (
-            StatusCode::LOCKED,
-            Json(serde_json::json!({
-                "status": "indexing_in_progress",
-                "workspace": job.workspace,
-                "phase": job.phase,
-                "files_indexed": job.files_indexed,
-                "total_files": job.total_files,
-                "retry_after_ms": 2000,
-                "message": format!("Workspace '{}' is actively {} ({} / {} files). Topology is locked until ingestion completes.", job.workspace, job.phase, job.files_indexed, job.total_files)
-            }))
-        ).into_response();
+    if let Some(fence) = check_read_fence(&state, ws.as_deref()).await {
+        return fence;
     }
 
     let mut records = state.db.get_galaxies_records(ws.as_deref()).await.unwrap_or_default();

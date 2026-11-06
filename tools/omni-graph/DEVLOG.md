@@ -2593,6 +2593,70 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
 - Test suite: 95/95 tests passing in 0.01s (`cargo test --test unit_tests`).
 - `cargo check`: Clean build with zero errors and zero warnings in 1.56s.
 
+---
+
+### 2026-11-05 — AI-Native Galaxy Cosmology, Universal Read-Fencing & Documentation Portal Parity
+
+**Agent/Author**: Antigravity (Google DeepMind) — Systems Architect & Pair Programmer  
+**SDLC Phase**: `review` (AI-Native Cosmology, Dynamic Modularity Guard, Read-Fence Generalization)  
+**Branch**: `feat/omni-graph-two-pass-engine-hardening`  
+**Duration**: ~60m  
+
+#### Objectives
+1. Implement Requirements `R-086` to `R-092` (AI-Native Galaxy Cosmology Engine):
+   - Purge the arbitrary human Miller's Law limit ($K \le 15$) and toxic fallback merge cheat.
+   - Enforce the Affinity-Floor Invariant (halt coarsening on 0-affinity / 0-directory candidate pairs).
+   - Implement Scale-Adaptive Target Sizing: $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$.
+   - Add Newman Modularity Differential Guard ($\Delta Q \ge -\epsilon$ with $\epsilon = 0.05$).
+   - Isolate micro-orphans ($< 3$ nodes) into designated noise floor (`cid: 999_999`).
+2. Generalize Transactional Read-Fencing (R-080) across ALL AST & graph endpoints:
+   - Centralize `check_read_fence` in `src/api/mod.rs` covering `/api/graph`, `/api/query`, `/api/galaxies`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/cluster`, `/api/galaxy/boundary`, `/api/galaxy/topology`.
+   - Update React UI `loadGraph` in `App.tsx` to handle HTTP 423 without clobbering rendered graphs.
+   - Update `omni-mcp.py` to return structured locking messages to AI coding agents.
+3. Synchronize Living Documentation Portal & External Pages:
+   - Add Chapter 01 sections for AI-Native Galaxy Cosmology and Two-Pass Ingestion Engine in `docs/site/index.html`.
+   - Update `vadde.github.io` portfolio foundry card for Omni-Graph.
+   - Pass all 14 gates of the headless documentation portal audit suite.
+4. Harmonize Multi-Workspace Database State in SurrealDB v2:
+   - Synchronize all 11 indexed codebases to the AI-Native Cosmology Engine.
+
+#### Implementation Details
+- **`src/analysis/mod.rs`**:
+  - Implemented `calculate_adaptive_target(node_count, user_limit)`.
+  - Added Newman modularity gain calculation $\Delta Q = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2}$ with $-\epsilon$ threshold guard.
+  - Enforced Affinity-Floor Invariant: removed `sizes.last()` cheat; decoupled domains are preserved independent.
+  - Implemented noise floor isolation (`cid: 999_999`) in `consolidate_communities`.
+- **`src/api/mod.rs`**:
+  - Centralized `check_read_fence` helper. Guarded `/api/graph`, `/api/query`, `/api/search`, `/api/condense`, `/api/symbol`, `/api/references`, `/api/relationships`, `/api/galaxy/boundary`, `/api/galaxies`, `/api/cluster`, `/api/galaxy/topology`.
+  - Added `max_galaxies` alias `limit` in `ClusterPayload` and `GraphParams`.
+- **`ui/src/App.tsx`**:
+  - Updated `loadGraph` to catch HTTP 423 Locked responses during background re-indexing.
+- **`skills/omni-graph/scripts/omni-mcp.py` & `.agents/skills/omni-graph/scripts/omni-mcp.py`**:
+  - Added explicit `urllib.error.HTTPError` handler decoding HTTP 423 to structured lock notifications.
+- **`docs/site/index.html`**:
+  - Added `#sec-omni-cosmology` (Miller's law fallacy, $K_{\text{adaptive}}$ formula, $\Delta Q$ guard, affinity floor).
+  - Added `#sec-omni-twopass` (Two-pass architecture, forward edge resolution, transactional read-fencing).
+  - Added Uncle Bob Abstractness ($A$) & Distance from Main Sequence ($D$) table.
+- **`vadde.github.io/index.html`**:
+  - Added `Two-Pass Ingestion` and `AI-Native Cosmology` chips and updated foundry breakthrough summary.
+
+#### Verification & Live Results
+- Test suite: 98/98 unit & integration tests passing in 0.01s (`cargo test --test unit_tests`).
+- Clippy: 0 warnings (`cargo clippy --all-targets -- -D warnings`).
+- Headless Documentation Audit: All 14 gates deterministically passed (`make docs-test`).
+- Empirical Multi-Workspace Clustering:
+  - `PolyTuring`: 65 natural galaxies (100% synchronized: node.community = 65, galaxy table = 65).
+  - `DSA`: 77 natural galaxies (down from 472 fragmented micro-clusters).
+  - `tutor-intelligence`: 68 natural galaxies (Galaxy #1 shrunk from 1,434 to 908 solver core).
+  - `DesignPatterns`: 49 natural galaxies.
+  - `django-sorcery`: 53 natural galaxies.
+  - `AWS`: 43 natural galaxies.
+  - `QuarkDock`: 38 natural galaxies.
+  - `python`: 34 natural galaxies.
+  - `Personal`: 25 natural galaxies.
+  - `GenAI`: 11 natural galaxies.
+  - `vadde.github.io`: 3 natural galaxies.
+
 
 
 

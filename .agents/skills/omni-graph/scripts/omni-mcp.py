@@ -320,6 +320,32 @@ def handle_tool_call(name: str, args: dict) -> dict:
         else:
             return {"isError": True, "content": [{"type": "text", "text": f"Unknown tool: '{name}'"}]}
 
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        try:
+            err_json = json.loads(body)
+            msg = err_json.get("message") or err_json.get("error") or body
+        except Exception:
+            msg = body
+        if e.code == 423:
+            return {
+                "isError": True,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"🔒 Workspace is indexing: {msg}"
+                    }
+                ]
+            }
+        return {
+            "isError": True,
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Omni-Graph HTTP {e.code}: {msg}"
+                }
+            ]
+        }
     except urllib.error.URLError as e:
         return {
             "isError": True,

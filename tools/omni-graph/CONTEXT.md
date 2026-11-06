@@ -34,12 +34,14 @@ blockers: []
 | Two-Pass Ingestion Engine (R-078) | Complete | — | 🟢 In-memory SymbolTable decoupled declarations from cross-file linkage; forward references resolved 100% |
 | Pipeline Symmetry & Leiden Coarsening (R-077, R-084) | Complete | — | 🟢 Identical 15 macro-galaxies across Ingestion and Re-cluster; multi-level hierarchical contraction |
 | Retentive Delta-Sync Caller Preservation (R-079) | Complete | — | 🟢 relink_inbound_edges preserves inbound callers across live file re-indexing |
-| Transactional Read-Fencing (R-080) | Complete | — | 🟢 HTTP 423 Locked during active indexing on read endpoints |
+| Transactional Read-Fencing (R-080) | Complete | — | 🟢 Universal check_read_fence helper guarding all 11 read endpoints with HTTP 423 Locked |
+| MCP & UI Resilience (HTTP 423) | Complete | — | 🟢 App.tsx loadGraph retry and omni-mcp.py structured locking messages for agents |
 | 256-Symbol Chunked Vector Batching (R-081) | Complete | — | 🟢 16.5x throughput speedup (django-sorcery cold refresh: 1,456s -> 87.9s) |
 | AST Receiver Chained Call Extraction (R-082) | Complete | — | 🟢 REFERENCES edges generated for receiver objects in chained calls |
 | Native SurrealDB v2 HNSW KNN Operator (R-083) | Complete | — | 🟢 Native <\|k, ef\|> operator active with 36-83ms search latency |
 | Uncle Bob Martin Package Metrics (R-085) | Complete | — | 🟢 Abstractness (A) and Distance from Main Sequence (D) computed and persisted |
-| Test Coverage | 95/95 Unit & Integration Tests | 95 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
+| Test Coverage | 98/98 Unit & Integration Tests | 98 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
+| Living Documentation & 14-Gate Audit | Complete | — | 🟢 docs/site/index.html & vadde.github.io synchronized; all 14 gates green |
 | Vector Search Cosine Null & Serde Deserialization Fix | Complete | — | 🟢 Excluded zero-vector structural nodes and handled null similarity, unblocking /api/search & /api/query |
 | Query Parameter Aliasing & Flexibility | Complete | — | 🟢 Permissive serde aliases (symbol/name, q/query, k/limit) eliminating 422 errors |
 | Pre-Tool Hook Guardrail Precision | Complete | — | 🟢 Guarded read_file (Path) under 150-line gate and registered api/query & scripts/omni in recon tracker |
