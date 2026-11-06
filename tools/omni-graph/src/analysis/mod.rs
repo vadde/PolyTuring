@@ -413,21 +413,21 @@ impl CommunityDetector {
         let total_m2 = (2.0 * total_m).max(1.0);
         let total_m_sq = (2.0 * total_m * total_m).max(1.0);
 
-        // 3. Iteratively merge smallest community with its highest affinity neighbor
-        while unique_cids.len() > effective_target {
-            // Compute inter-community edge affinity
-            let mut meta_affinity: HashMap<(i32, i32), f32> = HashMap::new();
-            for link in links {
-                let sc = node_comm.get(link.source.as_str());
-                let tc = node_comm.get(link.target.as_str());
-                if let (Some(&s), Some(&t)) = (sc, tc) {
-                    if s != t {
-                        let key = if s < t { (s, t) } else { (t, s) };
-                        *meta_affinity.entry(key).or_insert(0.0) += get_edge_weight(&link.edge_type);
-                    }
+        // Pre-compute initial inter-community edge affinity matrix once (R-095: O(|E|) initialization)
+        let mut meta_affinity: HashMap<(i32, i32), f32> = HashMap::new();
+        for link in links {
+            let sc = node_comm.get(link.source.as_str());
+            let tc = node_comm.get(link.target.as_str());
+            if let (Some(&s), Some(&t)) = (sc, tc) {
+                if s != t {
+                    let key = if s < t { (s, t) } else { (t, s) };
+                    *meta_affinity.entry(key).or_insert(0.0) += get_edge_weight(&link.edge_type);
                 }
             }
+        }
 
+        // 3. Iteratively merge smallest community with its highest affinity neighbor
+        while unique_cids.len() > effective_target {
             // Find sizes of remaining communities
             let mut sizes: Vec<(i32, usize)> = unique_cids.iter().map(|&c| {
                 let sz = comm_members.get(&c).map(|m| m.len()).unwrap_or(0);
@@ -513,6 +513,21 @@ impl CommunityDetector {
             }
             *comm_degree.entry(target_c).or_insert(0.0) += deg_cand;
             unique_cids.remove(&candidate_c);
+
+            // Incrementally update inter-community affinities (R-095: O(K) per merge, not O(|E|))
+            let self_key = if candidate_c < target_c { (candidate_c, target_c) } else { (target_c, candidate_c) };
+            meta_affinity.remove(&self_key);
+
+            for &other_c in &unique_cids {
+                if other_c == target_c {
+                    continue;
+                }
+                let old_key = if candidate_c < other_c { (candidate_c, other_c) } else { (other_c, candidate_c) };
+                if let Some(w) = meta_affinity.remove(&old_key) {
+                    let new_key = if target_c < other_c { (target_c, other_c) } else { (other_c, target_c) };
+                    *meta_affinity.entry(new_key).or_insert(0.0) += w;
+                }
+            }
         }
 
         // 4. Compact final community IDs to contiguous 0..K space
@@ -704,6 +719,26 @@ impl CommunityDetector {
             .into_iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(c, _)| c)
+    }
+
+    /// Calculate closed-form local modularity delta for moving node u from community C_A to C_B (R-095)
+    /// Delta Q = [ k_{u, C_B}/(2m) - (Sigma_{tot}(C_B) * k_u)/(2m^2) ] - [ k_{u, C_A}/(2m) - (Sigma_{tot}(C_A) * k_u)/(2m^2) ]
+    #[allow(dead_code)]
+    pub fn calculate_local_delta_q(
+        k_u_target: f32,
+        k_u_source: f32,
+        sigma_tot_target: f32,
+        sigma_tot_source: f32,
+        k_u: f32,
+        total_m: f32,
+    ) -> f32 {
+        let total_m2 = (2.0 * total_m).max(1.0);
+        let total_m_sq = (2.0 * total_m * total_m).max(1.0);
+
+        let target_gain = (k_u_target / total_m2) - (sigma_tot_target * k_u / total_m_sq);
+        let source_loss = (k_u_source / total_m2) - (sigma_tot_source * k_u / total_m_sq);
+
+        target_gain - source_loss
     }
 
     /// Summarize detected communities (macroscopic view)

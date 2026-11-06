@@ -261,7 +261,25 @@ impl IncrementalPipeline {
         }
 
         // 1. Look up existing community for this file before pruning to preserve community assignment
-        let existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
+        let mut existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
+
+        // 1a. Zero-delay community inference for brand-new files (R-105)
+        // If file is brand-new (existing_comm is None), infer modal community from neighbor connections or directory siblings
+        if existing_comm.is_none() {
+            let target_ids: Vec<String> = all_edges
+                .iter()
+                .filter_map(|e| e.target_id.clone())
+                .collect();
+            if !target_ids.is_empty() {
+                existing_comm = self.db.infer_community_from_targets(workspace, &target_ids).await.unwrap_or(None);
+            }
+            if existing_comm.is_none() {
+                let parent_dir = Path::new(rel_path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                if !parent_dir.is_empty() && parent_dir != "." {
+                    existing_comm = self.db.get_directory_modal_community(workspace, &parent_dir).await.unwrap_or(None);
+                }
+            }
+        }
 
         // 1b. Capture existing inbound caller edges (R-079) before pruning old nodes
         let inbound_edges = self.db.get_inbound_edges_for_file(workspace, rel_path).await.unwrap_or_default();

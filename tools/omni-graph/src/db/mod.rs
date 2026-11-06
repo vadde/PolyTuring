@@ -1876,6 +1876,51 @@ impl DbClient {
         Ok(None)
     }
 
+    /// Infer modal community from connected target nodes (R-105)
+    pub async fn infer_community_from_targets(&self, workspace: &str, target_ids: &[String]) -> Result<Option<i32>, String> {
+        if target_ids.is_empty() {
+            return Ok(None);
+        }
+        let esc_ws = surql_escape(workspace);
+        let ids_str = target_ids
+            .iter()
+            .map(|id| format!("type::thing('node', '{}')", surql_escape(clean_record_id(id))))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let q = format!(
+            "SELECT count(), community FROM node WHERE workspace = '{}' AND id IN [{}] AND community IS NOT NONE GROUP BY community ORDER BY count DESC LIMIT 1;",
+            esc_ws, ids_str
+        );
+        let resp = self.query_sql(&q).await?;
+        if let Some(arr) = resp.as_array().and_then(|a| a.first()).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
+            if let Some(first) = arr.first() {
+                if let Some(val) = first.get("community").and_then(|v| v.as_i64()) {
+                    return Ok(Some(val as i32));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Retrieve modal community for sibling files in a given directory (R-105)
+    pub async fn get_directory_modal_community(&self, workspace: &str, dir_path: &str) -> Result<Option<i32>, String> {
+        let esc_ws = surql_escape(workspace);
+        let esc_dir = surql_escape(dir_path);
+        let q = format!(
+            "SELECT count(), community FROM node WHERE workspace = '{}' AND string::starts_with(file_path, '{}/') AND community IS NOT NONE GROUP BY community ORDER BY count DESC LIMIT 1;",
+            esc_ws, esc_dir
+        );
+        let resp = self.query_sql(&q).await?;
+        if let Some(arr) = resp.as_array().and_then(|a| a.first()).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
+            if let Some(first) = arr.first() {
+                if let Some(val) = first.get("community").and_then(|v| v.as_i64()) {
+                    return Ok(Some(val as i32));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     /// Retrieve symbol architectural boundary contract and cross-galaxy blast radius
     pub async fn get_symbol_boundary(&self, symbol: &str, workspace: Option<&str>) -> Result<Option<SymbolBoundaryInfo>, String> {
         let symbols = self.find_symbols(symbol, workspace, None).await?;

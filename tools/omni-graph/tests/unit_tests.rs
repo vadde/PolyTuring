@@ -3521,6 +3521,96 @@ def create_account():
         assert_eq!(post_edge.call_count, 2, "post() call count should be 2");
         assert_eq!(post_edge.weight, 2.0, "post() edge weight should be 2.0");
     }
+
+    #[test]
+    fn test_r095_dual_tier_local_modularity_fast_path() {
+        use omni_graph::analysis::CommunityDetector;
+
+        // Node u strongly coupled to target community B (k_{u, B} = 10.0) vs weak source community A (k_{u, A} = 1.0)
+        let k_u_target = 10.0;
+        let k_u_source = 1.0;
+        let sigma_tot_target = 50.0;
+        let sigma_tot_source = 100.0;
+        let k_u = 11.0;
+        let total_m = 200.0;
+
+        let delta_q = CommunityDetector::calculate_local_delta_q(
+            k_u_target,
+            k_u_source,
+            sigma_tot_target,
+            sigma_tot_source,
+            k_u,
+            total_m,
+        );
+
+        // Fast-path invariant (R-095): Positive delta_Q triggers instant local reassignment
+        assert!(delta_q > 0.0, "Delta Q must be positive when coupled more strongly to target community");
+
+        // Reverse check: coupled weakly to target B vs strongly to source A
+        let delta_q_negative = CommunityDetector::calculate_local_delta_q(
+            0.5,
+            10.0,
+            120.0,
+            40.0,
+            10.5,
+            total_m,
+        );
+        assert!(delta_q_negative < 0.0, "Delta Q must be negative when source community has higher affinity");
+    }
+
+    #[test]
+    fn test_r105_zero_delay_community_inference_for_new_files() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::DbLink;
+        use std::collections::HashMap;
+
+        let mut node_communities = HashMap::new();
+        node_communities.insert("node_billing_1".to_string(), 2);
+        node_communities.insert("node_billing_2".to_string(), 2);
+        node_communities.insert("node_billing_3".to_string(), 2);
+        node_communities.insert("node_auth_1".to_string(), 5);
+
+        // New node links to 3 billing nodes and 1 auth node
+        let links = vec![
+            DbLink {
+                id: "l1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_2".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l3".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_billing_3".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "l4".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "node_new".to_string(),
+                target: "node_auth_1".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        let inferred = CommunityDetector::infer_neighbor_community("node_new", &links, &node_communities);
+
+        // Invariant (R-105): New file immediately inherits modal neighbor community 2 upon insertion
+        assert_eq!(inferred, Some(2), "New node must infer modal community of its connected neighbors");
+    }
 }
 
 
