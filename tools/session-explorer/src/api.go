@@ -79,8 +79,16 @@ func (h *APIHandler) HandleSessions(w http.ResponseWriter, r *http.Request) {
 		sortBy = "date"
 		sortOrder = "asc"
 	}
+	if sortBy == "active_asc" {
+		sortBy = "active"
+		sortOrder = "asc"
+	}
+	if sortBy == "active_desc" {
+		sortBy = "active"
+		sortOrder = "desc"
+	}
 	if sortBy == "" {
-		sortBy = "date"
+		sortBy = "active"
 	}
 	if sortOrder == "" {
 		sortOrder = "desc"
@@ -89,7 +97,15 @@ func (h *APIHandler) HandleSessions(w http.ResponseWriter, r *http.Request) {
 	from := parseDate(q.Get("from"), false)
 	to := parseDate(q.Get("to"), true)
 
-	sessions := h.index.GetSessions(workspace, sortBy, sortOrder, from, to)
+	dateMode := q.Get("date_mode")
+	if dateMode == "" {
+		dateMode = q.Get("date_filter_by")
+	}
+	if dateMode == "" {
+		dateMode = "active" // Default: filter by last active/touched recency (R-049)
+	}
+
+	sessions := h.index.GetSessions(workspace, sortBy, sortOrder, from, to, dateMode)
 	if runtimeMode != "" {
 		filtered := make([]Session, 0, len(sessions))
 		for _, s := range sessions {
@@ -159,7 +175,15 @@ func (h *APIHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := h.index.Search(query, workspace, msgType, from, to)
+	dateMode := q.Get("date_mode")
+	if dateMode == "" {
+		dateMode = q.Get("date_filter_by")
+	}
+	if dateMode == "" {
+		dateMode = "active"
+	}
+
+	results := h.index.Search(query, workspace, msgType, from, to, dateMode)
 	writeJSON(w, results)
 }
 

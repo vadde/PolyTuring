@@ -822,10 +822,15 @@ func (idx *SessionIndex) scanSession(loc DiscoveredLocation, sessionID, transcri
 }
 
 // GetSessions returns all sessions, optionally filtered.
-// Implements: R-010, R-011, R-014
-func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, to time.Time) []Session {
+// Implements: R-010, R-011, R-014, R-049
+func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, to time.Time, dateMode ...string) []Session {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
+
+	dm := "active"
+	if len(dateMode) > 0 && strings.TrimSpace(dateMode[0]) != "" {
+		dm = strings.ToLower(strings.TrimSpace(dateMode[0]))
+	}
 
 	filtered := make([]Session, 0, len(idx.sessions))
 	for _, s := range idx.sessions {
@@ -855,16 +860,33 @@ func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, 
 			}
 		}
 
-		// Filter by date range (inclusive session lifetime overlap)
+		// Filter by date range according to tri-modal temporal lens (R-049)
 		lastActive := s.LastMessageAt
 		if lastActive.IsZero() {
 			lastActive = s.CreatedAt
 		}
-		if !from.IsZero() && lastActive.Before(from) {
-			continue
-		}
-		if !to.IsZero() && s.CreatedAt.After(to) {
-			continue
+		switch dm {
+		case "created", "inception":
+			if !from.IsZero() && s.CreatedAt.Before(from) {
+				continue
+			}
+			if !to.IsZero() && s.CreatedAt.After(to) {
+				continue
+			}
+		case "overlap", "span":
+			if !from.IsZero() && lastActive.Before(from) {
+				continue
+			}
+			if !to.IsZero() && s.CreatedAt.After(to) {
+				continue
+			}
+		default: // inclusive session lifetime overlap: covers both inception and last touched
+			if !from.IsZero() && lastActive.Before(from) {
+				continue
+			}
+			if !to.IsZero() && s.CreatedAt.After(to) {
+				continue
+			}
 		}
 
 		filtered = append(filtered, s)
@@ -872,6 +894,32 @@ func (idx *SessionIndex) GetSessions(workspace, sortBy, sortOrder string, from, 
 
 	// Sort
 	switch sortBy {
+	case "active", "last_active":
+		if sortOrder == "asc" {
+			sort.Slice(filtered, func(i, j int) bool {
+				ti := filtered[i].LastMessageAt
+				if ti.IsZero() {
+					ti = filtered[i].CreatedAt
+				}
+				tj := filtered[j].LastMessageAt
+				if tj.IsZero() {
+					tj = filtered[j].CreatedAt
+				}
+				return ti.Before(tj)
+			})
+		} else {
+			sort.Slice(filtered, func(i, j int) bool {
+				ti := filtered[i].LastMessageAt
+				if ti.IsZero() {
+					ti = filtered[i].CreatedAt
+				}
+				tj := filtered[j].LastMessageAt
+				if tj.IsZero() {
+					tj = filtered[j].CreatedAt
+				}
+				return ti.After(tj)
+			})
+		}
 	case "date":
 		if sortOrder == "asc" {
 			sort.Slice(filtered, func(i, j int) bool {
@@ -1012,13 +1060,18 @@ func formatMessageDisplay(entry TranscriptEntry) MessageDisplay {
 }
 
 // Search performs full-text search across all sessions.
-// Implements: R-012
-func (idx *SessionIndex) Search(query, workspace, msgType string, from, to time.Time) *SearchResponse {
+// Implements: R-012, R-049
+func (idx *SessionIndex) Search(query, workspace, msgType string, from, to time.Time, dateMode ...string) *SearchResponse {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
 	if query == "" {
 		return &SearchResponse{Results: []SearchResult{}, TotalCount: 0, Query: query}
+	}
+
+	dm := "active"
+	if len(dateMode) > 0 && strings.TrimSpace(dateMode[0]) != "" {
+		dm = strings.ToLower(strings.TrimSpace(dateMode[0]))
 	}
 
 	queryLower := strings.ToLower(query)
@@ -1043,16 +1096,33 @@ func (idx *SessionIndex) Search(query, workspace, msgType string, from, to time.
 			}
 		}
 
-		// Apply date filter (inclusive lifetime overlap)
+		// Apply date filter according to tri-modal temporal lens (R-049)
 		lastActive := session.LastMessageAt
 		if lastActive.IsZero() {
 			lastActive = session.CreatedAt
 		}
-		if !from.IsZero() && lastActive.Before(from) {
-			continue
-		}
-		if !to.IsZero() && session.CreatedAt.After(to) {
-			continue
+		switch dm {
+		case "created", "inception":
+			if !from.IsZero() && session.CreatedAt.Before(from) {
+				continue
+			}
+			if !to.IsZero() && session.CreatedAt.After(to) {
+				continue
+			}
+		case "overlap", "span":
+			if !from.IsZero() && lastActive.Before(from) {
+				continue
+			}
+			if !to.IsZero() && session.CreatedAt.After(to) {
+				continue
+			}
+		default: // inclusive session lifetime overlap
+			if !from.IsZero() && lastActive.Before(from) {
+				continue
+			}
+			if !to.IsZero() && session.CreatedAt.After(to) {
+				continue
+			}
 		}
 
 		// Scan transcript for matches (Implements: R-036)

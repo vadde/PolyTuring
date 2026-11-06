@@ -228,8 +228,9 @@ const state = {
   filterRuntime: '', // '' | 'ide' | 'cli' | 'core'
   dateFrom: '',
   dateTo: '',
-  sortBy: 'date',
+  sortBy: 'active', // 'active' (last touched) | 'date' (created) | 'steps' | 'messages' | 'size'
   sortOrder: 'desc',
+  dateGroupingMode: 'active', // 'active' (group by last message) | 'created' (group by inception)
   messageFilter: 'ALL', // 'ALL' | 'USER_INPUT' | 'PLANNER_RESPONSE' | 'TOOL_CALLS' | 'ERROR'
   searchQuery: '',
   searchResults: [],
@@ -239,10 +240,11 @@ const state = {
   sessionStepSort: 'step_desc', // sort mode for steps within active session detail ('step_desc' by default, 'step_asc', 'time_desc', 'time_asc', 'tools_desc', 'length_desc')
   projectFilters: {
     search: '',
-    sort: 'date_desc',
+    sort: 'active_desc',
     dateFrom: '',
     dateTo: '',
-    datePreset: 'all'
+    datePreset: 'all',
+    dateMode: 'active'
   },
   liveInterval: parseInt(localStorage.getItem('se_live_interval') || '10000', 10),
   lastSynced: new Date(),
@@ -265,11 +267,21 @@ const state = {
   fileFindCaseSensitive: false,
   fileFindMatches: [],
   fileFindActiveIndex: -1,
-  sessionFilesMap: new Map(), // cleanPath -> { path, name, type, tool, stepIndex }
+  sessionFilesMap: new Map(), // cleanPath -> ForensicFileRecord
+  sessionFiles: {
+    lens: 'catalog', // 'catalog' | 'artifacts' | 'mutations' | 'telemetry'
+    type: 'ALL',     // 'ALL' | 'ARTIFACT' | 'MODIFIED' | 'READ' | 'REFERENCE'
+    search: '',
+    sort: 'type_priority', // 'type_priority' | 'churn_desc' | 'last_touch' | 'first_touch' | 'reads_desc' | 'name_asc' | 'ext_asc'
+    records: [],
+    telemetry: null,
+    sessionId: null
+  },
   agentMatrix: {
     scope: 'global', // 'global' | 'workspace' | 'cascade'
     type: 'ALL',     // 'ALL' | 'RULES' | 'SKILLS' | 'PLUGINS' | 'HOOKS'
     search: '',
+    sort: 'bloat_desc', // 'bloat_desc' | 'lines_desc' | 'name_asc' | 'scope'
     targetWorkspace: null,
     globalContext: null,
     workspaceContext: null
@@ -278,6 +290,7 @@ const state = {
     lens: 'active', // 'active' | 'cascade' | 'telemetry'
     type: 'ALL',    // 'ALL' | 'SKILLS' | 'MCP' | 'NATIVE' | 'RULES' | 'ORCHESTRATION'
     search: '',
+    sort: 'calls_desc', // 'calls_desc' | 'last_step' | 'bloat_desc' | 'precedence' | 'name_asc'
     context: null,
     sessionId: null
   },
@@ -310,9 +323,19 @@ const el = {
   dashboardView: document.getElementById('dashboardView'),
   detailView: document.getElementById('detailView'),
   detailBackBtn: document.getElementById('detailBackBtn'),
+  detailSessionCapsule: document.getElementById('detailSessionCapsule'),
   detailSessionId: document.getElementById('detailSessionId'),
+  copySessionIdBtn: document.getElementById('copySessionIdBtn'),
   detailWorkspaceBadge: document.getElementById('detailWorkspaceBadge'),
   detailRuntimeBadge: document.getElementById('detailRuntimeBadge'),
+  detailTemporalCapsule: document.getElementById('detailTemporalCapsule'),
+  detailActivePill: document.getElementById('detailActivePill'),
+  detailPulseDot: document.getElementById('detailPulseDot'),
+  detailActiveTime: document.getElementById('detailActiveTime'),
+  detailCreatedPill: document.getElementById('detailCreatedPill'),
+  detailCreatedTime: document.getElementById('detailCreatedTime'),
+  detailLifespanPill: document.getElementById('detailLifespanPill'),
+  detailLifespanText: document.getElementById('detailLifespanText'),
   detailTime: document.getElementById('detailTime'),
   detailFilesBtn: document.getElementById('detailFilesBtn'),
   detailFilesCountBadge: document.getElementById('detailFilesCountBadge'),
@@ -390,17 +413,33 @@ const el = {
   fileFindPrevBtn: document.getElementById('fileFindPrevBtn'),
   fileFindNextBtn: document.getElementById('fileFindNextBtn'),
   fileFindCloseBtn: document.getElementById('fileFindCloseBtn'),
-  // Session Files Modal
+  // Session Files Holographic Matrix (R-045)
   sessionFilesModal: document.getElementById('sessionFilesModal'),
   closeSessionFilesModalBtn: document.getElementById('closeSessionFilesModalBtn'),
-  sessionFilesTotalCount: document.getElementById('sessionFilesTotalCount'),
-  sessionFilesListContainer: document.getElementById('sessionFilesListContainer'),
+  sessionFilesIdBadge: document.getElementById('sessionFilesIdBadge'),
+  sessionFilesTotalCountBadge: document.getElementById('sessionFilesTotalCountBadge'),
+  sessionFilesLensControl: document.getElementById('sessionFilesLensControl'),
+  sessionFilesSortSelect: document.getElementById('sessionFilesSortSelect'),
+  sessionFilesSearchInput: document.getElementById('sessionFilesSearchInput'),
+  clearSessionFilesSearchBtn: document.getElementById('clearSessionFilesSearchBtn'),
+  sessionFilesChipAll: document.getElementById('sessionFilesChipAll'),
+  sessionFilesChipArtifacts: document.getElementById('sessionFilesChipArtifacts'),
+  sessionFilesChipModified: document.getElementById('sessionFilesChipModified'),
+  sessionFilesChipRead: document.getElementById('sessionFilesChipRead'),
+  sessionFilesChipRefs: document.getElementById('sessionFilesChipRefs'),
+  sessionFilesArtifactsVal: document.getElementById('sessionFilesArtifactsVal'),
+  sessionFilesMutationsVal: document.getElementById('sessionFilesMutationsVal'),
+  sessionFilesReadsVal: document.getElementById('sessionFilesReadsVal'),
+  sessionFilesBlastVal: document.getElementById('sessionFilesBlastVal'),
+  sessionFilesIntensityVal: document.getElementById('sessionFilesIntensityVal'),
+  sessionFilesContent: document.getElementById('sessionFilesContent'),
   // Agent Context Matrix & Brain Elements (R-039)
   agentBrainBtn: document.getElementById('agentBrainBtn'),
   agentMatrixModal: document.getElementById('agentMatrixModal'),
   closeAgentMatrixModalBtn: document.getElementById('closeAgentMatrixModalBtn'),
   agentMatrixScopeControl: document.getElementById('agentMatrixScopeControl'),
   agentMatrixWorkspaceSegment: document.getElementById('agentMatrixWorkspaceSegment'),
+  agentMatrixSortSelect: document.getElementById('agentMatrixSortSelect'),
   agentMatrixSearchInput: document.getElementById('agentMatrixSearchInput'),
   clearAgentMatrixSearchBtn: document.getElementById('clearAgentMatrixSearchBtn'),
   agentMatrixTotalCountBadge: document.getElementById('agentMatrixTotalCountBadge'),
@@ -418,6 +457,7 @@ const el = {
   // Session Matrix Holographic Elements (R-040)
   sessionMatrixTotalCountBadge: document.getElementById('sessionMatrixTotalCountBadge'),
   sessionMatrixLensControl: document.getElementById('sessionMatrixLensControl'),
+  sessionMatrixSortSelect: document.getElementById('sessionMatrixSortSelect'),
   sessionMatrixSearchInput: document.getElementById('sessionMatrixSearchInput'),
   clearSessionMatrixSearchBtn: document.getElementById('clearSessionMatrixSearchBtn'),
   sessionMatrixChipAll: document.getElementById('sessionMatrixChipAll'),
@@ -592,6 +632,36 @@ function initEventListeners() {
     });
   }
   if (el.doInstallSkillBtn) el.doInstallSkillBtn.addEventListener('click', executeInstallSkill);
+
+  // 1-Click Copy Session UUID Capsule (R-047)
+  const copySessionId = (e) => {
+    if (e) e.stopPropagation();
+    const sid = state.activeTimelineSessionId || (state.selectedSessionDetail?.session?.id) || el.detailSessionId?.textContent?.trim();
+    if (!sid) return;
+    copyToClipboard(sid, `Session UUID copied to clipboard: ${sid.slice(0, 8)}...`);
+    if (el.copySessionIdBtn) {
+      el.copySessionIdBtn.classList.add('copied');
+      const label = el.copySessionIdBtn.querySelector('.copy-label');
+      const icon = el.copySessionIdBtn.querySelector('.copy-icon');
+      if (label) label.textContent = 'Copied!';
+      if (icon) icon.textContent = '✓';
+      setTimeout(() => {
+        el.copySessionIdBtn.classList.remove('copied');
+        if (label) label.textContent = 'Copy';
+        if (icon) icon.textContent = '📋';
+      }, 1800);
+    }
+  };
+
+  if (el.copySessionIdBtn) {
+    el.copySessionIdBtn.addEventListener('click', copySessionId);
+  }
+  if (el.detailSessionCapsule) {
+    el.detailSessionCapsule.addEventListener('click', (e) => {
+      if (e.target.closest('#copySessionIdBtn')) return;
+      copySessionId(e);
+    });
+  }
 
   // Global search triggers
   if (el.globalSearchInput) {
@@ -879,6 +949,9 @@ function initEventListeners() {
       if (el.agentMatrixModal && el.agentMatrixModal.classList.contains('active')) {
         renderAgentMatrix();
       }
+      if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
+        renderSessionFilesMatrix();
+      }
     }, 120);
   }, { passive: true });
 
@@ -1075,13 +1148,8 @@ function initEventListeners() {
     });
   }
 
-  // Session Files Modal Listeners
-  if (el.detailFilesBtn) {
-    el.detailFilesBtn.addEventListener('click', openSessionFilesModal);
-  }
-  if (el.closeSessionFilesModalBtn) {
-    el.closeSessionFilesModalBtn.addEventListener('click', closeSessionFilesModal);
-  }
+  // Session Files Matrix Listeners (R-045)
+  initSessionFilesListeners();
 
   // Agent Matrix Listeners (R-039)
   initAgentMatrixListeners();
@@ -1093,6 +1161,12 @@ function formatLocalDate(d) {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+// Compact date helper for single-line multi-day spans (e.g. "Nov 4")
+function formatShortMonthDay(d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
 }
 
 // Date Presets Logic (R-010)
@@ -1457,24 +1531,33 @@ function renderProjectHub() {
         });
       }
 
-      // 2. In-Project Date Filter (inclusive lifetime overlap)
+      // 2. In-Project Date Filter (Tri-Modal Temporal Lens R-049)
       if (state.projectFilters.dateFrom || state.projectFilters.dateTo) {
         const fromTime = state.projectFilters.dateFrom ? new Date(state.projectFilters.dateFrom + 'T00:00:00Z').getTime() : 0;
         const toTime = state.projectFilters.dateTo ? new Date(state.projectFilters.dateTo + 'T23:59:59.999Z').getTime() : Infinity;
+        const pMode = state.projectFilters.dateMode || state.dateFilterMode || 'active';
 
         list = list.filter(s => {
           const cTime = new Date(s.created_at).getTime();
           const lTime = s.last_message_at ? new Date(s.last_message_at).getTime() : cTime;
-          return (lTime >= fromTime) && (cTime <= toTime);
+          if (pMode === 'created') {
+            return (cTime >= fromTime) && (cTime <= toTime);
+          } else if (pMode === 'overlap') {
+            return (lTime >= fromTime) && (cTime <= toTime);
+          } else { // 'active'
+            return (lTime >= fromTime) && (lTime <= toTime);
+          }
         });
       }
 
-      // 3. In-Project Sort
-      const pSort = state.projectFilters.sort || 'date_desc';
+      // 3. In-Project Sort (Dual-Temporal Sorting R-048)
+      const pSort = state.projectFilters.sort || 'active_desc';
       list.sort((a, b) => {
         switch (pSort) {
           case 'date_asc':
             return new Date(a.created_at) - new Date(b.created_at);
+          case 'date_desc':
+            return new Date(b.created_at) - new Date(a.created_at);
           case 'steps_desc':
             return (b.step_count || 0) - (a.step_count || 0);
           case 'messages_desc':
@@ -1483,9 +1566,12 @@ function renderProjectHub() {
             return (b.tool_call_count || 0) - (a.tool_call_count || 0);
           case 'size_desc':
             return (b.transcript_size_bytes || 0) - (a.transcript_size_bytes || 0);
-          case 'date_desc':
-          default:
-            return new Date(b.created_at) - new Date(a.created_at);
+          case 'active_desc':
+          default: {
+            const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : new Date(a.created_at).getTime();
+            const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : new Date(b.created_at).getTime();
+            return tb - ta;
+          }
         }
       });
 
@@ -1498,7 +1584,7 @@ function renderProjectHub() {
       state.projectFilters.dateFrom ||
       state.projectFilters.dateTo ||
       state.projectFilters.datePreset !== 'all' ||
-      state.projectFilters.sort !== 'date_desc'
+      state.projectFilters.sort !== 'active_desc'
     );
 
     // Show Hero Banner & In-Project Session Stack Toolbar
@@ -1537,8 +1623,9 @@ function renderProjectHub() {
           <div class="filter-group">
             <span class="filter-label">Sort:</span>
             <select id="projectSortSelect" class="select-custom" aria-label="Sort sessions in this project">
-              <option value="date_desc" ${state.projectFilters.sort === 'date_desc' ? 'selected' : ''}>Most Recent</option>
-              <option value="date_asc" ${state.projectFilters.sort === 'date_asc' ? 'selected' : ''}>Oldest First</option>
+              <option value="active_desc" ${state.projectFilters.sort === 'active_desc' ? 'selected' : ''}>⚡ Last Active (Recent First)</option>
+              <option value="date_desc" ${state.projectFilters.sort === 'date_desc' ? 'selected' : ''}>🌱 Inception Date (Newest First)</option>
+              <option value="date_asc" ${state.projectFilters.sort === 'date_asc' ? 'selected' : ''}>⏮️ Oldest Inception</option>
               <option value="steps_desc" ${state.projectFilters.sort === 'steps_desc' ? 'selected' : ''}>Most Steps</option>
               <option value="messages_desc" ${state.projectFilters.sort === 'messages_desc' ? 'selected' : ''}>Most Prompts</option>
               <option value="tools_desc" ${state.projectFilters.sort === 'tools_desc' ? 'selected' : ''}>Most Tool Calls</option>
@@ -1572,7 +1659,7 @@ function renderProjectHub() {
       document.getElementById('projectHeroBackBtn')?.addEventListener('click', () => {
         state.drilledProject = null;
         state.filterWorkspace = '';
-        state.projectFilters = { search: '', sort: 'date_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+        state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
         if (el.workspaceSelect) el.workspaceSelect.value = '';
         window.location.hash = '#/';
       });
@@ -1675,7 +1762,7 @@ function renderProjectHub() {
 
       // Reset Project Filters Button
       document.getElementById('resetProjectFiltersBtn')?.addEventListener('click', () => {
-        state.projectFilters = { search: '', sort: 'date_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+        state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
         renderProjectHub();
       });
     }
@@ -1691,7 +1778,7 @@ function renderProjectHub() {
           </div>
         `;
         document.getElementById('emptyResetBtn')?.addEventListener('click', () => {
-          state.projectFilters = { search: '', sort: 'date_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+          state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
           renderProjectHub();
         });
       } else {
@@ -1881,7 +1968,7 @@ function renderProjectHub() {
   });
 }
 
-// Mode 2: Date Grouped View (R-029)
+// Mode 2: Date Grouped View (Dual-Temporal Recency Partitioning R-048)
 function renderDateGroupedView() {
   if (el.projectHeroBanner) {
     el.projectHeroBanner.style.display = 'none';
@@ -1912,27 +1999,45 @@ function renderDateGroupedView() {
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - 7);
 
+  const isByLastActive = state.dateGroupingMode !== 'created';
   const buckets = {
-    today: { title: '🌟 Today', sessions: [] },
-    yesterday: { title: '⚡ Yesterday', sessions: [] },
-    thisWeek: { title: '📅 Past 7 Days', sessions: [] },
-    older: { title: '🗓️ Older', sessions: [] }
+    today: { title: isByLastActive ? '🌟 Active Today' : '🌟 Initiated Today', sessions: [] },
+    yesterday: { title: isByLastActive ? '⚡ Active Yesterday' : '⚡ Initiated Yesterday', sessions: [] },
+    thisWeek: { title: isByLastActive ? '📅 Active Past 7 Days' : '📅 Initiated Past 7 Days', sessions: [] },
+    older: { title: isByLastActive ? '🗓️ Active Earlier' : '🗓️ Initiated Earlier', sessions: [] }
   };
 
   sessions.forEach(s => {
-    const d = new Date(s.created_at);
-    if (d >= startOfToday) {
+    const targetDate = isByLastActive
+      ? (s.last_message_at ? new Date(s.last_message_at) : new Date(s.created_at))
+      : new Date(s.created_at);
+
+    if (targetDate >= startOfToday) {
       buckets.today.sessions.push(s);
-    } else if (d >= startOfYesterday) {
+    } else if (targetDate >= startOfYesterday) {
       buckets.yesterday.sessions.push(s);
-    } else if (d >= startOfWeek) {
+    } else if (targetDate >= startOfWeek) {
       buckets.thisWeek.sessions.push(s);
     } else {
       buckets.older.sessions.push(s);
     }
   });
 
-  let html = '';
+  let html = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+      <span style="font-size: 0.84rem; color: var(--text-dim); font-family: var(--font-mono, monospace);">
+        Partitioning ${sessions.length} sessions by ${isByLastActive ? '⚡ Last Active Recency' : '🌱 Inception Date'}
+      </span>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;">Partition by:</span>
+        <div class="segmented-control" id="dateGroupModeControl" style="margin: 0;">
+          <button class="segment-btn ${isByLastActive ? 'active' : ''}" data-mode="active" title="Partition by when the session was last active/touched">⚡ Last Active</button>
+          <button class="segment-btn ${!isByLastActive ? 'active' : ''}" data-mode="created" title="Partition by when the session was initially created">🌱 Inception Date</button>
+        </div>
+      </div>
+    </div>
+  `;
+
   for (const key of ['today', 'yesterday', 'thisWeek', 'older']) {
     const b = buckets[key];
     if (b.sessions.length === 0) continue;
@@ -1952,6 +2057,14 @@ function renderDateGroupedView() {
 
   container.innerHTML = html;
   attachSessionCardClicks(container);
+
+  // Attach Partition Lens Toggle Listener
+  container.querySelectorAll('#dateGroupModeControl .segment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.dateGroupingMode = btn.dataset.mode;
+      renderDateGroupedView();
+    });
+  });
 }
 
 // Mode 3: Flat Grid View (R-008, R-018)
@@ -2001,11 +2114,22 @@ function getRuntimeBadgeHtml(s) {
   return `<span class="runtime-badge runtime-ide" title="Antigravity IDE">💻 IDE</span>`;
 }
 
-// Helper: Render session cards HTML
+// Helper: Render session cards HTML (Dual-Temporal Matrix R-048)
 function renderSessionCardsHtml(sessions) {
+  const now = Date.now();
   return sessions.map(s => {
-    const timeStr = formatDateTime(s.created_at);
-    const relTime = formatRelativeTime(s.created_at);
+    const createdAt = new Date(s.created_at);
+    const lastActiveAt = s.last_message_at ? new Date(s.last_message_at) : createdAt;
+    const isRecent = (now - lastActiveAt.getTime()) < 3 * 3600 * 1000; // active in last 3 hours
+    const spanMs = Math.max(0, lastActiveAt.getTime() - createdAt.getTime());
+    const isMultiDay = spanMs >= 24 * 3600 * 1000;
+    const spanDays = Math.max(1, Math.round(spanMs / (24 * 3600 * 1000)));
+
+    const activeRel = formatRelativeTime(lastActiveAt);
+    const activeFormatted = formatDateTime(lastActiveAt);
+    const createdDateStr = formatLocalDate(createdAt);
+    const createdFormatted = formatDateTime(createdAt);
+
     const preview = s.first_user_prompt_preview || 'No explicit user prompt';
     const sizeKB = Math.round((s.transcript_size_bytes || 0) / 1024);
 
@@ -2013,13 +2137,32 @@ function renderSessionCardsHtml(sessions) {
       <div class="session-card" data-id="${s.id}">
         <div>
           <div class="card-top">
-            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+            <div class="card-header-left">
               <span class="workspace-badge" title="${escapeHtml(s.workspace || s.project_name)}">
                 📁 ${escapeHtml(s.project_name || 'Default')}
               </span>
               ${getRuntimeBadgeHtml(s)}
+              <button class="card-copy-btn" data-uuid="${s.id}" title="Click to copy full Session UUID (${s.id})" aria-label="Copy session ID">
+                <span class="copy-icon">📋</span>
+                <span class="copy-uuid">${s.id.slice(0, 8)}</span>
+              </button>
             </div>
-            <span class="session-time" title="${timeStr}">${relTime}</span>
+            <div class="temporal-badge-group">
+              <span class="session-active-time ${isRecent ? 'is-live' : ''}" title="Last active: ${activeFormatted} (${activeRel})">
+                ${isRecent ? '<span class="active-pulse-dot" title="Active within last 3 hours"></span>' : ''}
+                <span class="time-label">⚡ Active</span> ${activeRel}
+              </span>
+              <span class="session-created-time" title="Session initiated: ${createdFormatted}">
+                <span class="time-label">🌱 Inception:</span> ${createdDateStr}
+              </span>
+            </div>
+          </div>
+          <div class="session-lifespan-row">
+            ${isMultiDay ? `
+              <span class="session-lifespan-pill" title="Session active across ${spanDays} days (from ${formatDateTime(createdAt, true)} to ${formatDateTime(lastActiveAt, true)})">
+                ⏳ ${spanDays}d Span (${formatShortMonthDay(createdAt)} ➔ ${formatShortMonthDay(lastActiveAt)})
+              </span>
+            ` : '<span style="display: inline-block; height: 1px;"></span>'}
           </div>
           <div class="prompt-snippet" title="${escapeHtml(preview)}">
             "${escapeHtml(preview)}"
@@ -2039,8 +2182,26 @@ function renderSessionCardsHtml(sessions) {
 
 // Helper: Attach card clicks
 function attachSessionCardClicks(container) {
+  // Bind 1-Click Card UUID Copy Buttons (R-051)
+  container.querySelectorAll('.card-copy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const uuid = btn.dataset.uuid;
+      if (!uuid) return;
+      copyToClipboard(uuid, `Session UUID copied: ${uuid.slice(0, 8)}...`);
+      btn.classList.add('copied');
+      const icon = btn.querySelector('.copy-icon');
+      if (icon) icon.textContent = '✓';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        if (icon) icon.textContent = '📋';
+      }, 1800);
+    });
+  });
+
   container.querySelectorAll('.session-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-copy-btn')) return;
       window.location.hash = `#/session/${card.dataset.id}`;
     });
   });
@@ -2073,7 +2234,13 @@ function showDetailView(detail) {
     else c.classList.remove('active');
   });
 
-  if (el.detailSessionId) el.detailSessionId.textContent = s.id;
+  if (el.detailSessionId) {
+    el.detailSessionId.textContent = s.id;
+    el.detailSessionId.title = `Full Session UUID: ${s.id}\nClick to copy`;
+  }
+  if (el.detailSessionCapsule) {
+    el.detailSessionCapsule.title = `Full Session UUID: ${s.id}\nClick to copy`;
+  }
   if (el.detailWorkspaceBadge) el.detailWorkspaceBadge.textContent = `📁 ${s.project_name || 'Default'}`;
   if (el.detailRuntimeBadge) {
     const rm = (s.runtime_mode || 'ide').toLowerCase();
@@ -2100,6 +2267,39 @@ function showDetailView(detail) {
       el.detailRuntimeBadge.classList.add('runtime-ide');
       el.detailRuntimeBadge.textContent = '💻 IDE';
       el.detailRuntimeBadge.title = `Antigravity IDE (${s.storage_dir || ''})`;
+    }
+  }
+
+  // Dual-Temporal Quantum Telemetry Capsule (R-050)
+  const createdAt = new Date(s.created_at);
+  const lastActiveAt = s.last_message_at ? new Date(s.last_message_at) : createdAt;
+  const nowMs = Date.now();
+  const isRecent = (nowMs - lastActiveAt.getTime()) < 3 * 3600 * 1000;
+  const spanMs = Math.max(0, lastActiveAt.getTime() - createdAt.getTime());
+  const isMultiDay = spanMs >= 24 * 3600 * 1000;
+  const spanDays = Math.max(1, Math.round(spanMs / (24 * 3600 * 1000)));
+
+  if (el.detailActiveTime) {
+    el.detailActiveTime.textContent = `⚡ Active ${formatRelativeTime(lastActiveAt)}`;
+    el.detailActiveTime.title = `Last active message: ${formatDateTime(lastActiveAt, true)}`;
+  }
+  if (el.detailActivePill) {
+    el.detailActivePill.classList.toggle('is-live', isRecent);
+  }
+  if (el.detailPulseDot) {
+    el.detailPulseDot.style.display = isRecent ? 'inline-block' : 'none';
+  }
+  if (el.detailCreatedTime) {
+    el.detailCreatedTime.textContent = `🌱 Initiated ${formatDateTime(createdAt, true)}`;
+    el.detailCreatedTime.title = `Session initiated: ${formatDateTime(createdAt, true)}`;
+  }
+  if (el.detailLifespanPill && el.detailLifespanText) {
+    if (isMultiDay) {
+      el.detailLifespanPill.style.display = 'inline-flex';
+      el.detailLifespanText.textContent = `⏳ ${spanDays}d Span (${formatShortMonthDay(createdAt)} ➔ ${formatShortMonthDay(lastActiveAt)})`;
+      el.detailLifespanPill.title = `Session active across ${spanDays} days (from ${formatDateTime(createdAt, true)} to ${formatDateTime(lastActiveAt, true)})`;
+    } else {
+      el.detailLifespanPill.style.display = 'none';
     }
   }
   if (el.detailTime) el.detailTime.textContent = formatDateTime(s.created_at, true);
@@ -3729,63 +3929,231 @@ function goToPrevFindMatch() {
 }
 
 // ============================================================================
-//  Session Files & Artifacts Aggregator
+//  Universal Session Files & Artifacts Holographic Matrix (R-045)
 // ============================================================================
-function updateSessionFilesBadge(detail, forcePulse = false) {
-  state.sessionFilesMap.clear();
+
+function getFileCategory(ext) {
+  const e = (ext || '').toLowerCase();
+  switch (e) {
+    case '.go': return 'Go';
+    case '.js': case '.mjs': case '.cjs': return 'JavaScript';
+    case '.ts': case '.tsx': return 'TypeScript';
+    case '.py': return 'Python';
+    case '.rs': return 'Rust';
+    case '.java': return 'Java';
+    case '.c': case '.cpp': case '.h': case '.hpp': return 'C/C++';
+    case '.sh': case '.bash': case '.zsh': return 'Shell';
+    case '.css': case '.scss': case '.sass': case '.less': return 'CSS';
+    case '.html': case '.htm': return 'HTML';
+    case '.md': case '.markdown': return 'Markdown';
+    case '.json': return 'JSON';
+    case '.yaml': case '.yml': return 'YAML';
+    case '.toml': return 'TOML';
+    case '.sql': return 'SQL';
+    case '.png': case '.jpg': case '.jpeg': case '.gif': case '.svg': case '.webp': return 'Image';
+    default: return e ? e.replace('.', '').toUpperCase() : 'Generic';
+  }
+}
+
+function getFileCategoryColor(category) {
+  switch (category) {
+    case 'Go': return '#00add8';
+    case 'JavaScript': return '#f7df1e';
+    case 'TypeScript': return '#3178c6';
+    case 'Python': return '#3572a5';
+    case 'Rust': return '#dea584';
+    case 'CSS': return '#38bdf8';
+    case 'HTML': return '#e34c26';
+    case 'Markdown': return '#c084fc';
+    case 'JSON': return '#fbbf24';
+    case 'YAML': return '#cb171e';
+    case 'Shell': return '#89e051';
+    case 'Image': return '#ec4899';
+    default: return '#94a3b8';
+  }
+}
+
+function computeRelativePath(cleanPath, workspace) {
+  if (!cleanPath) return '';
+  if (workspace && cleanPath.startsWith(workspace)) {
+    const rel = cleanPath.slice(workspace.length).replace(/^\/+/, '');
+    return rel || cleanPath.split('/').pop() || cleanPath;
+  }
+  const brainIdx = cleanPath.indexOf('/brain/');
+  if (brainIdx !== -1) {
+    return cleanPath.slice(brainIdx + 1);
+  }
+  const parts = cleanPath.split('/').filter(Boolean);
+  if (parts.length > 3) {
+    return parts.slice(-3).join('/');
+  }
+  return cleanPath;
+}
+
+function getEmptyFilesTelemetry() {
+  return {
+    totalFiles: 0,
+    totalTouches: 0,
+    totalArtifacts: 0,
+    totalModified: 0,
+    totalEdits: 0,
+    totalReads: 0,
+    readWriteRatio: '0.0',
+    blastRadiusDirs: [],
+    extensionSpectrum: [],
+    churnHotspots: []
+  };
+}
+
+function extractSessionFilesForensics(detail) {
+  const fileRecordsMap = new Map();
   if (!detail || !detail.messages) {
-    if (el.detailFilesCountBadge) el.detailFilesCountBadge.textContent = '0';
-    return;
+    return { records: [], telemetry: getEmptyFilesTelemetry() };
   }
 
+  const workspace = detail.session?.workspace || '';
+
   detail.messages.forEach(msg => {
-    if (msg.tool_calls) {
+    const stepIdx = typeof msg.step_index === 'number' ? msg.step_index : 0;
+    const createdAt = msg.created_at || '';
+
+    // 1. Process tool calls
+    if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
       msg.tool_calls.forEach(tc => {
         const args = tc.args || {};
-        let p = args.Path || args.path || args.AbsolutePath || args.TargetFile || args.file_path || args.FilePath;
+        let p = args.Path || args.path || args.AbsolutePath || args.TargetFile || args.target_file || args.file_path || args.FilePath || args.DirectoryPath || args.Dir;
         if (p && typeof p === 'string') {
           p = p.trim().replace(/^["']|["']$/g, '');
-          const cleanP = p.replace(/^file:\/\//, '');
-          if (cleanP && !cleanP.startsWith('{')) {
-            const name = cleanP.split('/').pop() || cleanP;
-            let fileType = 'read';
-            if (tc.name === 'write_file' || tc.name === 'edit_file' || tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
-              fileType = 'modified';
+          const cleanP = p.replace(/^file:\/\//, '').split('#')[0];
+          if (cleanP && !cleanP.startsWith('{') && cleanP !== '/' && cleanP.length > 1) {
+            const fileName = cleanP.split('/').pop() || cleanP;
+            const ext = fileName.includes('.') ? ('.' + fileName.split('.').pop().toLowerCase()) : '';
+            const dir = cleanP.substring(0, cleanP.lastIndexOf('/')) || '/';
+
+            // Determine operation type
+            let opType = 'read';
+            if (tc.name === 'write_file' || tc.name === 'edit_file' || tc.name === 'write_to_file' ||
+                tc.name === 'replace_file_content' || tc.name === 'append_file' || tc.name === 'create_file') {
+              opType = 'modified';
             }
-            if (args.ArtifactMetadata || cleanP.includes('/brain/') || cleanP.endsWith('.md')) {
-              if (args.ArtifactMetadata || cleanP.includes('/brain/')) {
-                fileType = 'artifact';
+
+            let isArtifact = false;
+            let artifactMeta = null;
+            if (args.ArtifactMetadata || (tc.name === 'write_file' && (cleanP.includes('/brain/') || cleanP.includes('/artifacts/'))) || cleanP.includes('/.user_uploaded/')) {
+              isArtifact = true;
+              if (args.ArtifactMetadata && typeof args.ArtifactMetadata === 'object') {
+                artifactMeta = {
+                  summary: args.ArtifactMetadata.Summary || '',
+                  userFacing: args.ArtifactMetadata.UserFacing === true,
+                  requestFeedback: args.ArtifactMetadata.RequestFeedback === true
+                };
               }
+            } else if (cleanP.includes('/brain/') && cleanP.endsWith('.md')) {
+              isArtifact = true;
             }
-            if (!state.sessionFilesMap.has(cleanP) || fileType === 'artifact') {
-              state.sessionFilesMap.set(cleanP, {
+
+            let record = fileRecordsMap.get(cleanP);
+            if (!record) {
+              record = {
                 path: cleanP,
-                name: name,
-                type: fileType,
-                tool: tc.name,
-                stepIndex: msg.step_index
-              });
+                relativePath: computeRelativePath(cleanP, workspace),
+                name: fileName,
+                extension: ext,
+                category: getFileCategory(ext),
+                directory: dir,
+                type: isArtifact ? 'artifact' : opType,
+                touchCount: 0,
+                churnCount: 0,
+                readCount: 0,
+                stepIndices: [],
+                toolsUsed: new Set(),
+                artifactMetadata: artifactMeta,
+                operations: []
+              };
+              fileRecordsMap.set(cleanP, record);
             }
+
+            // Upgrade primary type
+            if (isArtifact) {
+              record.type = 'artifact';
+              if (artifactMeta && !record.artifactMetadata) {
+                record.artifactMetadata = artifactMeta;
+              }
+            } else if (opType === 'modified' && record.type !== 'artifact') {
+              record.type = 'modified';
+            }
+
+            record.touchCount++;
+            if (opType === 'modified') {
+              record.churnCount++;
+            } else {
+              record.readCount++;
+            }
+
+            if (!record.stepIndices.includes(stepIdx)) {
+              record.stepIndices.push(stepIdx);
+            }
+            if (tc.name) {
+              record.toolsUsed.add(tc.name);
+            }
+            record.operations.push({
+              tool: tc.name,
+              type: opType,
+              stepIndex: stepIdx,
+              time: createdAt
+            });
           }
         }
       });
     }
 
+    // 2. Process markdown links in message content
     if (msg.content) {
-      const linkRegex = /\[([^\]]+)\]\((?:file:\/\/)?([^)]+)\)/g;
+      const linkRegex = /\[([^\]]+)\]\((?:file:\/\/)?([^)#\s]+)(?:#[^)]*)?\)/g;
       let match;
       while ((match = linkRegex.exec(msg.content)) !== null) {
         const rawHref = match[2];
         if (rawHref.startsWith('/') || rawHref.startsWith('file://')) {
           const cleanP = rawHref.replace(/^file:\/\//, '').split('#')[0];
-          const name = match[1] || cleanP.split('/').pop() || cleanP;
-          if (!state.sessionFilesMap.has(cleanP)) {
-            state.sessionFilesMap.set(cleanP, {
-              path: cleanP,
-              name: name,
-              type: 'reference',
+          if (cleanP && !cleanP.startsWith('{') && cleanP.length > 1) {
+            let record = fileRecordsMap.get(cleanP);
+            const linkText = match[1] || '';
+            const fileName = cleanP.split('/').pop() || cleanP;
+            const ext = fileName.includes('.') ? ('.' + fileName.split('.').pop().toLowerCase()) : '';
+            const dir = cleanP.substring(0, cleanP.lastIndexOf('/')) || '/';
+            const isBrain = cleanP.includes('/brain/');
+
+            if (!record) {
+              record = {
+                path: cleanP,
+                relativePath: computeRelativePath(cleanP, workspace),
+                name: fileName,
+                extension: ext,
+                category: getFileCategory(ext),
+                directory: dir,
+                type: isBrain ? 'artifact' : 'reference',
+                touchCount: 0,
+                churnCount: 0,
+                readCount: 0,
+                stepIndices: [],
+                toolsUsed: new Set(),
+                artifactMetadata: null,
+                operations: []
+              };
+              fileRecordsMap.set(cleanP, record);
+            }
+
+            record.touchCount++;
+            if (!record.stepIndices.includes(stepIdx)) {
+              record.stepIndices.push(stepIdx);
+            }
+            record.toolsUsed.add('markdown');
+            record.operations.push({
               tool: 'markdown',
-              stepIndex: msg.step_index
+              type: 'reference',
+              stepIndex: stepIdx,
+              time: createdAt,
+              label: linkText
             });
           }
         }
@@ -3793,67 +4161,349 @@ function updateSessionFilesBadge(detail, forcePulse = false) {
     }
   });
 
+  const records = Array.from(fileRecordsMap.values()).map(r => {
+    r.stepIndices.sort((a, b) => a - b);
+    r.firstStepIdx = r.stepIndices[0] ?? 0;
+    r.lastStepIdx = r.stepIndices[r.stepIndices.length - 1] ?? 0;
+    r.toolsUsed = Array.from(r.toolsUsed);
+    return r;
+  });
+
+  const totalFiles = records.length;
+  let totalTouches = 0;
+  let totalArtifacts = 0;
+  let totalModified = 0;
+  let totalEdits = 0;
+  let totalReads = 0;
+  const blastDirsSet = new Set();
+  const extCounts = new Map();
+
+  records.forEach(r => {
+    totalTouches += r.touchCount;
+    if (r.type === 'artifact') totalArtifacts++;
+    if (r.churnCount > 0) {
+      totalModified++;
+      totalEdits += r.churnCount;
+      if (r.directory && r.directory !== '/') blastDirsSet.add(r.directory);
+    }
+    totalReads += r.readCount;
+
+    const extKey = r.extension || 'no-ext';
+    extCounts.set(extKey, (extCounts.get(extKey) || 0) + 1);
+  });
+
+  const readWriteRatio = totalEdits > 0
+    ? (totalReads / totalEdits).toFixed(1)
+    : (totalReads > 0 ? `${totalReads}.0` : '0.0');
+
+  const sortedExts = Array.from(extCounts.entries()).sort((a, b) => b[1] - a[1]);
+  const extensionSpectrum = sortedExts.map(([ext, count]) => {
+    const pct = totalFiles > 0 ? Math.round((count / totalFiles) * 100) : 0;
+    const cat = getFileCategory(ext === 'no-ext' ? '' : ext);
+    return {
+      extension: ext,
+      category: cat,
+      count: count,
+      percentage: pct,
+      color: getFileCategoryColor(cat)
+    };
+  });
+
+  const churnHotspots = records
+    .filter(r => r.churnCount > 0)
+    .sort((a, b) => b.churnCount - a.churnCount)
+    .slice(0, 6);
+
+  const telemetry = {
+    totalFiles,
+    totalTouches,
+    totalArtifacts,
+    totalModified,
+    totalEdits,
+    totalReads,
+    readWriteRatio,
+    blastRadiusDirs: Array.from(blastDirsSet),
+    extensionSpectrum,
+    churnHotspots
+  };
+
+  return { records, telemetry };
+}
+
+function updateSessionFilesBadge(detail, forcePulse = false) {
+  state.sessionFilesMap.clear();
+  if (!detail || !detail.messages) {
+    if (el.detailFilesCountBadge) el.detailFilesCountBadge.textContent = '0';
+    state.sessionFiles.records = [];
+    state.sessionFiles.telemetry = getEmptyFilesTelemetry();
+    return;
+  }
+
+  const { records, telemetry } = extractSessionFilesForensics(detail);
+  records.forEach(r => state.sessionFilesMap.set(r.path, r));
+  state.sessionFiles.records = records;
+  state.sessionFiles.telemetry = telemetry;
+  state.sessionFiles.sessionId = detail.session?.id || state.selectedSessionId;
+
   if (el.detailFilesCountBadge) {
     const prevText = el.detailFilesCountBadge.textContent.trim();
     const prevCount = parseInt(prevText, 10);
-    const count = state.sessionFilesMap.size;
+    const count = records.length;
     el.detailFilesCountBadge.textContent = count.toString();
     if (el.detailFilesBtn) {
-      el.detailFilesBtn.title = `${count} files and artifacts touched in this session (click to inspect drawer)`;
+      el.detailFilesBtn.title = `${count} files & artifacts touched (${telemetry.totalEdits} edits, ${telemetry.totalArtifacts} artifacts) — click to inspect matrix`;
     }
     if (forcePulse || (!isNaN(prevCount) && prevCount !== count)) {
       pulseCounterBadge(el.detailFilesCountBadge);
     }
   }
+
+  // If the files modal is currently active/open, dynamically refresh in-place without flicker (R-044, AC-085)
+  if (el.sessionFilesModal && el.sessionFilesModal.classList.contains('active')) {
+    renderSessionFilesMatrix();
+  }
 }
 
-function renderSessionFilesList() {
-  if (!el.sessionFilesModal || !el.sessionFilesListContainer) return;
-  const files = Array.from(state.sessionFilesMap.values());
-  if (el.sessionFilesTotalCount) el.sessionFilesTotalCount.textContent = files.length.toString();
+function renderSessionFilesMatrix() {
+  if (!el.sessionFilesModal || !el.sessionFilesContent) return;
 
-  if (files.length === 0) {
-    el.sessionFilesListContainer.innerHTML = `
-      <div class="empty-state" style="padding: 2.5rem; text-align: center;">
-        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📄</div>
-        <p style="color: var(--text-muted);">No file operations or artifacts detected in this session.</p>
+  const records = state.sessionFiles.records || [];
+  const telemetry = state.sessionFiles.telemetry || getEmptyFilesTelemetry();
+  const lens = state.sessionFiles.lens || 'catalog';
+  const typeFilter = state.sessionFiles.type || 'ALL';
+  const search = (state.sessionFiles.search || '').trim().toLowerCase();
+
+  // 1. Update Header Badges
+  if (el.sessionFilesIdBadge) {
+    const sid = state.sessionFiles.sessionId || state.selectedSessionId || '';
+    el.sessionFilesIdBadge.textContent = sid ? sid.slice(0, 8) : 'Session';
+    el.sessionFilesIdBadge.title = sid;
+  }
+  if (el.sessionFilesTotalCountBadge) {
+    el.sessionFilesTotalCountBadge.textContent = `${telemetry.totalFiles} files`;
+  }
+
+  // 2. Update Telemetry Ribbon
+  if (el.sessionFilesArtifactsVal) el.sessionFilesArtifactsVal.textContent = `${telemetry.totalArtifacts} deliverables`;
+  if (el.sessionFilesMutationsVal) el.sessionFilesMutationsVal.textContent = `${telemetry.totalModified} files (${telemetry.totalEdits} edits)`;
+  if (el.sessionFilesReadsVal) el.sessionFilesReadsVal.textContent = `${telemetry.totalReads} reads`;
+  if (el.sessionFilesBlastVal) el.sessionFilesBlastVal.textContent = `${telemetry.blastRadiusDirs.length} directories`;
+  if (el.sessionFilesIntensityVal) el.sessionFilesIntensityVal.textContent = `${telemetry.readWriteRatio}x read/write`;
+
+  // 3. Update Filter Chip Counters
+  if (el.sessionFilesChipAll) el.sessionFilesChipAll.textContent = telemetry.totalFiles.toString();
+  if (el.sessionFilesChipArtifacts) el.sessionFilesChipArtifacts.textContent = telemetry.totalArtifacts.toString();
+  if (el.sessionFilesChipModified) el.sessionFilesChipModified.textContent = telemetry.totalModified.toString();
+  if (el.sessionFilesChipRead) {
+    const readsOnly = records.filter(r => r.readCount > 0 && r.type !== 'artifact' && r.churnCount === 0).length;
+    el.sessionFilesChipRead.textContent = readsOnly.toString();
+  }
+  if (el.sessionFilesChipRefs) {
+    const refsOnly = records.filter(r => r.type === 'reference').length;
+    el.sessionFilesChipRefs.textContent = refsOnly.toString();
+  }
+
+  // 4. Update Lens and Filter Chips active visual states
+  if (el.sessionFilesLensControl) {
+    el.sessionFilesLensControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.lens === lens);
+    });
+  }
+  const chipsContainer = document.getElementById('sessionFilesFilterChips');
+  if (chipsContainer) {
+    chipsContainer.style.display = (lens === 'telemetry') ? 'none' : 'flex';
+    chipsContainer.querySelectorAll('.matrix-filter-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.type === typeFilter);
+    });
+  }
+
+  // 5. Render Lens Content
+  if (lens === 'telemetry') {
+    renderFilesTelemetryDashboard(telemetry);
+    return;
+  }
+
+  // Filter records based on lens, typeFilter, and search query
+  let filtered = records;
+
+  if (lens === 'artifacts') {
+    filtered = filtered.filter(r => r.type === 'artifact');
+  } else if (lens === 'mutations') {
+    filtered = filtered.filter(r => r.churnCount > 0 || r.type === 'modified');
+  } else {
+    // Universal Catalog: apply type filter chip
+    if (typeFilter === 'ARTIFACT') {
+      filtered = filtered.filter(r => r.type === 'artifact');
+    } else if (typeFilter === 'MODIFIED') {
+      filtered = filtered.filter(r => r.churnCount > 0 || r.type === 'modified');
+    } else if (typeFilter === 'READ') {
+      filtered = filtered.filter(r => r.readCount > 0 && r.churnCount === 0 && r.type !== 'artifact');
+    } else if (typeFilter === 'REFERENCE') {
+      filtered = filtered.filter(r => r.type === 'reference');
+    }
+  }
+
+  // Apply search query
+  if (search) {
+    filtered = filtered.filter(r => {
+      const matchName = r.name.toLowerCase().includes(search);
+      const matchPath = r.path.toLowerCase().includes(search);
+      const matchExt = (r.extension || '').toLowerCase().includes(search);
+      const matchCat = (r.category || '').toLowerCase().includes(search);
+      const matchTools = (r.toolsUsed || []).some(t => t.toLowerCase().includes(search));
+      const matchSummary = r.artifactMetadata?.summary ? r.artifactMetadata.summary.toLowerCase().includes(search) : false;
+      return matchName || matchPath || matchExt || matchCat || matchTools || matchSummary;
+    });
+  }
+
+  if (filtered.length === 0) {
+    el.sessionFilesContent.innerHTML = `
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
+        <div style="font-size: 2.4rem; margin-bottom: 0.6rem;">🔍</div>
+        <h4 style="color: #f8fafc; font-size: 1.1rem; margin-bottom: 0.35rem;">No matching files or artifacts found</h4>
+        <p style="color: var(--text-muted); font-size: 0.88rem; max-width: 480px; margin: 0 auto;">
+          No file operations match the active lens (${escapeHtml(lens)}) and filters. Try adjusting your search query or selecting "All Touches".
+        </p>
       </div>
     `;
     return;
   }
 
-  const typeOrder = { artifact: 0, modified: 1, read: 2, reference: 3 };
-  files.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
+  if (el.sessionFilesSortSelect) {
+    el.sessionFilesSortSelect.value = state.sessionFiles.sort || 'type_priority';
+  }
 
-  el.sessionFilesListContainer.innerHTML = files.map(f => {
-    const typeBadge = f.type === 'artifact'
-      ? '<span class="file-meta-pill" style="border-color: rgba(168, 85, 247, 0.5); color: #c084fc; background: rgba(168, 85, 247, 0.15);">✨ Artifact</span>'
-      : f.type === 'modified'
-      ? '<span class="file-meta-pill" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; background: rgba(245, 158, 11, 0.15);">✏️ Modified</span>'
-      : '<span class="file-meta-pill">👁️ Read</span>';
+  // Universal Forensic Sorting Engine (R-046)
+  const sortMode = state.sessionFiles.sort || 'type_priority';
+  const typeWeight = { artifact: 0, modified: 1, read: 2, reference: 3 };
 
-    return `
-      <div class="session-file-item" data-path="${escapeHtml(f.path)}">
-        <div class="session-file-item-left">
-          <span style="font-size: 1.3rem;">${getFileIcon(f.path)}</span>
-          <div class="session-file-item-info">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="session-file-name">${escapeHtml(f.name)}</span>
-              ${typeBadge}
-              <span style="font-size: 0.72rem; color: var(--text-dim);">Step ${f.stepIndex}</span>
-            </div>
-            <div class="session-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</div>
+  filtered.sort((a, b) => {
+    switch (sortMode) {
+      case 'churn_desc':
+        if (b.churnCount !== a.churnCount) return b.churnCount - a.churnCount;
+        return b.touchCount - a.touchCount;
+      case 'last_touch':
+        return b.lastStepIdx - a.lastStepIdx;
+      case 'first_touch':
+        return a.firstStepIdx - b.firstStepIdx;
+      case 'reads_desc':
+        if (b.readCount !== a.readCount) return b.readCount - a.readCount;
+        return b.touchCount - a.touchCount;
+      case 'name_asc':
+        return a.name.localeCompare(b.name);
+      case 'ext_asc': {
+        const extDiff = (a.extension || '').localeCompare(b.extension || '');
+        if (extDiff !== 0) return extDiff;
+        return a.name.localeCompare(b.name);
+      }
+      case 'type_priority':
+      default: {
+        const wa = typeWeight[a.type] ?? 9;
+        const wb = typeWeight[b.type] ?? 9;
+        if (wa !== wb) return wa - wb;
+        if (b.churnCount !== a.churnCount) return b.churnCount - a.churnCount;
+        return b.touchCount - a.touchCount;
+      }
+    }
+  });
+
+  // Generate cards for greedy bin-packing
+  const renderedCards = filtered.map(f => {
+    let weight = 150;
+    if (f.artifactMetadata?.summary) weight += 60;
+    if (f.stepIndices.length > 3) weight += 25;
+    if (f.toolsUsed && f.toolsUsed.length > 2) weight += 15;
+
+    const isArtifact = f.type === 'artifact';
+    const isModified = f.churnCount > 0 || f.type === 'modified';
+    const isRead = f.type === 'read' && !isModified && !isArtifact;
+    const cardClass = isArtifact ? 'is-artifact' : (isModified ? 'is-modified' : (isRead ? 'is-read' : 'is-reference'));
+
+    let opBadge = '';
+    if (isArtifact) {
+      opBadge = `<span class="session-file-card-op-pill artifact">✨ Artifact</span>`;
+    } else if (isModified) {
+      opBadge = `<span class="session-file-card-op-pill modified">✏️ ${f.churnCount > 1 ? f.churnCount + ' Edits' : 'Modified'}</span>`;
+    } else if (isRead) {
+      opBadge = `<span class="session-file-card-op-pill read">👁️ ${f.readCount > 1 ? f.readCount + ' Reads' : 'Read'}</span>`;
+    } else {
+      opBadge = `<span class="session-file-card-op-pill reference">🔗 Reference</span>`;
+    }
+
+    const dispSteps = f.stepIndices.slice(0, 5);
+    const hasMoreSteps = f.stepIndices.length > 5;
+    const spanText = f.stepIndices.length > 1
+      ? `Span: #${f.firstStepIdx} ➔ #${f.lastStepIdx}`
+      : `Step #${f.firstStepIdx}`;
+
+    const cardHtml = `
+      <div class="session-file-card ${cardClass}" data-path="${escapeHtml(f.path)}">
+        <div class="session-file-card-header">
+          <div class="session-file-card-title-group">
+            <span class="session-file-card-icon">${getFileIcon(f.path)}</span>
+            <span class="session-file-card-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+            ${f.extension ? `<span class="session-file-card-ext-pill">${escapeHtml(f.extension)}</span>` : ''}
           </div>
+          ${opBadge}
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn-ghost-sm open-file-item-btn" data-path="${escapeHtml(f.path)}" title="Open in Browser">Open ↗</button>
-          <button class="btn-icon copy-file-path-btn" style="width: 28px; height: 28px; font-size: 0.75rem;" data-path="${escapeHtml(f.path)}" title="Copy Path">📋</button>
+
+        <div class="session-file-card-path" title="${escapeHtml(f.path)}">
+          <span class="session-file-card-path-text">${escapeHtml(f.relativePath || f.path)}</span>
+          <button class="session-file-card-quick-copy" data-path="${escapeHtml(f.path)}" title="Copy absolute path">📋</button>
+        </div>
+
+        ${f.artifactMetadata && f.artifactMetadata.summary ? `
+          <div class="session-file-card-summary">
+            <strong>✨ Deliverable:</strong> ${escapeHtml(f.artifactMetadata.summary)}
+          </div>
+        ` : ''}
+
+        <div class="session-file-card-meta-row">
+          <div class="steps-row">
+            <span class="touch-span-pill" title="Execution lifetime span in session timeline">${spanText}</span>
+            <span class="steps-label" style="font-size: 0.65rem;">Touched:</span>
+            ${dispSteps.map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st} in timeline">#${st}</button>`).join('')}
+            ${hasMoreSteps ? `<span class="step-marker-pill more" title="${f.stepIndices.length} total operations">+${f.stepIndices.length - 5}</span>` : ''}
+          </div>
+          ${f.toolsUsed && f.toolsUsed.length > 0 ? `
+            <div class="session-file-card-tools">
+              ${f.toolsUsed.map(t => `<span class="session-file-tool-pill">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="session-file-card-actions">
+          <button class="session-file-open-btn" data-path="${escapeHtml(f.path)}" title="Open natively in browser">
+            <span>Open</span> <span>↗</span>
+          </button>
+          <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <button class="session-file-copy-btn copy-rel-path-btn" data-path="${escapeHtml(f.relativePath || f.name)}" title="Copy workspace-relative path">
+              <span>📋 Rel</span>
+            </button>
+            <button class="session-file-copy-btn copy-abs-path-btn" data-path="${escapeHtml(f.path)}" title="Copy full filesystem path">
+              <span>📋 Full</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
-  }).join('');
 
-  el.sessionFilesListContainer.querySelectorAll('.open-file-item-btn').forEach(btn => {
+    return { html: cardHtml, weight };
+  });
+
+  const containerW = el.sessionFilesContent.clientWidth || window.innerWidth;
+  el.sessionFilesContent.innerHTML = binPackCards(renderedCards, containerW);
+
+  // Attach interactive step navigation pills
+  el.sessionFilesContent.querySelectorAll('.step-marker-pill[data-step]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      jumpToTimelineStep(parseInt(btn.dataset.step, 10));
+    };
+  });
+
+  // Attach Open in Native File Viewer
+  el.sessionFilesContent.querySelectorAll('.session-file-open-btn').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
       closeSessionFilesModal();
@@ -3861,25 +4511,255 @@ function renderSessionFilesList() {
     };
   });
 
-  el.sessionFilesListContainer.querySelectorAll('.session-file-item').forEach(item => {
-    item.onclick = () => {
+  // Card click defaults to open file
+  el.sessionFilesContent.querySelectorAll('.session-file-card').forEach(card => {
+    card.onclick = (e) => {
+      if (e.target.closest('button')) return;
       closeSessionFilesModal();
-      openFileViewer(item.dataset.path);
+      openFileViewer(card.dataset.path);
     };
   });
 
-  el.sessionFilesListContainer.querySelectorAll('.copy-file-path-btn').forEach(btn => {
+  // Quick Copy buttons
+  el.sessionFilesContent.querySelectorAll('.session-file-card-quick-copy, .copy-abs-path-btn').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
-      copyToClipboard(btn.dataset.path, 'File path copied to clipboard!');
+      copyToClipboard(btn.dataset.path, 'Absolute path copied to clipboard!');
+    };
+  });
+
+  el.sessionFilesContent.querySelectorAll('.copy-rel-path-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.path, 'Relative path copied to clipboard!');
     };
   });
 }
 
+function renderFilesTelemetryDashboard(telemetry) {
+  if (!el.sessionFilesContent) return;
+
+  const totalFiles = telemetry.totalFiles || 0;
+  const ratio = parseFloat(telemetry.readWriteRatio) || 0;
+  let ratioDiagnosis = '🎯 High Reconnaissance';
+  let ratioColor = '#34d399';
+  if (ratio < 0.8) {
+    ratioDiagnosis = '⚡ Rapid Direct Mutation';
+    ratioColor = '#fbbf24';
+  } else if (ratio < 2.0) {
+    ratioDiagnosis = '⚖️ Balanced Reconnaissance';
+    ratioColor = '#38bdf8';
+  }
+
+  const html = `
+    <div class="files-telemetry-dashboard">
+      <!-- 1. Holographic Language & File Extension Spectrum -->
+      <div class="files-spectrum-card">
+        <div class="files-spectrum-header">
+          <div class="files-spectrum-title">
+            <span>🌈</span>
+            <span>File Extension &amp; Language Spectrum</span>
+          </div>
+          <span style="font-size: 0.76rem; color: var(--text-dim); font-family: var(--font-mono, monospace);">
+            ${telemetry.extensionSpectrum.length} file types · ${totalFiles} unique files
+          </span>
+        </div>
+
+        <div class="files-spectrum-bar">
+          ${telemetry.extensionSpectrum.map(seg => `
+            <div class="files-spectrum-segment" style="width: ${seg.percentage}%; background: ${seg.color};" title="${escapeHtml(seg.extension)} (${escapeHtml(seg.category)}): ${seg.count} files (${seg.percentage}%)"></div>
+          `).join('')}
+        </div>
+
+        <div class="files-spectrum-legend">
+          ${telemetry.extensionSpectrum.map(seg => `
+            <div class="files-spectrum-legend-item">
+              <span class="files-spectrum-legend-dot" style="background: ${seg.color};"></span>
+              <span style="font-family: var(--font-mono, monospace); font-weight: 600; color: #f1f5f9;">${escapeHtml(seg.extension)}</span>
+              <span>(${seg.count} · ${seg.percentage}%)</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- 2. Telemetry Grid (3 Cards) -->
+      <div class="files-telemetry-grid">
+        <!-- Card 1: Reconnaissance Efficiency -->
+        <div class="files-telemetry-col-card">
+          <div class="files-telemetry-col-title">
+            <span>🔬</span>
+            <span>Reconnaissance &amp; Churn Efficiency</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 0.6rem;">
+            <span style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-mono, monospace); color: #38bdf8; line-height: 1;">
+              ${telemetry.readWriteRatio}x
+            </span>
+            <span style="font-size: 0.82rem; font-weight: 700; color: ${ratioColor};">
+              ${ratioDiagnosis}
+            </span>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin: 0;">
+            The agent conducted <strong>${telemetry.totalReads} reads</strong> across files before/between performing <strong>${telemetry.totalEdits} code mutations</strong> (${telemetry.totalTouches} total operations).
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <div style="flex: 1; padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25);">
+              <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Inspected</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #38bdf8; font-family: var(--font-mono, monospace);">${telemetry.totalReads}</div>
+            </div>
+            <div style="flex: 1; padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25);">
+              <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Mutations</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #fbbf24; font-family: var(--font-mono, monospace);">${telemetry.totalEdits}</div>
+            </div>
+            <div style="flex: 1; padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25);">
+              <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Deliverables</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #c084fc; font-family: var(--font-mono, monospace);">${telemetry.totalArtifacts}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Directory Blast Radius -->
+        <div class="files-telemetry-col-card">
+          <div class="files-telemetry-col-title">
+            <span>🎯</span>
+            <span>Directory Blast Radius (${telemetry.blastRadiusDirs.length} packages)</span>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+            Code mutations spanned ${telemetry.blastRadiusDirs.length} distinct directory modules across the monorepo:
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 180px; overflow-y: auto;">
+            ${telemetry.blastRadiusDirs.length > 0 ? telemetry.blastRadiusDirs.map(dir => `
+              <div class="blast-dir-item">
+                <span title="${escapeHtml(dir)}">${escapeHtml(dir.split('/').slice(-3).join('/'))}</span>
+                <span class="blast-dir-count">Module</span>
+              </div>
+            `).join('') : `
+              <div style="color: var(--text-dim); font-size: 0.78rem; padding: 0.5rem;">No file mutations recorded yet</div>
+            `}
+          </div>
+        </div>
+
+        <!-- Card 3: Top Churn Hotspots -->
+        <div class="files-telemetry-col-card">
+          <div class="files-telemetry-col-title">
+            <span>🔥</span>
+            <span>Top Churn Hotspots</span>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+            Files modified most frequently across the agent session turns:
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+            ${telemetry.churnHotspots.length > 0 ? telemetry.churnHotspots.map(h => `
+              <div class="churn-hotspot-item">
+                <div style="display: flex; align-items: center; gap: 0.45rem; min-width: 0;">
+                  <span>${getFileIcon(h.path)}</span>
+                  <span class="churn-hotspot-name" title="${escapeHtml(h.path)}">${escapeHtml(h.name)}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                  <span class="churn-hotspot-badge">✏️ ${h.churnCount}x</span>
+                  <div class="steps-row">
+                    ${h.stepIndices.slice(0, 3).map(st => `<button class="step-marker-pill" data-step="${st}" title="Jump to Step #${st}">#${st}</button>`).join('')}
+                  </div>
+                </div>
+              </div>
+            `).join('') : `
+              <div style="color: var(--text-dim); font-size: 0.78rem; padding: 0.5rem;">No files mutated in this session</div>
+            `}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  el.sessionFilesContent.innerHTML = html;
+
+  // Wire up step jump buttons inside telemetry dashboard
+  el.sessionFilesContent.querySelectorAll('.step-marker-pill[data-step]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      jumpToTimelineStep(parseInt(btn.dataset.step, 10));
+    };
+  });
+}
+
+function renderSessionFilesList() {
+  renderSessionFilesMatrix();
+}
+
 function openSessionFilesModal() {
   if (!el.sessionFilesModal) return;
-  renderSessionFilesList();
+  renderSessionFilesMatrix();
   el.sessionFilesModal.classList.add('active');
+}
+
+function closeSessionFilesModal() {
+  if (el.sessionFilesModal) el.sessionFilesModal.classList.remove('active');
+}
+
+function initSessionFilesListeners() {
+  if (el.detailFilesBtn) {
+    el.detailFilesBtn.addEventListener('click', openSessionFilesModal);
+  }
+
+  if (el.closeSessionFilesModalBtn) {
+    el.closeSessionFilesModalBtn.addEventListener('click', closeSessionFilesModal);
+  }
+
+  // Lens segmented control (Catalog, Artifacts, Mutations, Telemetry)
+  if (el.sessionFilesLensControl) {
+    el.sessionFilesLensControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.sessionFiles.lens = btn.dataset.lens || 'catalog';
+        renderSessionFilesMatrix();
+      });
+    });
+  }
+
+  // Universal Sort Select (R-046)
+  if (el.sessionFilesSortSelect) {
+    el.sessionFilesSortSelect.addEventListener('change', (e) => {
+      state.sessionFiles.sort = e.target.value;
+      renderSessionFilesMatrix();
+    });
+  }
+
+  // Filter chips (All, Artifacts, Modified, Read, Reference)
+  const chipsContainer = document.getElementById('sessionFilesFilterChips');
+  if (chipsContainer) {
+    chipsContainer.querySelectorAll('.matrix-filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        state.sessionFiles.type = chip.dataset.type || 'ALL';
+        renderSessionFilesMatrix();
+      });
+    });
+  }
+
+  // Search input debouncer
+  if (el.sessionFilesSearchInput) {
+    let searchDebounceTimer = null;
+    el.sessionFilesSearchInput.addEventListener('input', (e) => {
+      clearTimeout(searchDebounceTimer);
+      const val = e.target.value;
+      if (el.clearSessionFilesSearchBtn) {
+        el.clearSessionFilesSearchBtn.style.display = val ? 'inline-flex' : 'none';
+      }
+      searchDebounceTimer = setTimeout(() => {
+        state.sessionFiles.search = val;
+        renderSessionFilesMatrix();
+      }, 150);
+    });
+  }
+
+  if (el.clearSessionFilesSearchBtn) {
+    el.clearSessionFilesSearchBtn.addEventListener('click', () => {
+      if (el.sessionFilesSearchInput) {
+        el.sessionFilesSearchInput.value = '';
+        el.sessionFilesSearchInput.focus();
+      }
+      el.clearSessionFilesSearchBtn.style.display = 'none';
+      state.sessionFiles.search = '';
+      renderSessionFilesMatrix();
+    });
+  }
 }
 
 function closeSessionFilesModal() {
@@ -3925,6 +4805,14 @@ function initAgentMatrixListeners() {
     });
   }
 
+  // Session Matrix Universal Sort Select (R-046)
+  if (el.sessionMatrixSortSelect) {
+    el.sessionMatrixSortSelect.addEventListener('change', (e) => {
+      state.sessionMatrix.sort = e.target.value;
+      renderSessionMatrix();
+    });
+  }
+
   // Session Matrix Filter Chips (R-040)
   const sessionTypeChips = document.querySelectorAll('.session-matrix-filter-chips .matrix-filter-chip, .session-matrix-filter-chips .chip');
   sessionTypeChips.forEach(chip => {
@@ -3965,6 +4853,14 @@ function initAgentMatrixListeners() {
         state.agentMatrix.scope = btn.dataset.scope;
         renderAgentMatrix();
       });
+    });
+  }
+
+  // Machine Agent Matrix Universal Sort Select (R-046)
+  if (el.agentMatrixSortSelect) {
+    el.agentMatrixSortSelect.addEventListener('change', (e) => {
+      state.agentMatrix.sort = e.target.value;
+      renderAgentMatrix();
     });
   }
 
@@ -4191,6 +5087,33 @@ function renderAgentMatrix() {
     return;
   }
 
+  if (el.agentMatrixSortSelect) {
+    el.agentMatrixSortSelect.value = state.agentMatrix.sort || 'bloat_desc';
+  }
+
+  // Universal Machine Agent Sorting Engine (R-046)
+  const agentSort = state.agentMatrix.sort || 'bloat_desc';
+  const scopeWeight = { workspace: 0, global: 1, cascade: 2 };
+  items.sort((a, b) => {
+    const da = a.data || {};
+    const db = b.data || {};
+    switch (agentSort) {
+      case 'lines_desc':
+        return (db.line_count || 0) - (da.line_count || 0);
+      case 'scope': {
+        const sa = scopeWeight[da.scope] ?? 9;
+        const sb = scopeWeight[db.scope] ?? 9;
+        if (sa !== sb) return sa - sb;
+        return (da.name || da.title || '').localeCompare(db.name || db.title || '');
+      }
+      case 'name_asc':
+        return (da.name || da.title || '').localeCompare(db.name || db.title || '');
+      case 'bloat_desc':
+      default:
+        return (db.tokens_est || 0) - (da.tokens_est || 0);
+    }
+  });
+
   const renderedCards = [];
   items.forEach(it => {
     let cardHtml = '';
@@ -4383,6 +5306,7 @@ function closeSessionContextModal() {
 
 function jumpToTimelineStep(stepIndex) {
   closeSessionContextModal();
+  closeSessionFilesModal();
 
   let targetNode = document.getElementById(`step-${stepIndex}`) || document.querySelector(`.message-item[data-step="${stepIndex}"]`);
 
@@ -4839,6 +5763,54 @@ function renderSessionMatrix() {
     return;
   }
 
+  if (el.sessionMatrixSortSelect) {
+    el.sessionMatrixSortSelect.value = state.sessionMatrix.sort || 'calls_desc';
+  }
+
+  // Universal Session Agent Brain Sorting Engine (R-046)
+  const sessSort = state.sessionMatrix.sort || 'calls_desc';
+  const sessScopeWeight = { workspace: 0, global: 1, cascade: 2 };
+  const itKindOrder = { rule: 0, skill_active: 1, mcp_server: 2, native_tool: 3, subagent: 4, command: 5, skill_dormant: 6 };
+
+  items.sort((a, b) => {
+    const da = a.data || {};
+    const db = b.data || {};
+    switch (sessSort) {
+      case 'last_step': {
+        const lsa = da.last_step_idx ?? da.lastStepIdx ?? 0;
+        const lsb = db.last_step_idx ?? db.lastStepIdx ?? 0;
+        return lsb - lsa;
+      }
+      case 'bloat_desc': {
+        const ta = da.tokens_est || 0;
+        const tb = db.tokens_est || 0;
+        return tb - ta;
+      }
+      case 'precedence': {
+        const pa = sessScopeWeight[da.scope] ?? (itKindOrder[a.kind] ?? 9);
+        const pb = sessScopeWeight[db.scope] ?? (itKindOrder[b.kind] ?? 9);
+        if (pa !== pb) return pa - pb;
+        const na = typeof da === 'string' ? da : (da.name || da.title || '');
+        const nb = typeof db === 'string' ? db : (db.name || db.title || '');
+        return na.localeCompare(nb);
+      }
+      case 'name_asc': {
+        const na = typeof da === 'string' ? da : (da.name || da.title || '');
+        const nb = typeof db === 'string' ? db : (db.name || db.title || '');
+        return na.localeCompare(nb);
+      }
+      case 'calls_desc':
+      default: {
+        const ca = da.invoked_count ?? 0;
+        const cb = db.invoked_count ?? 0;
+        if (cb !== ca) return cb - ca;
+        const lsa = da.last_step_idx ?? da.lastStepIdx ?? 0;
+        const lsb = db.last_step_idx ?? db.lastStepIdx ?? 0;
+        return lsb - lsa;
+      }
+    }
+  });
+
   const renderedCards = [];
 
   items.forEach(it => {
@@ -5285,6 +6257,7 @@ window.goToNextFindMatch = goToNextFindMatch;
 window.goToPrevFindMatch = goToPrevFindMatch;
 window.openSessionFilesModal = openSessionFilesModal;
 window.closeSessionFilesModal = closeSessionFilesModal;
+window.renderSessionFilesMatrix = renderSessionFilesMatrix;
 window.openAgentBrainModal = openAgentBrainModal;
 window.closeAgentMatrixModal = closeAgentMatrixModal;
 window.openSessionContextModal = openSessionContextModal;

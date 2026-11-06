@@ -99,8 +99,9 @@
         <div class="filter-group">
           <span class="filter-label">Sort:</span>
           <select id="sortBySelect" class="select-custom" aria-label="Sort sessions">
-            <option value="date">Newest First</option>
-            <option value="date_asc">Oldest First</option>
+            <option value="active" selected>⚡ Last Active (Recent First)</option>
+            <option value="date">🌱 Inception Date (Newest First)</option>
+            <option value="date_asc">⏮️ Inception Date (Oldest First)</option>
             <option value="steps">Most Steps</option>
             <option value="messages">Most Prompts</option>
             <option value="size">Largest File Size</option>
@@ -166,10 +167,30 @@
             <button class="back-btn" id="detailBackBtn">
               <span>←</span> Back
             </button>
-            <span class="detail-session-id" id="detailSessionId"></span>
+            <div class="detail-session-capsule" id="detailSessionCapsule" title="Click to copy full Session UUID">
+              <span class="capsule-icon">🆔</span>
+              <span class="detail-session-id" id="detailSessionId"></span>
+              <button class="copy-session-id-btn" id="copySessionIdBtn" title="Copy full Session UUID to clipboard" aria-label="Copy session ID">
+                <span class="copy-icon">📋</span>
+                <span class="copy-label">Copy</span>
+              </button>
+            </div>
             <span class="workspace-badge" id="detailWorkspaceBadge">📁 Workspace</span>
             <span class="runtime-badge" id="detailRuntimeBadge" style="display: none;">💻 IDE</span>
-            <span class="session-time" id="detailTime"></span>
+            
+            <!-- Quantum Dual-Temporal Telemetry Capsule (R-050) -->
+            <div class="detail-temporal-capsule" id="detailTemporalCapsule" title="Session Temporal Telemetry">
+              <span class="detail-active-pill" id="detailActivePill">
+                <span class="active-pulse-dot" id="detailPulseDot"></span>
+                <span id="detailActiveTime">⚡ Active</span>
+              </span>
+              <span class="detail-created-pill" id="detailCreatedPill">
+                <span id="detailCreatedTime">🌱 Initiated</span>
+              </span>
+              <span class="detail-lifespan-pill" id="detailLifespanPill" style="display: none;">
+                <span id="detailLifespanText">⏳ Multi-Day Span</span>
+              </span>
+            </div>
           </div>
 
           <!-- Relocated Export Actions and Artifacts in Top Section with Year 2126 Holographic Aero-Mica Capsules -->
@@ -445,18 +466,102 @@
     </div>
   </div>
 
-  <!-- SESSION FILES & ARTIFACTS MODAL -->
-  <div class="modal-overlay" id="sessionFilesModal" aria-label="Session Files and Artifacts" role="dialog">
-    <div class="modal-box" style="max-width: 820px;">
+  <!-- SESSION FILES & ARTIFACTS MATRIX MODAL (R-045) -->
+  <div class="modal-overlay" id="sessionFilesModal" aria-label="Session Files and Artifacts Matrix" role="dialog">
+    <div class="modal-box session-matrix-box session-files-box" style="width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh; display: flex; flex-direction: column;">
       <div class="modal-header">
-        <div class="modal-title">📁 Session Files &amp; Artifacts (<span id="sessionFilesTotalCount">0</span>)</div>
-        <button class="btn-icon" id="closeSessionFilesModalBtn">✕</button>
+        <div class="modal-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+          <span class="holo-files-pulse">📁</span>
+          <span>Session Files &amp; Artifacts Matrix</span>
+          <span class="badge" id="sessionFilesIdBadge" style="font-family: monospace; font-size: 0.78rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);"></span>
+          <span class="badge" id="sessionFilesTotalCountBadge" style="background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.78rem;">0 files</span>
+        </div>
+        <button class="btn-icon" id="closeSessionFilesModalBtn" title="Close (Esc)">✕</button>
       </div>
-      <div class="modal-body" style="padding: 1.25rem 1.5rem; max-height: 72vh; overflow-y: auto;">
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-          All artifacts generated, files modified, and documents inspected throughout this session. Click any file to open it natively in the browser.
-        </p>
-        <div id="sessionFilesListContainer">
+
+      <!-- Holographic Mica Controls & Toolbar -->
+      <div class="agent-matrix-toolbar session-files-toolbar">
+        <div class="segmented-control" id="sessionFilesLensControl" role="group" aria-label="Session Files Lenses">
+          <button class="segment-btn active" data-lens="catalog">🗂️ Universal Catalog</button>
+          <button class="segment-btn" data-lens="artifacts">✨ Artifacts &amp; Deliverables</button>
+          <button class="segment-btn" data-lens="mutations">✏️ Codebase Mutations</button>
+          <button class="segment-btn" data-lens="telemetry">📊 Churn &amp; Blast Radius</button>
+        </div>
+        <div class="agent-matrix-sort-box" title="Sort files across multi-dimensional criteria">
+          <span class="sort-icon">⇅</span>
+          <select id="sessionFilesSortSelect" class="holo-matrix-select" aria-label="Sort Files">
+            <option value="type_priority">✨ Deliverable Priority</option>
+            <option value="churn_desc">🔥 Churn Intensity (High → Low)</option>
+            <option value="last_touch">⏱️ Last Touched (Recent Step)</option>
+            <option value="first_touch">⏮️ First Touched (Chronological)</option>
+            <option value="reads_desc">👁️ Read Volume (Most Inspected)</option>
+            <option value="name_asc">🔤 Name &amp; Path (A → Z)</option>
+            <option value="ext_asc">🏷️ File Extension (.go, .js, ...)</option>
+          </select>
+        </div>
+        <div class="agent-matrix-search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="sessionFilesSearchInput" placeholder="Filter files, extensions (.go, .js), directories, or tools..." autocomplete="off">
+          <button class="clear-search-btn" id="clearSessionFilesSearchBtn" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <!-- Multi-Spectrum Fluid Adaptive Filter Chips -->
+      <div class="agent-matrix-filter-chips session-files-filter-chips" id="sessionFilesFilterChips">
+        <button class="matrix-filter-chip active" data-type="ALL">
+          <span class="matrix-chip-icon">🌐</span>
+          <span class="matrix-chip-label">All Touches</span>
+          <span class="matrix-chip-counter all" id="sessionFilesChipAll">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="ARTIFACT">
+          <span class="matrix-chip-icon">✨</span>
+          <span class="matrix-chip-label">Deliverables &amp; Artifacts</span>
+          <span class="matrix-chip-counter skills" id="sessionFilesChipArtifacts">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="MODIFIED">
+          <span class="matrix-chip-icon">✏️</span>
+          <span class="matrix-chip-label">Code Mutations</span>
+          <span class="matrix-chip-counter mcp" id="sessionFilesChipModified">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="READ">
+          <span class="matrix-chip-icon">👁️</span>
+          <span class="matrix-chip-label">Inspected Files</span>
+          <span class="matrix-chip-counter native" id="sessionFilesChipRead">0</span>
+        </button>
+        <button class="matrix-filter-chip" data-type="REFERENCE">
+          <span class="matrix-chip-icon">🔗</span>
+          <span class="matrix-chip-label">Doc References</span>
+          <span class="matrix-chip-counter rules" id="sessionFilesChipRefs">0</span>
+        </button>
+      </div>
+
+      <!-- Holographic Telemetry Ribbon -->
+      <div class="agent-matrix-telemetry-ribbon session-files-telemetry-ribbon" id="sessionFilesTelemetryRibbon">
+        <div class="telemetry-pill artifacts" id="sessionFilesArtifactsPill" title="Artifacts and report deliverables generated during this session">
+          <span class="telemetry-lbl">✨ Deliverables:</span>
+          <span class="telemetry-val" id="sessionFilesArtifactsVal">0 deliverables</span>
+        </div>
+        <div class="telemetry-pill mutations" id="sessionFilesMutationsPill" title="Files created, written, or edited across the codebase">
+          <span class="telemetry-lbl">✏️ Code Mutations:</span>
+          <span class="telemetry-val" id="sessionFilesMutationsVal">0 files (0 edits)</span>
+        </div>
+        <div class="telemetry-pill reads" id="sessionFilesReadsPill" title="Files read or inspected during agent reconnaissance turns">
+          <span class="telemetry-lbl">👁️ Inspected Files:</span>
+          <span class="telemetry-val" id="sessionFilesReadsVal">0 files (0 reads)</span>
+        </div>
+        <div class="telemetry-pill blast" id="sessionFilesBlastPill" title="Unique directory modules touched (blast radius spread)">
+          <span class="telemetry-lbl">🎯 Blast Radius:</span>
+          <span class="telemetry-val" id="sessionFilesBlastVal">0 directories</span>
+        </div>
+        <div class="telemetry-pill intensity" id="sessionFilesIntensityPill" title="Reconnaissance ratio: Read operations per mutation operation">
+          <span class="telemetry-lbl">📈 Read/Write Ratio:</span>
+          <span class="telemetry-val" id="sessionFilesIntensityVal">0.0x</span>
+        </div>
+      </div>
+
+      <!-- Modal Body (Bin-Packed Cards or Telemetry Dashboard) -->
+      <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
+        <div id="sessionFilesContent">
           <!-- Injected dynamically by app.js -->
         </div>
       </div>
@@ -479,6 +584,15 @@
           <button class="segment-btn active" data-scope="global">🌐 Global Machine</button>
           <button class="segment-btn" data-scope="workspace" id="agentMatrixWorkspaceSegment">📁 Workspace</button>
           <button class="segment-btn" data-scope="cascade">⚡ Precedence Cascade</button>
+        </div>
+        <div class="agent-matrix-sort-box" title="Sort discovered rules and skills">
+          <span class="sort-icon">⇅</span>
+          <select id="agentMatrixSortSelect" class="holo-matrix-select" aria-label="Sort Discovered Elements">
+            <option value="bloat_desc">📊 Token Bloat (Largest Footprint)</option>
+            <option value="lines_desc">📏 Line Count (Longest → Shortest)</option>
+            <option value="name_asc">🔤 Name (A → Z)</option>
+            <option value="scope">🌐 Scope (Workspace → Global)</option>
+          </select>
         </div>
         <div class="agent-matrix-search-box">
           <span class="search-icon">🔍</span>
@@ -553,6 +667,16 @@
           <button class="segment-btn active" data-lens="active">⚡ Active Runtime Matrix</button>
           <button class="segment-btn" data-lens="cascade">🌐 Full Context Cascade</button>
           <button class="segment-btn" data-lens="telemetry">📊 Holographic Telemetry &amp; Audit</button>
+        </div>
+        <div class="agent-matrix-sort-box" title="Sort session tools, skills, and rules">
+          <span class="sort-icon">⇅</span>
+          <select id="sessionMatrixSortSelect" class="holo-matrix-select" aria-label="Sort Context Elements">
+            <option value="calls_desc">⚡ Execution Count (Most Invoked)</option>
+            <option value="last_step">⏱️ Recency (Last Step Invoked)</option>
+            <option value="bloat_desc">📊 Token Bloat (Largest Footprint)</option>
+            <option value="precedence">🛡️ Precedence (Workspace → Global)</option>
+            <option value="name_asc">🔤 Name (A → Z)</option>
+          </select>
         </div>
         <div class="agent-matrix-search-box">
           <span class="search-icon">🔍</span>
