@@ -252,16 +252,25 @@ impl IncrementalPipeline {
             .synthesize_directory_backbone(workspace, rel_path)
             .await;
         if !synth_dir_nodes.is_empty() {
-            if let Err(e) = self.db.store_nodes(&synth_dir_nodes, &[], None).await {
+            let (store_nodes_res, store_edges_res) = tokio::join!(
+                self.db.store_nodes(&synth_dir_nodes, &[], None),
+                self.db.store_edges(&synth_dir_edges)
+            );
+            if let Err(e) = store_nodes_res {
                 warn!("Failed to store synthesized directory backbone nodes for '{}': {}", rel_path, e);
             }
-            if let Err(e) = self.db.store_edges(&synth_dir_edges).await {
+            if let Err(e) = store_edges_res {
                 warn!("Failed to store synthesized directory backbone edges for '{}': {}", rel_path, e);
             }
         }
 
-        // 1. Look up existing community for this file before pruning to preserve community assignment
-        let mut existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);
+        // 1. Look up existing community & inbound edges concurrently (R-100)
+        let (comm_res, inbound_res) = tokio::join!(
+            self.db.get_file_community(workspace, rel_path),
+            self.db.get_inbound_edges_for_file(workspace, rel_path)
+        );
+        let mut existing_comm = comm_res.unwrap_or(None);
+        let inbound_edges = inbound_res.unwrap_or_default();
 
         // 1a. Zero-delay community inference for brand-new files (R-105)
         // If file is brand-new (existing_comm is None), infer modal community from neighbor connections or directory siblings
@@ -280,9 +289,6 @@ impl IncrementalPipeline {
                 }
             }
         }
-
-        // 1b. Capture existing inbound caller edges (R-079) before pruning old nodes
-        let inbound_edges = self.db.get_inbound_edges_for_file(workspace, rel_path).await.unwrap_or_default();
 
         // 2. Generate vector embeddings for newly parsed nodes FIRST (eliminates 404 blackout window)
         let enriched_texts: Vec<String> = all_nodes

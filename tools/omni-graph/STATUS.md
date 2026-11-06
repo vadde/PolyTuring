@@ -52,6 +52,7 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | 2026-11-05 | `review` | `review` | Implement AI-Native Galaxy Cosmology (R-086 to R-092): Purge Miller's Law clamp, enforce Affinity-Floor Invariant, modularity differential guard, sub-linear scale-adaptive sizing, and noise floor isolation. Synchronized PolyTuring (65 galaxies) and verified tutor-intelligence (68), DesignPatterns (49), and django-sorcery (53). 98 unit tests pass. |
 | 2026-11-05 | `review` | `review` | Forensic resolution of watcher 392s subquery bottleneck: Integrated in-memory SymbolTable (R-078/R-091) into IncrementalPipeline with parameterized batch edge resolution, dedicated 1s quiescent auto-cluster trigger, and test_r091 (99 unit tests pass). |
 | 2026-11-06 | `review` | `in-progress` | Launch v0.7.0 Live Watcher Fidelity Parity & Concurrency Overhaul (ADR-002, SPEC-OMNI-005, R-093 to R-109): Closing 14 forensic loopholes across transactional atomic batch swap, reactive reverse dependencies, unresolved retention pool, deduplication, and non-blocking Louvain actor. |
+| 2026-11-06 | `in-progress` | `testing` | Completed Milestones 1 through 6 (R-093 to R-106): SymbolTable hardening, directory backbone synthesis, transactional atomic swap, edge deduplication, dual-tier modularity, non-blocking Louvain actor, convergence barrier (wait_for_sync), nanometer fidelity diagnostics, and lock-free generational versioning. 111 unit tests pass (100% green, 0 clippy warnings). |
 
 ---
 
@@ -159,6 +160,20 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | R-H083 | True SurrealDB v2 HNSW KNN Operator `<|k, ef|>` | `src/db/mod.rs` | Verified against HNSW index | ✅ |
 | R-H084 | Hierarchical Leiden Macro-Coarsening ($5 \le K \le 15$) | `src/analysis/mod.rs`, `src/api/mod.rs` | `tests/unit_tests.rs:test_r084_hierarchical_leiden_coarsening` | ✅ |
 | R-H085 | Complete Uncle Bob Package Metrics ($C_a, C_e, I, A, D$) | `src/analysis/mod.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r085_package_metrics_completeness` | ✅ |
+| R-093 | Reactive Reverse Dependency Re-Resolution (`symbol_callers`) | `src/ingestion/symbol_table.rs` | `tests/unit_tests.rs:test_r093_reactive_reverse_dependency_resolution` | ✅ |
+| R-094 | Autonomous Directory Backbone DAG Synthesis | `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r094_autonomous_directory_backbone_synthesis` | ✅ |
+| R-095 | Dual-Tier Modularity Fast-Path ($\Delta Q$) | `src/analysis/mod.rs` | `tests/unit_tests.rs:test_r095_dual_tier_local_modularity_fast_path` | ✅ |
+| R-096 | CPU-Bound Concurrency Isolation (`spawn_blocking`) | `src/watcher/mod.rs` | Unit & reactor responsiveness tests | ✅ |
+| R-097 | Transactional Convergence Barrier (`wait_for_sync`) | `src/api/mod.rs`, `src/watcher/mod.rs` | `tests/unit_tests.rs:test_r097_convergence_barrier_blocks_until_sync` | ✅ |
+| R-098 | Nanometer Fidelity Diagnostic Endpoint (`/api/watch/fidelity`) | `src/api/mod.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r098_fidelity_diagnostic_endpoint` | ✅ |
+| R-099 | Lock-Free Generational Versioning (`graph_generation`) | `src/db/mod.rs`, `src/api/mod.rs` | `tests/unit_tests.rs:test_r099_lock_free_generational_versioning` | ✅ |
+| R-100 | High-Throughput Parallel Batch Persistence & MCP Hardening | `src/watcher/pipeline.rs`, `scripts/omni-mcp.py` | Unit tests & MCP handler tests | ✅ |
+| R-101 | Atomic Transactional Multi-Statement Swap | `src/db/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r101_atomic_transactional_multi_statement_swap` | ✅ |
+| R-102 | Disambiguated Inbound Edge Signature Relinking | `src/db/mod.rs` | `tests/unit_tests.rs:test_r102_disambiguated_inbound_signature_relinking` | ✅ |
+| R-103 | Unresolved Edge Retention Pool | `src/ingestion/symbol_table.rs` | `tests/unit_tests.rs:test_r103_unresolved_edge_retention_pool` | ✅ |
+| R-104 | Edge Relationship Deduplication & Call Weighting | `src/db/mod.rs` | `tests/unit_tests.rs:test_r104_edge_relationship_deduplication` | ✅ |
+| R-105 | Zero-Delay Community Inference for New Files | `src/analysis/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r105_zero_delay_community_inference_for_new_files` | ✅ |
+| R-106 | Language-Aware SAIR Scoping & Exact Match Fast-Path | `src/ingestion/symbol_table.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r106_language_aware_sair_scoping` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

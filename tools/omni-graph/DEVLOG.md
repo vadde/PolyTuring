@@ -32,9 +32,21 @@
    - Authored `deduplicate_edges` in `DbClient` and updated `store_resolved_edges` and `/api/references`. Consolidates multiple calls into single directed links with `call_count` and `weight`, resolving 499 duplicate groups.
    - Added exact-match fast path in `find_references` using `idx_node_label` before falling back to ends_with queries.
    - Verified via `test_r101_atomic_transactional_multi_statement_swap`, `test_r102_disambiguated_inbound_signature_relinking`, and `test_r104_edge_relationship_deduplication`.
-4. **Test Suite Status**:
-   - 106/106 unit tests passing in 0.01s (100% green).
-   - 0 clippy warnings under `-D warnings`.
+4. **Milestone 5: Dual-Tier Modularity & Non-Blocking Louvain Actor (`R-095`, `R-096`, `R-105`)**:
+   - Optimized `coarsen_to_macro_galaxies` in `analysis/mod.rs` to maintain an incremental `meta_affinity` matrix, eliminating the $O(K \cdot |E|)$ rescanning loop and reducing coarsening complexity to linear $O(|E|)$ (`R-095`).
+   - Added `CommunityDetector::calculate_local_delta_q` for sub-millisecond local modularity evaluation in RAM (`R-095`).
+   - Activated `infer_neighbor_community`, `infer_community_from_targets`, and `get_directory_modal_community` in `pipeline.rs`, ensuring brand-new files inherit modal neighbor/directory communities immediately upon insertion (`R-105`).
+   - Decoupled quiescent Louvain clustering in `watcher/mod.rs` into an asynchronous background task off the watcher loop using `tokio::task::spawn_blocking`, eliminating reactor loop starvation and notify channel buffer overflows (`R-096`).
+   - Verified via `test_r095_dual_tier_local_modularity_fast_path` and `test_r105_zero_delay_community_inference_for_new_files`.
+5. **Milestone 6: Convergence Barrier & Diagnostics (`R-097`, `R-098`, `R-099`, `R-100`)**:
+   - Implemented `wait_for_convergence` on `WatchManager` and enhanced `check_read_fence` to accept `wait_for_sync: bool` and `timeout_ms: Option<u64>`. Awaits internal live watcher convergence up to 3,000ms before serving fresh AST truth (`R-097`).
+   - Exposed `GET /api/watch/fidelity` returning `fidelity_score`, `node_count`, `edge_count`, `dangling_directory_pointers`, `dangling_directory_edges`, and `convergence_state` (`R-098`, `AC-041`).
+   - Implemented lock-free generational versioning (`Arc<AtomicU64>`) on `DbClient` and `AppState`, incremented on all database mutations (`execute_atomic_swap`, `store_resolved_edges`, `delete_file`). Axum middleware injects `X-Graph-Generation` header on all responses (`R-099`).
+   - Parallelized independent SurrealDB backbone writes and community reads via `tokio::join!`. Updated `omni-mcp.py` to pass `wait_for_sync=true` by default and gracefully handle HTTP 423 Locked (`R-100`).
+   - Verified via `test_r097_convergence_barrier_blocks_until_sync`, `test_r098_fidelity_diagnostic_endpoint`, and `test_r099_lock_free_generational_versioning`.
+6. **Test Suite Status**:
+   - 111/111 unit tests passing in 0.05s (100% green).
+   - 0 clippy warnings under strict `-D warnings`.
 
 ---
 

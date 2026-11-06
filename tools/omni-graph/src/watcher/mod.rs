@@ -322,6 +322,33 @@ impl WatchManager {
             None
         }
     }
+
+    /// Await until live watcher convergence occurs for workspace, up to timeout (R-097)
+    pub async fn wait_for_convergence(&self, workspace: Option<&str>, timeout: Duration) -> bool {
+        let start = Instant::now();
+        loop {
+            let is_syncing = if let Some(ws) = workspace {
+                if let Some(st) = self.get_workspace_status(ws).await {
+                    st.status == "syncing"
+                } else {
+                    false
+                }
+            } else {
+                let statuses = self.get_status().await;
+                statuses.iter().any(|s| s.status == "syncing")
+            };
+
+            if !is_syncing {
+                return true;
+            }
+
+            if start.elapsed() >= timeout {
+                return false;
+            }
+
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
 }
 
 /// Count files in a directory (excluding noise and gitignored files)

@@ -7,6 +7,8 @@ use reqwest::header::{ACCEPT, AUTHORIZATION};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tracing::info;
 
@@ -62,6 +64,7 @@ pub struct DbClient {
     db: String,
     client: Client,
     auth_header: String,
+    pub graph_generation: Arc<AtomicU64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -142,6 +145,10 @@ pub struct RelationshipPayload {
     #[serde(default = "default_inferred_category")]
     pub category: String,
     pub metadata: Option<serde_json::Value>,
+    #[serde(default)]
+    pub wait_for_sync: Option<bool>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 pub fn deserialize_null_as_zero<'de, D>(deserializer: D) -> Result<f32, D::Error>
@@ -337,6 +344,7 @@ impl DbClient {
             db: config.surreal_db.clone(),
             client,
             auth_header: encoded_auth,
+            graph_generation: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -660,6 +668,7 @@ impl DbClient {
                 self.query_sql(&query).await?;
             }
         }
+        self.graph_generation.fetch_add(1, Ordering::SeqCst);
         Ok(stored)
     }
 
@@ -983,6 +992,71 @@ impl DbClient {
         }))
     }
 
+    /// Get nanometer fidelity diagnostics for live-watcher topology parity (R-098, AC-041)
+    pub async fn get_fidelity_diagnostics(
+        &self,
+        workspace: Option<&str>,
+    ) -> Result<serde_json::Value, String> {
+        let ws_clause = match workspace {
+            Some(ws) if !ws.is_empty() => format!("WHERE workspace = '{}'", surql_escape(ws)),
+            _ => String::new(),
+        };
+
+        let q = format!(
+            "SELECT count() FROM node {} GROUP ALL;\n\
+             SELECT count() FROM linked_to {} GROUP ALL;\n\
+             SELECT count() FROM linked_to {} {} out.id = NONE GROUP ALL;\n\
+             SELECT count() FROM linked_to {} {} in.id = NONE GROUP ALL;",
+            ws_clause,
+            ws_clause,
+            ws_clause,
+            if ws_clause.is_empty() { "WHERE" } else { "AND" },
+            ws_clause,
+            if ws_clause.is_empty() { "WHERE" } else { "AND" }
+        );
+
+        let resp = self.query_sql(&q).await?;
+        let mut node_count: i64 = 0;
+        let mut edge_count: i64 = 0;
+        let mut dangling_out: i64 = 0;
+        let mut dangling_in: i64 = 0;
+
+        if let Some(arr) = resp.as_array() {
+            if let Some(n) = arr.first().and_then(|r| r.get("result")).and_then(|res| res.as_array()).and_then(|a| a.first()).and_then(|o| o.get("count")).and_then(|c| c.as_i64()) {
+                node_count = n;
+            }
+            if let Some(e) = arr.get(1).and_then(|r| r.get("result")).and_then(|res| res.as_array()).and_then(|a| a.first()).and_then(|o| o.get("count")).and_then(|c| c.as_i64()) {
+                edge_count = e;
+            }
+            if let Some(d) = arr.get(2).and_then(|r| r.get("result")).and_then(|res| res.as_array()).and_then(|a| a.first()).and_then(|o| o.get("count")).and_then(|c| c.as_i64()) {
+                dangling_out = d;
+            }
+            if let Some(d) = arr.get(3).and_then(|r| r.get("result")).and_then(|res| res.as_array()).and_then(|a| a.first()).and_then(|o| o.get("count")).and_then(|c| c.as_i64()) {
+                dangling_in = d;
+            }
+        }
+
+        let dangling_directory_pointers = dangling_out + dangling_in;
+        let fidelity_score = if edge_count > 0 {
+            let healthy = edge_count.saturating_sub(dangling_directory_pointers) as f64;
+            (healthy / edge_count as f64).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+
+        let current_gen = self.graph_generation.load(Ordering::Relaxed);
+
+        Ok(serde_json::json!({
+            "workspace": workspace,
+            "node_count": node_count,
+            "edge_count": edge_count,
+            "dangling_directory_pointers": dangling_directory_pointers,
+            "dangling_directory_edges": dangling_directory_pointers,
+            "fidelity_score": fidelity_score,
+            "graph_generation": current_gen
+        }))
+    }
+
     /// Record full workspace metadata including worktree lineage (R-051)
     pub async fn record_workspace_meta(
         &self,
@@ -1012,6 +1086,7 @@ impl DbClient {
             esc_ws, esc_ws, esc_path, is_worktree, parent_field, branch_field, wt_field
         );
         self.query_sql(&q).await?;
+        self.graph_generation.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -1454,6 +1529,7 @@ impl DbClient {
             esc_ws, esc_path, esc_ws, esc_path
         );
         self.query_sql(&q).await?;
+        self.graph_generation.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -1674,6 +1750,7 @@ impl DbClient {
             inbound_edges,
         );
         self.query_sql(&sql).await?;
+        self.graph_generation.fetch_add(1, Ordering::SeqCst);
         Ok((node_count, edge_count, relink_count))
     }
 
@@ -1740,6 +1817,7 @@ impl DbClient {
             esc_new, esc_ws, esc_old
         );
         self.query_sql(&q).await?;
+        self.graph_generation.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 

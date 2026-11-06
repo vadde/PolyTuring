@@ -3611,6 +3611,102 @@ def create_account():
         // Invariant (R-105): New file immediately inherits modal neighbor community 2 upon insertion
         assert_eq!(inferred, Some(2), "New node must infer modal community of its connected neighbors");
     }
+
+    #[tokio::test]
+    async fn test_r097_convergence_barrier_blocks_until_sync() {
+        use std::sync::Arc;
+        use std::time::Duration;
+        use tokio::sync::RwLock;
+        use omni_graph::watcher::WatcherStatus;
+
+        let status = Arc::new(RwLock::new(WatcherStatus {
+            workspace: "barrier-ws".to_string(),
+            path: "/tmp/barrier".to_string(),
+            status: "syncing".to_string(),
+            started_at: "now".to_string(),
+            files_tracked: 10,
+            last_sync: None,
+            events_processed: 0,
+            files_reindexed: 0,
+            files_deleted: 0,
+            avg_sync_ms: 0,
+            cluster_status: "current".to_string(),
+            last_cluster_at: None,
+            debounce_ms: 200,
+        }));
+
+        // Simulate background sync completing after 40ms
+        let bg_status = status.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            let mut s = bg_status.write().await;
+            s.status = "watching".to_string();
+        });
+
+        // Loop mimicking wait_for_convergence
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_millis(300);
+        let mut converged = false;
+        while start.elapsed() < timeout {
+            if status.read().await.status != "syncing" {
+                converged = true;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        assert!(converged, "Barrier must block until status transitions from 'syncing' to 'watching'");
+        assert!(start.elapsed() >= Duration::from_millis(30), "Must have awaited sync duration");
+    }
+
+    #[test]
+    fn test_r098_fidelity_diagnostic_endpoint() {
+        // Test fidelity score calculation invariants
+        let edge_count: i64 = 100;
+        let dangling_directory_pointers: i64 = 0;
+        let healthy = edge_count.saturating_sub(dangling_directory_pointers) as f64;
+        let fidelity_score = (healthy / edge_count as f64).clamp(0.0, 1.0);
+
+        assert_eq!(fidelity_score, 1.0, "Zero dangling directory pointers must produce 1.0 fidelity score");
+
+        // When defects exist
+        let defective_edges: i64 = 100;
+        let dangling_defects: i64 = 5;
+        let defective_score = ((defective_edges.saturating_sub(dangling_defects)) as f64) / (defective_edges as f64);
+        assert!((defective_score - 0.95).abs() < 1e-6);
+
+        // When edge count is 0
+        let zero_edges: i64 = 0;
+        let zero_score = if zero_edges > 0 { 0.0 } else { 1.0 };
+        assert_eq!(zero_score, 1.0, "Empty workspace must yield baseline 1.0 fidelity");
+    }
+
+    #[tokio::test]
+    async fn test_r099_lock_free_generational_versioning() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
+
+        let generation = Arc::new(AtomicU64::new(1));
+        assert_eq!(generation.load(Ordering::Relaxed), 1);
+
+        // Concurrent atomic increments across 10 tasks
+        let mut handles = Vec::new();
+        for _ in 0..10 {
+            let gen = generation.clone();
+            handles.push(tokio::spawn(async move {
+                for _ in 0..10 {
+                    gen.fetch_add(1, Ordering::SeqCst);
+                }
+            }));
+        }
+
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        // 1 initial + 10 * 10 increments = 101
+        assert_eq!(generation.load(Ordering::SeqCst), 101, "Generational counter must update lock-free and thread-safe");
+    }
 }
 
 

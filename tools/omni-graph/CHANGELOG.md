@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - v0.7.0
 
 ### Added
+- **Transactional Convergence Barrier (R-097, ADR-002.6)**: Read endpoints (`/api/symbol`, `/api/references`, `/api/condense`, `/api/search`, `/api/galaxies`, `/api/query`, `/api/cluster`, `/api/galaxy/boundary`, `/api/galaxy/topology`) support `wait_for_sync=true`, awaiting internal convergence signal up to `timeout_ms` (default 3,000ms) with graceful fallback.
+- **Nanometer Fidelity Diagnostic Endpoint (R-098, AC-041)**: Exposes `GET /api/watch/fidelity` returning `fidelity_score`, `node_count`, `edge_count`, `dangling_directory_pointers`, `dangling_directory_edges`, and `convergence_state`.
+- **Lock-Free Generational Versioning (R-099)**: Implemented atomic 64-bit generation counter (`Arc<AtomicU64>`) incremented on all database mutations; Axum middleware injects `X-Graph-Generation` header on all responses.
+- **High-Throughput Parallel Batch Persistence & MCP Hardening (R-100)**: Parallelized independent SurrealDB backbone writes and community reads via `tokio::join!`; updated `omni-mcp.py` to pass `wait_for_sync=true` and handle HTTP 423 Locked with friendly non-crashing status messages.
 - **Transactional Atomic Batch Swap (R-101, ADR-002.1)**: Unified file deletion, node insertion, edge resolution, and inbound relinking into a single multi-statement `BEGIN TRANSACTION; ... COMMIT TRANSACTION;` SurrealQL script, dropping network round-trips from 4 to 1 and eliminating the 50–250ms torn-read blackout window.
 - **Disambiguated Inbound Edge Signature Relinking (R-102)**: Enhanced `InboundEdgeRef` with `target_kind` to support composite `(label, kind)` signature matching, preventing sibling structs and methods from colliding during live re-indexing.
 - **Edge Relationship Deduplication & Call Weighting (R-104)**: In-memory `deduplicate_edges` consolidates multiple identical calls between source and target into a single directed edge with `call_count` and `weight`; deduplicated `/api/references` to return distinct caller entities.

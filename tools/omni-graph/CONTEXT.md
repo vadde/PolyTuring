@@ -35,7 +35,13 @@ blockers: []
 | Atomic Transactional Multi-Statement Swap (R-101) | Complete | — | 🟢 Single `BEGIN TRANSACTION; ... COMMIT TRANSACTION;` script; eliminates 50-250ms torn-read window |
 | Disambiguated Inbound Edge Signature Relinking (R-102) | Complete | — | 🟢 Composite `(label, kind)` signature matching; eliminates sibling struct/method collision |
 | Edge Relationship Deduplication & Call Weighting (R-104) | Complete | — | 🟢 In-memory deduplication with `call_count` and `weight`; resolves 499 duplicate groups |
-| Test Coverage | 106/106 Unit Tests | 106 | 🟢 100% Verified (0.01s, 0 clippy warnings) |
+| Dual-Tier Modularity Fast-Path (R-095, R-105) | Complete | — | 🟢 Sub-microsecond local Delta Q evaluation in RAM; brand-new files inherit modal neighbor community immediately |
+| Decoupled Non-Blocking Louvain Actor (R-096) | Complete | — | 🟢 Quiescent clustering isolated to dedicated blocking thread via spawn_blocking; zero reactor starvation |
+| Transactional Convergence Barrier (R-097) | Complete | — | 🟢 wait_for_sync=true on all read endpoints; awaits live-watcher convergence up to 3000ms |
+| Nanometer Fidelity Diagnostic Endpoint (R-098) | Complete | — | 🟢 GET /api/watch/fidelity returning fidelity_score, dangling directory pointers, and convergence state |
+| Lock-Free Generational Versioning (R-099) | Complete | — | 🟢 Arc<AtomicU64> incremented on all DB mutations; X-Graph-Generation injected on all HTTP responses |
+| High-Throughput Parallel Batch Persistence (R-100) | Complete | — | 🟢 tokio::join! on backbone storage and community inference; omni-mcp.py handles HTTP 423 gracefully |
+| Test Coverage | 111/111 Unit Tests | 111 | 🟢 100% Verified (0.05s, 0 clippy warnings) |
 | Live Watcher In-Memory SAIR Acceleration (R-078, R-091) | Complete | — | 🟢 Integrated in-memory SymbolTable into IncrementalPipeline; eliminated 392s subquery bottleneck; live sync completes in <250ms with dedicated 1s quiescent trigger |
 | AI-Native Cosmology & Modularity Guard (R-086, R-087) | Complete | — | 🟢 Purged Miller's Law clamp; enforced Affinity-Floor Invariant and delta Q guard |
 | Scale-Adaptive Subsystem Sizing (R-088) | Complete | — | 🟢 Sub-linear dynamic ceiling K_adaptive(N) bounding natural domains without forced merges |
