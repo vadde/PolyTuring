@@ -30,7 +30,7 @@ footer: "PolyTuring Architecture Keynote | DeepMind & Systems Engineering"
 1. **ASTs are Syntax Islands**: Abstract Syntax Trees provide local syntactic tokens, not cross-file architectural semantics or blast radius.
 2. **Code Call Graphs are Naturally Sparse**: With $|E|/|V| \approx 1.07$, raw code graphs fall below the percolation threshold and collapse into disconnected noise.
 3. **Omni-Graph Solves Percolation**: We introduce the **Topological Containment Backbone** ($E_{\text{AST}} \cup E_{\text{Topo}}$) ensuring 100% DAG reachability without corrupting semantic call paths.
-4. **Community Detection Replaces Spaghetti Code**: Hierarchical Leiden & Seed-Preserving LPA mathematically cluster code into 5–15 macro architectural **Galaxies**.
+4. **Community Detection Replaces Spaghetti Code**: AI-Native Leiden & Modularity-Guarded LPA mathematically cluster code into scale-adaptive, unpolluted architectural **Galaxies** ($K_{\text{adaptive}}$).
 5. **Uncle Bob at Graph Scale**: We automate **Afferent/Efferent Coupling ($C_a, C_e$)**, **Instability ($I$)**, and **PageRank Risk (PRR)** to give AI agents sub-second, sub-1,500-token surgical reasoning.
 
 ---
@@ -247,15 +247,16 @@ Omni-Graph solves this with a **Two-Phase Re-Clustering Pipeline**:
            │    Merge into macro-cluster sharing directory path   │
            │                     │ (No dir match?)                │
            │                     ▼                                │
-           │ 3. Dominant Cluster Fallback:                        │
-           │    Merge into largest dominant macro-cluster         │
+           │ 3. AFFINITY-FLOOR INVARIANT (R-086):                 │
+           │    NEVER merge decoupled domains with zero affinity! │
+           │    Preserve as independent bounded context domain.   │
            └──────────────────────────┬───────────────────────────┘
                                       │
                                       ▼
-             Contiguous, Stable Galaxy Topology (5 to 15 Galaxies)
+             Scale-Adaptive Topology: K_adaptive = clamp(round(3.5 * N^0.35), 5, 150)
 ```
 
-* **Guarantee**: Clean logarithmic scaling: $5 \le N_{\text{galaxies}} \le 15$ for repos up to $10^6$ nodes.
+* **Guarantee**: Natural, unpolluted domain scaling from small scripts ($K \approx 5$) to 10M LOC Titans ($K \le 150$ per partition), with zero artificial forced merges.
 
 ---
 
