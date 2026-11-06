@@ -6,6 +6,7 @@ use crate::embedder::EmbedderClient;
 use crate::ingestion::{FileCache, SymbolTable};
 use crate::parser::{CodeParser, ExtractedEdge, ExtractedNode};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -17,6 +18,7 @@ pub struct IncrementalPipeline {
     embedder: EmbedderClient,
     cache: FileCache,
     symbol_table: Arc<RwLock<SymbolTable>>,
+    known_dirs: Arc<RwLock<HashSet<String>>>,
 }
 
 impl IncrementalPipeline {
@@ -25,13 +27,117 @@ impl IncrementalPipeline {
         embedder: EmbedderClient,
         cache: FileCache,
         symbol_table: Arc<RwLock<SymbolTable>>,
+        known_dirs: Arc<RwLock<HashSet<String>>>,
     ) -> Self {
         Self {
             db,
             embedder,
             cache,
             symbol_table,
+            known_dirs,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_default_dirs(
+        db: DbClient,
+        embedder: EmbedderClient,
+        cache: FileCache,
+        symbol_table: Arc<RwLock<SymbolTable>>,
+    ) -> Self {
+        Self::new(
+            db,
+            embedder,
+            cache,
+            symbol_table,
+            Arc::new(RwLock::new(HashSet::new())),
+        )
+    }
+
+    /// Ensure all ancestor directory nodes and hierarchy edges exist for rel_path (R-094)
+    pub async fn synthesize_directory_backbone(
+        &self,
+        workspace: &str,
+        rel_path: &str,
+    ) -> (Vec<ExtractedNode>, Vec<ExtractedEdge>) {
+        let mut cur_dir = Path::new(rel_path).parent();
+        let mut missing_dirs = Vec::new();
+
+        {
+            let known = self.known_dirs.read().await;
+            while let Some(dir) = cur_dir {
+                let dir_str = dir.to_string_lossy().to_string();
+                if dir_str.is_empty() || dir_str == "." {
+                    break;
+                }
+                if !known.contains(&dir_str) {
+                    missing_dirs.push(dir_str);
+                }
+                cur_dir = dir.parent();
+            }
+        }
+
+        if missing_dirs.is_empty() {
+            return (Vec::new(), Vec::new());
+        }
+
+        // Sort from shallowest to deepest directory so hierarchy is built top-down
+        missing_dirs.sort_by_key(|d| d.len());
+
+        let mut synth_nodes = Vec::with_capacity(missing_dirs.len());
+        let mut synth_edges = Vec::with_capacity(missing_dirs.len());
+
+        {
+            let mut known = self.known_dirs.write().await;
+            for dir_str in &missing_dirs {
+                if known.insert(dir_str.clone()) {
+                    let dir_name = Path::new(dir_str)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| dir_str.clone());
+
+                    synth_nodes.push(ExtractedNode {
+                        id: format!("{}:dir:{}", workspace, dir_str),
+                        workspace: workspace.to_string(),
+                        label: dir_name.clone(),
+                        kind: "directory".to_string(),
+                        file_path: dir_str.clone(),
+                        language: String::new(),
+                        line_start: 0,
+                        line_end: 0,
+                        text: format!("Directory: {}", dir_str),
+                    });
+
+                    let parent_of_dir = Path::new(dir_str)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    let parent_id = if parent_of_dir.is_empty() || parent_of_dir == "." {
+                        format!("{}:workspace", workspace)
+                    } else {
+                        format!("{}:dir:{}", workspace, parent_of_dir)
+                    };
+
+                    synth_edges.push(ExtractedEdge {
+                        workspace: workspace.to_string(),
+                        source_id: parent_id,
+                        target_label: dir_name,
+                        target_id: Some(format!("{}:dir:{}", workspace, dir_str)),
+                        edge_type: "CONTAINS".to_string(),
+                        category: "CONTAINMENT".to_string(),
+                    });
+                }
+            }
+        }
+
+        (synth_nodes, synth_edges)
+    }
+
+    /// Access the known directory cache (R-094)
+    #[allow(dead_code)]
+    pub fn known_dirs(&self) -> Arc<RwLock<HashSet<String>>> {
+        Arc::clone(&self.known_dirs)
     }
 
     /// Re-index a single created or modified file incrementally
@@ -140,6 +246,19 @@ impl IncrementalPipeline {
             edge_type: "CONTAINS_FILE".to_string(),
             category: "CONTAINMENT".to_string(),
         });
+
+        // 0. Ensure directory backbone DAG exists up to root (R-094)
+        let (synth_dir_nodes, synth_dir_edges) = self
+            .synthesize_directory_backbone(workspace, rel_path)
+            .await;
+        if !synth_dir_nodes.is_empty() {
+            if let Err(e) = self.db.store_nodes(&synth_dir_nodes, &[], None).await {
+                warn!("Failed to store synthesized directory backbone nodes for '{}': {}", rel_path, e);
+            }
+            if let Err(e) = self.db.store_edges(&synth_dir_edges).await {
+                warn!("Failed to store synthesized directory backbone edges for '{}': {}", rel_path, e);
+            }
+        }
 
         // 1. Look up existing community for this file before pruning to preserve community assignment
         let existing_comm = self.db.get_file_community(workspace, rel_path).await.unwrap_or(None);

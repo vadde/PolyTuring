@@ -18,7 +18,7 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use pipeline::IncrementalPipeline;
+pub use pipeline::IncrementalPipeline;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -409,7 +409,10 @@ async fn run_watcher(
         symbol_table.write().await.register_raw_symbols(&workspace, raw_symbols);
         info!("Initialized watcher symbol table with {} symbols for '{}'", count, workspace);
     }
-    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache, symbol_table);
+    let known_dirs = Arc::new(tokio::sync::RwLock::new(
+        db.get_directory_paths(&workspace).await.unwrap_or_default()
+    ));
+    let pipeline = IncrementalPipeline::new(db.clone(), embedder, cache, symbol_table, known_dirs);
     let debounce_duration = Duration::from_millis(debounce_ms);
     let mut pending_events: Vec<Event> = Vec::new();
     let mut last_batch_time = Instant::now();

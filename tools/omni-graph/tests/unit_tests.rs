@@ -3262,6 +3262,73 @@ def create_account():
             "Python caller must link to Python candidate"
         );
     }
+
+    #[tokio::test]
+    async fn test_r094_autonomous_directory_backbone_synthesis() {
+        use omni_graph::config::Config;
+        use omni_graph::db::DbClient;
+        use omni_graph::embedder::EmbedderClient;
+        use omni_graph::ingestion::{FileCache, SymbolTable};
+        use omni_graph::watcher::IncrementalPipeline;
+        use std::sync::Arc;
+        use tokio::sync::RwLock;
+
+        let cfg = Config::from_env();
+        let db = DbClient::new(&cfg);
+        let embedder = EmbedderClient::new(cfg.tei_url);
+        let cache = FileCache::new();
+        let st = Arc::new(RwLock::new(SymbolTable::new()));
+
+        let pipeline = IncrementalPipeline::with_default_dirs(db, embedder, cache, st);
+        let ws = "test-ws";
+
+        // Deeply nested file path
+        let rel_path = "src/modules/billing/v2/invoice_generator.rs";
+
+        // First pass: synthesizes missing directory hierarchy up to workspace
+        let (nodes, edges) = pipeline.synthesize_directory_backbone(ws, rel_path).await;
+
+        // Expect 4 ancestor directories: src, src/modules, src/modules/billing, src/modules/billing/v2
+        assert_eq!(nodes.len(), 4, "Should synthesize 4 missing directory nodes");
+        assert_eq!(edges.len(), 4, "Should synthesize 4 hierarchical CONTAINS edges");
+
+        // Verify nodes
+        let dir_paths: Vec<String> = nodes.iter().map(|n| n.file_path.clone()).collect();
+        assert_eq!(
+            dir_paths,
+            vec![
+                "src".to_string(),
+                "src/modules".to_string(),
+                "src/modules/billing".to_string(),
+                "src/modules/billing/v2".to_string(),
+            ]
+        );
+        for n in &nodes {
+            assert_eq!(n.kind, "directory");
+            assert_eq!(n.workspace, ws);
+        }
+
+        // Verify edge hierarchy: root workspace -> src -> modules -> billing -> v2
+        assert_eq!(edges[0].source_id, "test-ws:workspace");
+        assert_eq!(edges[0].target_id, Some("test-ws:dir:src".to_string()));
+        assert_eq!(edges[0].edge_type, "CONTAINS");
+
+        assert_eq!(edges[1].source_id, "test-ws:dir:src");
+        assert_eq!(edges[1].target_id, Some("test-ws:dir:src/modules".to_string()));
+
+        assert_eq!(edges[2].source_id, "test-ws:dir:src/modules");
+        assert_eq!(edges[2].target_id, Some("test-ws:dir:src/modules/billing".to_string()));
+
+        assert_eq!(edges[3].source_id, "test-ws:dir:src/modules/billing");
+        assert_eq!(edges[3].target_id, Some("test-ws:dir:src/modules/billing/v2".to_string()));
+
+        // Second pass: another file in the same directory (or sibling subdirectory)
+        let (sibling_nodes, sibling_edges) = pipeline
+            .synthesize_directory_backbone(ws, "src/modules/billing/v2/receipt.rs")
+            .await;
+        assert_eq!(sibling_nodes.len(), 0, "Known directories should not be re-synthesized");
+        assert_eq!(sibling_edges.len(), 0);
+    }
 }
 
 

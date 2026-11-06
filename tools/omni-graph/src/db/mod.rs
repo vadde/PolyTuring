@@ -626,6 +626,27 @@ impl DbClient {
         Ok(defs)
     }
 
+    /// Retrieve all existing directory node file_paths for a workspace (R-094)
+    pub async fn get_directory_paths(&self, workspace: &str) -> Result<HashSet<String>, String> {
+        let escaped = surql_escape(workspace);
+        let q = format!(
+            "SELECT file_path FROM node WHERE workspace = '{}' AND kind = 'directory';",
+            escaped
+        );
+        let resp = self.query_sql(&q).await?;
+        let mut paths = HashSet::new();
+        if let Some(arr) = resp.as_array().and_then(|r| r.first()).and_then(|r| r.get("result")).and_then(|v| v.as_array()) {
+            for item in arr {
+                if let Some(fp) = item.get("file_path").and_then(|v| v.as_str()) {
+                    if !fp.is_empty() {
+                        paths.insert(fp.to_string());
+                    }
+                }
+            }
+        }
+        Ok(paths)
+    }
+
     /// Semantic search using native SurrealDB v2 HNSW KNN operator (R-007, R-009, R-067, R-083)
     pub async fn search_vector(
         &self,
