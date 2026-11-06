@@ -1,3 +1,33 @@
+### 2026-11-06 — Public Living Documentation Portal Editorial Streamline & Anti-Bloat Law
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `review` (Living Documentation Portal Overhaul & Editorial Governance)  
+**Branch**: `docs/portal-editorial-streamline`  
+**Governance**: Governed by [`.agents/rules/06-documentation.md`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/.agents/rules/06-documentation.md) (Public Static Pages Manifesto)  
+**Duration**: Complete  
+
+#### Executive Summary & Key Milestones Completed
+1. **Public Documentation Tone & Anti-Bloat Manifesto Codification (`.agents/rules/06-documentation.md`)**:
+   - Enshrined the strict boundary between the Public Storefront (`docs/site/index.html`) and the Internal Factory Floor (`specs/`, `ADRs`, `DEVLOG.md`, `tests/`).
+   - Outlawed the "Sedimentary Geology" anti-pattern (blindly appending new sections chronologically at the bottom of public pages).
+   - Mandated customer-centric value selling, layman-accessible mental models over academic formula dumps, and complete elimination of internal ticket codes (`R-101`), ADR codes (`ADR-002`), and competing version badges (`v0.4.0` vs `v0.7.0`).
+2. **Chapter 01 Editorial Overhaul (`docs/site/index.html`)**:
+   - Consolidated 15 sprawling, fragmented sub-headings into **4 High-Impact Themes**:
+     - **Theme 1: The 60-Second Value Pitch & Competitive Edge** (`#ch1-omni-graph`, `#sec-omni-advantage`, `#sec-omni-arch`): The 60-second mental model, the 4-way comparison matrix, and the 4-tier container topology.
+     - **Theme 2: What Fuels the Engine — The Secret Sauce Behind Superior Graph-RAG** (`#sec-omni-graph-rag`): Layman deep dive into why flat text chunking and standalone Tree-Sitter fail on code, followed by the 4 core pillars: Deterministic Multi-Pass Ingestion, Language-Aware SAIR Disambiguation (explaining how 14 `new()` functions are disambiguated across packages), Dual-Tier Content Partitioning & Topological Containment Backbone, and Strict Token Budgeting ($\le 1,500$ tokens via Personalized PageRank).
+     - **Theme 3: Autonomous Architecture & Real-Time Sync** (`#sec-omni-realtime`): AI-Native Galaxy Subsystems (Louvain/Leiden clustering without arbitrary Miller ceilings), Robert C. Martin coupling metrics ($C_a, C_e, I, D$) & dynamic blast-radius contracts (`GET /api/galaxy/boundary`), the Real-Time Live Watcher with "The Airplane Airlock" atomic swap, and Ephemeral Branch Fabric (EBF) with Git worktrees.
+     - **Theme 4: The Developer Experience — Plug, Play & Query** (`#sec-omni-agentic-triad`): The Unified Triad (Brain, Nervous System, Hands via MCP and CLI), SurrealDB relational B-tree indexing, Tokio FIFO ingestion queue, and OpenAPI 3.0.3 Explorer.
+   - Preserved all interactive sandboxes: Context Condenser Token Simulator (`#token-simulator`) and REST API Playground (`#api-playground`).
+   - Retained all former section anchor IDs as sub-heading anchors so zero deep links break.
+   - Synchronized Left Navigation Tree (`.nav-tree-children`) to reflect the streamlined 4-theme hierarchy.
+3. **Verification & Audit**:
+   - Ran 14-Gate automated headless verification suite (`bash .agents/skills/docs-portal/scripts/test-docs.sh`): **All 14 gates deterministically passed**.
+   - Built distribution bundle via `scripts/build-docs.sh` (27 distribution files verified).
+   - Verified local server running on `http://localhost:4000/` returns HTTP 200 with 153KB payload.
+   - Net code change: -140 lines of bloated, redundant markup.
+
+---
+
 ### 2026-11-06 — v0.7.0 Live Watcher Fidelity Parity: Final Verification, Static Docs & Full Governance Sync
 
 **Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
