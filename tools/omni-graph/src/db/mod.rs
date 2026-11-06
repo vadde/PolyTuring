@@ -109,6 +109,12 @@ pub struct ReferenceResult {
     pub category: String,
     #[serde(default)]
     pub metadata: Option<serde_json::Value>,
+    #[serde(default = "default_call_count")]
+    pub call_count: usize,
+}
+
+fn default_call_count() -> usize {
+    1
 }
 
 impl std::ops::Deref for ReferenceResult {
@@ -205,8 +211,67 @@ pub struct GalaxySubsystemRef {
 pub struct InboundEdgeRef {
     pub caller_id: String,
     pub target_label: String,
+    #[serde(default)]
+    pub target_kind: Option<String>,
     pub edge_type: String,
     pub category: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeduplicatedEdge {
+    pub workspace: String,
+    pub source_id: String,
+    pub target_label: String,
+    pub target_id: Option<String>,
+    pub edge_type: String,
+    pub category: String,
+    pub call_count: usize,
+    pub weight: f32,
+}
+
+type EdgeDedupKey = (String, String, Option<String>, String, String);
+
+/// Deduplicate extracted edges in memory before database write (R-104)
+/// Consolidates identical directed edges between source and target, calculating call_count and weight.
+pub fn deduplicate_edges(edges: &[ExtractedEdge]) -> Vec<DeduplicatedEdge> {
+    if edges.is_empty() {
+        return Vec::new();
+    }
+    let mut order = Vec::new();
+    let mut map: HashMap<EdgeDedupKey, (ExtractedEdge, usize)> = HashMap::new();
+
+    for edge in edges {
+        let key = (
+            edge.workspace.clone(),
+            edge.source_id.clone(),
+            edge.target_id.clone(),
+            edge.edge_type.clone(),
+            edge.category.clone(),
+        );
+        if let Some(entry) = map.get_mut(&key) {
+            entry.1 += 1;
+        } else {
+            order.push(key.clone());
+            map.insert(key, (edge.clone(), 1));
+        }
+    }
+
+    let mut result = Vec::with_capacity(order.len());
+    for key in order {
+        if let Some((edge, count)) = map.remove(&key) {
+            result.push(DeduplicatedEdge {
+                workspace: edge.workspace,
+                source_id: edge.source_id,
+                target_label: edge.target_label,
+                target_id: edge.target_id,
+                edge_type: edge.edge_type,
+                category: edge.category,
+                call_count: count,
+                weight: count as f32,
+            });
+        }
+    }
+    result
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -563,13 +628,14 @@ impl DbClient {
         Ok(())
     }
 
-    /// Bulk store resolved edges in parameterized batches (R-078 Pass 2)
+    /// Bulk store resolved edges in parameterized batches (R-078 Pass 2, R-104 Deduplicated)
     pub async fn store_resolved_edges(&self, edges: &[ExtractedEdge]) -> Result<usize, String> {
         if edges.is_empty() {
             return Ok(0);
         }
+        let deduped = deduplicate_edges(edges);
         let mut stored = 0;
-        for chunk in edges.chunks(100) {
+        for chunk in deduped.chunks(100) {
             let mut query = String::new();
             for edge in chunk {
                 if let Some(target_id) = &edge.target_id {
@@ -578,12 +644,14 @@ impl DbClient {
                     query.push_str(&format!(
                         "LET $s = type::thing('node', '{src}');\n\
                          LET $t = type::thing('node', '{tgt}');\n\
-                         RELATE $s->linked_to->$t SET workspace = '{ws}', type = '{t}', category = '{cat}';\n",
+                         RELATE $s->linked_to->$t SET workspace = '{ws}', type = '{t}', category = '{cat}', call_count = {cnt}, weight = {w};\n",
                         src = surql_escape(clean_src),
                         tgt = surql_escape(clean_tgt),
                         ws = surql_escape(&edge.workspace),
                         t = surql_escape(&edge.edge_type),
-                        cat = surql_escape(&edge.category)
+                        cat = surql_escape(&edge.category),
+                        cnt = edge.call_count,
+                        w = edge.weight,
                     ));
                     stored += 1;
                 }
@@ -1224,7 +1292,35 @@ impl DbClient {
         Ok(results)
     }
 
+    /// Parse raw SurrealQL response into ReferenceResult items
+    fn parse_reference_items(resp: &serde_json::Value) -> Vec<ReferenceResult> {
+        let mut results = Vec::new();
+        if let Some(arr) = resp.as_array() {
+            if let Some(res_arr) = arr.get(1).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
+                for item in res_arr {
+                    let call_count = item.get("call_count").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
+                    if let Ok(mut ref_res) = serde_json::from_value::<ReferenceResult>(item.clone()) {
+                        ref_res.call_count = call_count;
+                        results.push(ref_res);
+                    } else if let Some(caller) = item.get("caller") {
+                        if let Ok(node) = serde_json::from_value::<DbNode>(caller.clone()) {
+                            results.push(ReferenceResult {
+                                caller: node,
+                                edge_type: item.get("type").and_then(|t| t.as_str()).unwrap_or("CALLS").to_string(),
+                                category: item.get("category").and_then(|c| c.as_str()).unwrap_or("EXTRACTED").to_string(),
+                                metadata: item.get("metadata").cloned(),
+                                call_count,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        results
+    }
+
     /// Symbolic references: Find all callers / references of a symbol (LSP textDocument/references equivalent)
+    /// Employs exact-match fast path on idx_node_label (R-106) and deduplicates multi-edges with call_count (R-104)
     pub async fn find_references(
         &self,
         symbol_name: &str,
@@ -1236,38 +1332,41 @@ impl DbClient {
             Some(ws) if !ws.is_empty() => format!("AND workspace = '{}'", surql_escape(ws)),
             _ => String::new(),
         };
-        let lim_clause = match limit {
-            Some(l) => format!("LIMIT {}", l.min(500)),
-            None => String::new(),
-        };
-        let q = format!(
-            "LET $targets = (SELECT id FROM node WHERE (label = '{escaped}' OR string::ends_with(label, '::{escaped}') OR string::ends_with(label, '.{escaped}') OR file_path = '{escaped}' OR string::ends_with(file_path, '/{escaped}') OR string::ends_with(file_path, '{escaped}')) {ws_filter});\n\
-             SELECT in.* AS caller, type, category, metadata FROM linked_to WHERE out IN $targets.id {lim_clause};\n"
+        let lim_val = limit.unwrap_or(100).min(500);
+
+        // Fast-path: query exact match first (uses idx_node_label, <2ms, R-106)
+        let exact_q = format!(
+            "LET $targets = (SELECT id FROM node WHERE label = '{escaped}' {ws_filter});\n\
+             SELECT in.* AS caller, type, category, metadata, call_count FROM linked_to WHERE out IN $targets.id LIMIT {lim_val};\n"
         );
+        let resp = self.query_sql(&exact_q).await?;
+        let mut raw_results = Self::parse_reference_items(&resp);
 
-        let resp = self.query_sql(&q).await?;
-        let mut results = Vec::new();
+        // If no exact matches found, fallback to substring/ends_with matching
+        if raw_results.is_empty() {
+            let fallback_q = format!(
+                "LET $targets = (SELECT id FROM node WHERE (string::ends_with(label, '::{escaped}') OR string::ends_with(label, '.{escaped}') OR file_path = '{escaped}' OR string::ends_with(file_path, '/{escaped}') OR string::ends_with(file_path, '{escaped}')) {ws_filter});\n\
+                 SELECT in.* AS caller, type, category, metadata, call_count FROM linked_to WHERE out IN $targets.id LIMIT {lim_val};\n"
+            );
+            let fb_resp = self.query_sql(&fallback_q).await?;
+            raw_results = Self::parse_reference_items(&fb_resp);
+        }
 
-        if let Some(arr) = resp.as_array() {
-            if let Some(res_arr) = arr.get(1).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
-                for item in res_arr {
-                    if let Ok(ref_res) = serde_json::from_value::<ReferenceResult>(item.clone()) {
-                        results.push(ref_res);
-                    } else if let Some(caller) = item.get("caller") {
-                        if let Ok(node) = serde_json::from_value::<DbNode>(caller.clone()) {
-                            results.push(ReferenceResult {
-                                caller: node,
-                                edge_type: item.get("type").and_then(|t| t.as_str()).unwrap_or("CALLS").to_string(),
-                                category: item.get("category").and_then(|c| c.as_str()).unwrap_or("EXTRACTED").to_string(),
-                                metadata: item.get("metadata").cloned(),
-                            });
-                        }
-                    }
-                }
+        // Deduplicate callers by (caller_id, edge_type), aggregating call_count (R-104)
+        let mut deduped: Vec<ReferenceResult> = Vec::new();
+        let mut caller_index: HashMap<String, usize> = HashMap::new();
+        for res in raw_results {
+            let key = format!("{}:{}", res.caller.id, res.edge_type);
+            if let Some(&idx) = caller_index.get(&key) {
+                deduped[idx].call_count += res.call_count.max(1);
+            } else {
+                let idx = deduped.len();
+                caller_index.insert(key, idx);
+                deduped.push(res);
             }
         }
 
-        Ok(results)
+        Ok(deduped)
     }
 
     /// Batch update community IDs for nodes (R-012 Graph RAG clustering)
@@ -1368,7 +1467,7 @@ impl DbClient {
         let esc_path = surql_escape(file_path);
         let q = format!(
             "LET $nodes = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{path}');\n\
-             SELECT in, out.label AS target_label, type, category FROM linked_to WHERE out IN $nodes AND in NOT IN $nodes AND category != 'CONTAINMENT';",
+             SELECT in, out.label AS target_label, out.kind AS target_kind, type, category FROM linked_to WHERE out IN $nodes AND in NOT IN $nodes AND category != 'CONTAINMENT';",
             ws = esc_ws,
             path = esc_path
         );
@@ -1381,11 +1480,13 @@ impl DbClient {
                     item.get("in").and_then(|v| v.as_str()),
                     item.get("target_label").and_then(|v| v.as_str()),
                 ) {
+                    let target_kind = item.get("target_kind").and_then(|v| v.as_str()).map(|s| s.to_string());
                     let edge_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("CALLS").to_string();
                     let category = item.get("category").and_then(|v| v.as_str()).unwrap_or("EXTRACTED").to_string();
                     inbound.push(InboundEdgeRef {
                         caller_id: caller_id.to_string(),
                         target_label: target_label.to_string(),
+                        target_kind,
                         edge_type,
                         category,
                     });
@@ -1396,6 +1497,7 @@ impl DbClient {
     }
 
     /// Re-link surviving inbound caller edges to newly parsed nodes by symbol label (R-079)
+    #[allow(dead_code)]
     pub async fn relink_inbound_edges(
         &self,
         workspace: &str,
@@ -1419,9 +1521,11 @@ impl DbClient {
             return (String::new(), 0);
         }
 
+        let mut sig_to_id: HashMap<(&str, &str), &str> = HashMap::new();
         let mut label_to_id: HashMap<&str, &str> = HashMap::new();
         for node in surviving_nodes {
             if node.kind != "file" {
+                sig_to_id.insert((node.label.as_str(), node.kind.as_str()), node.id.as_str());
                 label_to_id.insert(node.label.as_str(), node.id.as_str());
             }
         }
@@ -1431,7 +1535,13 @@ impl DbClient {
         let esc_ws = surql_escape(workspace);
 
         for edge in inbound_edges {
-            if let Some(&new_target_id) = label_to_id.get(edge.target_label.as_str()) {
+            let matched_id = edge
+                .target_kind
+                .as_deref()
+                .and_then(|k| sig_to_id.get(&(edge.target_label.as_str(), k)).copied())
+                .or_else(|| label_to_id.get(edge.target_label.as_str()).copied());
+
+            if let Some(new_target_id) = matched_id {
                 let clean_src = clean_record_id(&edge.caller_id);
                 let clean_tgt = clean_record_id(new_target_id);
                 query.push_str(&format!(
@@ -1448,6 +1558,123 @@ impl DbClient {
             }
         }
         (query, relinked_count)
+    }
+
+    /// Pure function to build the multi-statement atomic swap SurrealQL script (R-101, R-102, R-104)
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_atomic_swap_sql(
+        workspace: &str,
+        file_path: &str,
+        file_hash: Option<&str>,
+        nodes: &[ExtractedNode],
+        embeddings: &[Vec<f32>],
+        community: Option<i32>,
+        edges: &[ExtractedEdge],
+        inbound_edges: &[InboundEdgeRef],
+    ) -> (String, usize, usize, usize) {
+        let esc_ws = surql_escape(workspace);
+        let esc_path = surql_escape(file_path);
+
+        let mut sql = String::from("BEGIN TRANSACTION;\n");
+
+        // 1. Atomic Prune of old nodes and relations
+        sql.push_str(&format!(
+            "LET $nodes = (SELECT VALUE id FROM node WHERE workspace = '{ws}' AND file_path = '{path}');\n\
+             DELETE linked_to WHERE in IN $nodes OR out IN $nodes;\n\
+             DELETE node WHERE workspace = '{ws}' AND file_path = '{path}';\n",
+            ws = esc_ws,
+            path = esc_path
+        ));
+
+        // 2. Insert new nodes with community, embeddings, hash
+        let hash_field = match file_hash {
+            Some(h) => format!(", file_hash: '{}'", surql_escape(h)),
+            None => String::new(),
+        };
+        let comm_field = match community {
+            Some(c) => format!(", community: {}", c),
+            None => String::new(),
+        };
+
+        let default_emb = vec![0.0f32; 384];
+        let mut node_count = 0;
+        for (idx, node) in nodes.iter().enumerate() {
+            let emb = embeddings.get(idx).unwrap_or(&default_emb);
+            let emb_str = serde_json::to_string(emb).unwrap_or_else(|_| "[]".to_string());
+            let escaped_text = surql_escape(&node.text);
+            let escaped_label = surql_escape(&node.label);
+            let escaped_path = surql_escape(&node.file_path);
+            let clean_id = clean_record_id(&node.id);
+            let escaped_id = surql_escape(clean_id);
+            let escaped_kind = surql_escape(&node.kind);
+            let escaped_lang = surql_escape(&node.language);
+
+            sql.push_str(&format!(
+                "UPSERT type::thing('node', '{}') MERGE {{ workspace: '{}', label: '{}', kind: '{}', file_path: '{}', language: '{}', line_start: {}, line_end: {}, text: '{}', embedding: {}{}{} }};\n",
+                escaped_id, esc_ws, escaped_label, escaped_kind, escaped_path, escaped_lang, node.line_start, node.line_end, escaped_text, emb_str, hash_field, comm_field
+            ));
+            node_count += 1;
+        }
+
+        // 3. Relate resolved edges (with call_count and weight)
+        let deduped_edges = deduplicate_edges(edges);
+        let mut edge_count = 0;
+        for edge in &deduped_edges {
+            if let Some(target_id) = &edge.target_id {
+                let clean_src = clean_record_id(&edge.source_id);
+                let clean_tgt = clean_record_id(target_id);
+                sql.push_str(&format!(
+                    "LET $s = type::thing('node', '{src}');\n\
+                     LET $t = type::thing('node', '{tgt}');\n\
+                     RELATE $s->linked_to->$t SET workspace = '{ws}', type = '{t}', category = '{cat}', call_count = {cnt}, weight = {w};\n",
+                    src = surql_escape(clean_src),
+                    tgt = surql_escape(clean_tgt),
+                    ws = esc_ws,
+                    t = surql_escape(&edge.edge_type),
+                    cat = surql_escape(&edge.category),
+                    cnt = edge.call_count,
+                    w = edge.weight,
+                ));
+                edge_count += 1;
+            }
+        }
+
+        // 4. Relink inbound edges with signature disambiguation (R-102)
+        let (relink_sql, relink_count) = Self::build_relink_inbound_sql(workspace, inbound_edges, nodes);
+        if !relink_sql.is_empty() {
+            sql.push_str(&relink_sql);
+        }
+
+        sql.push_str("COMMIT TRANSACTION;\n");
+
+        (sql, node_count, edge_count, relink_count)
+    }
+
+    /// Execute atomic transactional swap of a file's graph state in SurrealDB (R-101)
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_atomic_swap(
+        &self,
+        workspace: &str,
+        file_path: &str,
+        file_hash: Option<&str>,
+        nodes: &[ExtractedNode],
+        embeddings: &[Vec<f32>],
+        community: Option<i32>,
+        edges: &[ExtractedEdge],
+        inbound_edges: &[InboundEdgeRef],
+    ) -> Result<(usize, usize, usize), String> {
+        let (sql, node_count, edge_count, relink_count) = Self::build_atomic_swap_sql(
+            workspace,
+            file_path,
+            file_hash,
+            nodes,
+            embeddings,
+            community,
+            edges,
+            inbound_edges,
+        );
+        self.query_sql(&sql).await?;
+        Ok((node_count, edge_count, relink_count))
     }
 
     /// Atomic purge of ALL nodes, edges, and galaxy records for a workspace.

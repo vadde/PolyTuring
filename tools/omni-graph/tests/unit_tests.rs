@@ -2451,12 +2451,14 @@ mod hardening_v050_tests {
             InboundEdgeRef {
                 caller_id: "test-ws:tests/test_profiler.rs:test_measure:10".to_string(),
                 target_label: "SQLAlchemyProfiler".to_string(),
+                target_kind: None,
                 edge_type: "CALLS".to_string(),
                 category: "EXTRACTED".to_string(),
             },
             InboundEdgeRef {
                 caller_id: "test-ws:src/legacy.rs:old_call:20".to_string(),
                 target_label: "RemovedFunction".to_string(),
+                target_kind: None,
                 edge_type: "CALLS".to_string(),
                 category: "EXTRACTED".to_string(),
             },
@@ -3328,6 +3330,196 @@ def create_account():
             .await;
         assert_eq!(sibling_nodes.len(), 0, "Known directories should not be re-synthesized");
         assert_eq!(sibling_edges.len(), 0);
+    }
+
+    #[test]
+    fn test_r101_atomic_transactional_multi_statement_swap() {
+        use omni_graph::db::{DbClient, InboundEdgeRef};
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let ws = "test-ws";
+        let rel_path = "src/payment.rs";
+
+        let nodes = vec![
+            ExtractedNode {
+                id: "test-ws:file:src/payment.rs".to_string(),
+                workspace: ws.to_string(),
+                label: "payment.rs".to_string(),
+                kind: "file".to_string(),
+                file_path: rel_path.to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 100,
+                text: "pub fn charge() {}".to_string(),
+            },
+            ExtractedNode {
+                id: "test-ws:src/payment.rs:charge:10".to_string(),
+                workspace: ws.to_string(),
+                label: "charge".to_string(),
+                kind: "function".to_string(),
+                file_path: rel_path.to_string(),
+                language: "rust".to_string(),
+                line_start: 10,
+                line_end: 25,
+                text: "pub fn charge() {}".to_string(),
+            },
+        ];
+
+        let edges = vec![ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: "test-ws:src/payment.rs:charge:10".to_string(),
+            target_label: "StripeClient".to_string(),
+            target_id: Some("test-ws:src/stripe.rs:StripeClient:5".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        }];
+
+        let inbound = vec![InboundEdgeRef {
+            caller_id: "test-ws:src/checkout.rs:run:20".to_string(),
+            target_label: "charge".to_string(),
+            target_kind: Some("function".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        }];
+
+        let embeddings = vec![vec![0.1f32; 384], vec![0.2f32; 384]];
+
+        let (sql, node_cnt, edge_cnt, relink_cnt) = DbClient::build_atomic_swap_sql(
+            ws,
+            rel_path,
+            Some("fake_hash_123"),
+            &nodes,
+            &embeddings,
+            Some(4),
+            &edges,
+            &inbound,
+        );
+
+        // Transaction boundaries (R-101)
+        assert!(sql.starts_with("BEGIN TRANSACTION;\n"));
+        assert!(sql.ends_with("COMMIT TRANSACTION;\n"));
+
+        // Step 1: Deletion of previous state
+        assert!(sql.contains("DELETE linked_to WHERE in IN $nodes OR out IN $nodes;"));
+        assert!(sql.contains("DELETE node WHERE workspace = 'test-ws' AND file_path = 'src/payment.rs';"));
+
+        // Step 2: Upsert new nodes
+        assert!(sql.contains("UPSERT type::thing('node', 'test-ws:file:src/payment.rs') MERGE"));
+        assert!(sql.contains("UPSERT type::thing('node', 'test-ws:src/payment.rs:charge:10') MERGE"));
+        assert_eq!(node_cnt, 2);
+
+        // Step 3: Outbound edge relate with call_count & weight
+        assert!(sql.contains("call_count = 1"));
+        assert!(sql.contains("weight = 1"));
+        assert_eq!(edge_cnt, 1);
+
+        // Step 4: Relink inbound caller
+        assert!(sql.contains("test-ws:src/checkout.rs:run:20"));
+        assert_eq!(relink_cnt, 1);
+    }
+
+    #[test]
+    fn test_r102_disambiguated_inbound_signature_relinking() {
+        use omni_graph::db::{DbClient, InboundEdgeRef};
+        use omni_graph::parser::ExtractedNode;
+
+        let ws = "test-ws";
+        // File defines both a struct User and a function User (or sibling kinds)
+        let surviving_nodes = vec![
+            ExtractedNode {
+                id: "test-ws:src/auth.rs:User:10".to_string(),
+                workspace: ws.to_string(),
+                label: "User".to_string(),
+                kind: "struct".to_string(),
+                file_path: "src/auth.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 10,
+                line_end: 20,
+                text: "pub struct User {}".to_string(),
+            },
+            ExtractedNode {
+                id: "test-ws:src/auth.rs:User:30".to_string(),
+                workspace: ws.to_string(),
+                label: "User".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/auth.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 30,
+                line_end: 40,
+                text: "pub fn User() {}".to_string(),
+            },
+        ];
+
+        // Caller 1 wants struct User
+        let struct_caller = InboundEdgeRef {
+            caller_id: "test-ws:src/repo.rs:get_user:5".to_string(),
+            target_label: "User".to_string(),
+            target_kind: Some("struct".to_string()),
+            edge_type: "REFERENCES".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+
+        // Caller 2 wants function User
+        let fn_caller = InboundEdgeRef {
+            caller_id: "test-ws:src/factory.rs:make:8".to_string(),
+            target_label: "User".to_string(),
+            target_kind: Some("function".to_string()),
+            edge_type: "CALLS".to_string(),
+            category: "EXTRACTED".to_string(),
+        };
+
+        let (sql, relinked_cnt) = DbClient::build_relink_inbound_sql(
+            ws,
+            &[struct_caller, fn_caller],
+            &surviving_nodes,
+        );
+
+        assert_eq!(relinked_cnt, 2);
+        // struct_caller links to line 10 struct node
+        assert!(sql.contains("test-ws:src/auth.rs:User:10"));
+        // fn_caller links to line 30 function node
+        assert!(sql.contains("test-ws:src/auth.rs:User:30"));
+    }
+
+    #[test]
+    fn test_r104_edge_relationship_deduplication() {
+        use omni_graph::db::deduplicate_edges;
+        use omni_graph::parser::ExtractedEdge;
+
+        let ws = "test-ws";
+        // Simulate 4 calls to get() and 2 calls to post() from the same function
+        let mut edges = Vec::new();
+        for _ in 0..4 {
+            edges.push(ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: "test-ws:src/worker.rs:fetch:10".to_string(),
+                target_label: "get".to_string(),
+                target_id: Some("test-ws:src/client.rs:get:50".to_string()),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+        for _ in 0..2 {
+            edges.push(ExtractedEdge {
+                workspace: ws.to_string(),
+                source_id: "test-ws:src/worker.rs:fetch:10".to_string(),
+                target_label: "post".to_string(),
+                target_id: Some("test-ws:src/client.rs:post:80".to_string()),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            });
+        }
+
+        let deduped = deduplicate_edges(&edges);
+        assert_eq!(deduped.len(), 2, "6 redundant calls should deduplicate to exactly 2 unique edges");
+
+        let get_edge = deduped.iter().find(|e| e.target_label == "get").unwrap();
+        assert_eq!(get_edge.call_count, 4, "get() call count should be 4");
+        assert_eq!(get_edge.weight, 4.0, "get() edge weight should be 4.0");
+
+        let post_edge = deduped.iter().find(|e| e.target_label == "post").unwrap();
+        assert_eq!(post_edge.call_count, 2, "post() call count should be 2");
+        assert_eq!(post_edge.weight, 2.0, "post() edge weight should be 2.0");
     }
 }
 

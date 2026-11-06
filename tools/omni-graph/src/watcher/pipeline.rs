@@ -11,7 +11,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 pub struct IncrementalPipeline {
     db: DbClient,
@@ -280,18 +280,7 @@ impl IncrementalPipeline {
             }
         };
 
-        // 3. Atomic swap: prune previous nodes immediately before storing new ones
-        if let Err(e) = self.db.delete_file(workspace, rel_path).await {
-            warn!("Failed to prune previous nodes for '{}': {}", rel_path, e);
-        }
-
-        // 4. Store new nodes with inherited community
-        if let Err(e) = self.db.store_nodes_with_community(&all_nodes, &embeddings, Some(&hash), existing_comm).await {
-            error!("Failed to store nodes during live sync for '{}': {}", rel_path, e);
-            return Err(e);
-        }
-
-        // 5. In-Memory SAIR Edge Resolution (R-078)
+        // 3. In-Memory SAIR Edge Resolution & Unresolved Pool Retention (R-078, R-093, R-103)
         let mut containment_edges = Vec::new();
         let mut cross_file_edges = Vec::new();
         for edge in all_edges {
@@ -316,30 +305,52 @@ impl IncrementalPipeline {
             st.register_file_imports(workspace, rel_path, &imported_symbols);
 
             for mut edge in cross_file_edges {
+                let caller_file = edge.source_id.split(':').nth(1).unwrap_or("").to_string();
+                if !caller_file.is_empty() {
+                    st.record_caller_dependency(workspace, &caller_file, &edge.target_label);
+                }
                 if let Some(target_id) = st.resolve_edge(&edge) {
                     edge.target_id = Some(target_id);
                     resolved_edges.push(edge);
+                } else {
+                    // Retain unresolved forward reference in pool (R-103)
+                    st.retain_unresolved(edge);
+                }
+            }
+
+            // Drain any pending unsatisfied edges from other files now satisfied by our new symbols (R-103)
+            for node in &all_nodes {
+                let satisfied = st.drain_satisfied(workspace, &node.label);
+                for mut sat_edge in satisfied {
+                    if let Some(target_id) = st.resolve_edge(&sat_edge) {
+                        sat_edge.target_id = Some(target_id);
+                        resolved_edges.push(sat_edge);
+                    }
                 }
             }
         }
 
-        // 5b. Bulk store resolved edges (parameterized batch insert, zero SurrealQL subqueries)
-        if !resolved_edges.is_empty() {
-            if let Err(e) = self.db.store_resolved_edges(&resolved_edges).await {
-                warn!("Failed to store resolved edges during live sync for '{}': {}", rel_path, e);
-            }
+        // 4. Atomic Multi-Statement Swap (R-101, R-102, R-104)
+        // Combines file pruning, node upsert, edge persistence, and inbound relinking into a single transaction.
+        let (_node_cnt, _edge_cnt, relink_cnt) = self
+            .db
+            .execute_atomic_swap(
+                workspace,
+                rel_path,
+                Some(&hash),
+                &all_nodes,
+                &embeddings,
+                existing_comm,
+                &resolved_edges,
+                &inbound_edges,
+            )
+            .await?;
+
+        if relink_cnt > 0 {
+            info!("Preserved and relinked {} inbound caller edges for '{}'", relink_cnt, rel_path);
         }
 
-        // 5c. Re-link surviving inbound caller edges to new symbol node IDs (R-079)
-        if !inbound_edges.is_empty() {
-            if let Ok(relinked) = self.db.relink_inbound_edges(workspace, &inbound_edges, &all_nodes).await {
-                if relinked > 0 {
-                    info!("Preserved and relinked {} inbound caller edges for '{}'", relinked, rel_path);
-                }
-            }
-        }
-
-        // 6. Update staleness cache
+        // 5. Update staleness cache
         self.cache.update(rel_path, &hash).await;
 
         info!(
