@@ -275,29 +275,48 @@ impl IncrementalPipeline {
             return Ok(());
         }
 
-        let content = match fs::read_to_string(&full_path) {
-            Ok(c) => c,
-            Err(e) => {
-                // Could be non-UTF-8 or lock file, skip silently
-                warn!("Cannot read file '{}' for live sync: {}", rel_path, e);
+        // Intercept MathWorks Simulink .slx archives before UTF-8 read (R-108)
+        let ext = Path::new(rel_path).extension().and_then(|s| s.to_str()).unwrap_or("");
+        let (content, hash, parse_res) = if ext == "slx" {
+            let raw_bytes = match fs::read(&full_path) {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!("Cannot read .slx file '{}': {}", rel_path, e);
+                    return Ok(());
+                }
+            };
+            let mut hasher = Sha256::new();
+            hasher.update(&raw_bytes);
+            let hash = hex::encode(hasher.finalize());
+            if !self.cache.is_stale(rel_path, &hash).await {
                 return Ok(());
             }
+
+            let parse_res = CodeParser::parse_simulink_slx(workspace, rel_path, &raw_bytes);
+            (format!("Simulink Model Archive: {}", rel_path), hash, parse_res)
+        } else {
+            let content = match fs::read_to_string(&full_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    // Could be non-UTF-8 or lock file, skip silently
+                    warn!("Cannot read file '{}' for live sync: {}", rel_path, e);
+                    return Ok(());
+                }
+            };
+
+            let mut hasher = Sha256::new();
+            hasher.update(content.as_bytes());
+            let hash = hex::encode(hasher.finalize());
+
+            if !self.cache.is_stale(rel_path, &hash).await {
+                return Ok(());
+            }
+
+            let parse_res = CodeParser::parse_file(workspace, rel_path, &content)
+                .filter(|pr| !pr.nodes.is_empty())
+                .or_else(|| CodeParser::parse_fallback(workspace, rel_path, &content));
+            (content, hash, parse_res)
         };
-
-        // Compute sha256 hash
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        let hash = hex::encode(hasher.finalize());
-
-        // Check staleness against cache
-        if !self.cache.is_stale(rel_path, &hash).await {
-            return Ok(());
-        }
-
-        // Parse AST or fallback chunker
-        let parse_res = CodeParser::parse_file(workspace, rel_path, &content)
-            .filter(|pr| !pr.nodes.is_empty())
-            .or_else(|| CodeParser::parse_fallback(workspace, rel_path, &content));
 
         let parse_res = match parse_res {
             Some(pr) if !pr.nodes.is_empty() => pr,

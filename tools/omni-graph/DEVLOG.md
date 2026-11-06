@@ -1,3 +1,35 @@
+### 2026-11-06 — MathWorks Simulink (`.slx` / `.mdl`) MBSE Block Diagram Ingestion Engine (R-108)
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `review` (MBSE Graph Integration & Verification)  
+**Branch**: `feat/r108-simulink-mbse-ingestion`  
+**Requirement**: `R-108` ([`specs/catalog/omni-graph-live-watcher-fidelity-parity.md`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md))  
+**Duration**: Complete  
+
+#### Executive Summary & Key Milestones Completed
+1. **Model-Based Systems Engineering (MBSE) Ingestion Architecture (`src/parser/simulink.rs`)**:
+   - Implemented `parse_slx` Open Packaging Conventions (OPC) ZIP decompression: extracted `simulink/blockdiagram.xml` in-memory with bounded buffer memory footprint (< 5MB) and zero temporary disk writes.
+   - Implemented streaming XML parser using `quick-xml 0.42` handling both `Event::Start` and `Event::Empty` tags for `<Block BlockType="..." Name="..." SID="...">`, `<System>`, `<Line>`, `<Branch>`, and `<P Name="...">`.
+   - Implemented legacy plain-text Simulink `.mdl` tokenizer and parser with identical topological parity for pre-2012 models (`Model { System { Block { ... } Line { ... } } }`).
+2. **Topological Block, Signal Wire, and Cross-Model Linkage**:
+   - Hierarchical Containment: Emitted root `model` node, `subsystem` nodes, and `CONTAINS_BLOCK` edges tracking the system hierarchy stack.
+   - SIDs and Ports: Indexed blocks (`Inport`, `Outport`, `Gain`, `DiscreteFilter`, `SubSystem`, `ModelReference`) by their unique Simulink Identifier (`SID`).
+   - Signal Dataflow: Emitted directed `SIGNAL_TO` edges connecting output ports (`SID#out:port`) to input ports (`SID#in:port`), supporting branched fan-out topologies.
+   - Cross-Model Architecture: Emitted `REFERENCES_MODEL` edges from `ModelReference` blocks targeting external `.slx` and `.mdl` models across the workspace.
+   - High-Degree Broadcast Attenuation: High-fanout broadcast lines (deg(v) > 50, e.g. 28V power buses, CAN telemetry buses) are automatically classified into `DATAFLOW_BROADCAST` to preserve community modularity clustering.
+3. **Pipeline & Live-Watcher Integration**:
+   - Symmetrically wired into batch ingestion (`execute_ingest` in `src/ingestion/mod.rs`) and incremental watcher (`reindex_file` in `src/watcher/pipeline.rs`).
+   - Binary `.slx` files are intercepted before null-byte binary filtering, computing SHA-256 hashes, updating the in-memory `SymbolTable`, and executing transactional atomic swaps in SurrealDB.
+4. **Verification & Testing (`tests/unit_tests.rs`)**:
+   - Added 4 dedicated MBSE unit tests:
+     - `test_r108_simulink_slx_opc_zip_extraction`: In-memory ZIP archive generation and blockdiagram.xml extraction verifying `Inport`, `Gain`, `SubSystem`, and `SIGNAL_TO` dataflow edges.
+     - `test_r108_simulink_model_reference_and_fanout`: Model reference cross-model links (`REFERENCES_MODEL`) and branched fan-out signal lines.
+     - `test_r108_simulink_legacy_mdl_parity`: Full parsing of legacy plain-text `.mdl` files verifying identical topological structure.
+     - `test_r108_simulink_broadcast_bus_degree_attenuation`: High-degree bus fanout (56 receivers > 50) verified to be tagged as `DATAFLOW_BROADCAST`.
+   - All 122 unit tests pass (100% green, 0 clippy warnings).
+
+---
+
 ### 2026-11-06 — MathWorks MATLAB (`.m`) AST Ingestion Engine (R-107)
 
 **Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  

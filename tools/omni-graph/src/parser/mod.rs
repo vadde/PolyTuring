@@ -2,6 +2,9 @@
 // Implements: R-003 (Deterministic AST parsing)
 // Extracts functions, structs, classes, imports, and calls
 
+pub mod simulink;
+pub use simulink::SimulinkParser;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -66,6 +69,9 @@ impl CodeParser {
         }
         if extension == "toml" {
             return Self::parse_toml(workspace, file_path, content);
+        }
+        if extension == "mdl" {
+            return Self::parse_simulink_mdl(workspace, file_path, content);
         }
         let (language_name, mut parser) = match extension {
             "rs" => {
@@ -171,6 +177,22 @@ impl CodeParser {
         }
 
         Some(ParseResult { nodes, edges })
+    }
+
+    /// Ingests a Simulink .slx archive in-memory (R-108)
+    pub fn parse_simulink_slx(workspace: &str, file_path: &str, raw_bytes: &[u8]) -> Option<ParseResult> {
+        SimulinkParser::parse_slx(workspace, file_path, raw_bytes)
+    }
+
+    /// Ingests a Simulink blockdiagram.xml payload (R-108)
+    #[allow(dead_code)]
+    pub fn parse_simulink_xml(workspace: &str, file_path: &str, xml_content: &str) -> Option<ParseResult> {
+        SimulinkParser::parse_blockdiagram_xml(workspace, file_path, xml_content)
+    }
+
+    /// Ingests a legacy plain-text Simulink .mdl model (R-108)
+    pub fn parse_simulink_mdl(workspace: &str, file_path: &str, content: &str) -> Option<ParseResult> {
+        SimulinkParser::parse_mdl(workspace, file_path, content)
     }
 
     /// Extracts function identifier from C/C++ function_definition declarator chain

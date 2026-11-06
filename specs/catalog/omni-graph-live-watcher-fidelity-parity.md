@@ -98,6 +98,14 @@ A recursive divide-and-conquer code and database audit of `tools/omni-graph/src/
 - **AC-058**: Method invocations with receiver targets (e.g. `FilterEngine.calculate(x)`) preserve root receiver objects as `REFERENCES` edges.
 - **AC-059**: MATLAB `import` statements (e.g. `import control.guidance.NavSystem;` or `import math.filters.*;`) emit `import` nodes and `IMPORTS` edges.
 - **AC-060**: Package directory hierarchies prefixed with `+` (e.g. `+control/+guidance/NavSystem.m`) synthesize `package` nodes (`control.guidance`) with `DECLARES` edges to contained classes and functions.
+- **AC-061**: An `.slx` Open Packaging Conventions ZIP archive is decompressed in-memory to stream `simulink/blockdiagram.xml` with zero temporary disk writes and bounded memory consumption (< 5MB).
+- **AC-062**: Top-level model declaration emits a `model` node, and nested subsystems emit `subsystem` nodes with hierarchical `CONTAINS_BLOCK` edges.
+- **AC-063**: Individual computational and I/O blocks (`Inport`, `Outport`, `Gain`, `Sum`, `Integrator`, `MATLABFunction`) emit `block` nodes indexed by unique Simulink Identifier (`SID`).
+- **AC-064**: Direct and branched signal connection lines (`<Line Src="SID#out:port" Dst="SID#in:port">` and `<Branch>`) emit directed `SIGNAL_TO` edges connecting output ports to input ports.
+- **AC-065**: Model reference blocks (`<Block BlockType="ModelReference">`) emit `model_reference` nodes and cross-file `REFERENCES_MODEL` edges targeting the referenced `.slx` / `.mdl` model.
+- **AC-066**: High-fanout broadcast signal lines (deg(v) > 50, such as power rails or global CAN buses) are classified into `DATAFLOW_BROADCAST` to preserve modularity cluster boundaries.
+- **AC-067**: Legacy plain-text Simulink `.mdl` files are parsed with identical topological node and edge parity to `.slx` archives.
+- **AC-068**: Both full directory ingestion (`execute_ingest`) and the incremental live watcher (`reindex_file`) support `.slx` and `.mdl` files with transactional atomic swap fidelity.
 
 ### 2.3 Non-Functional Requirements (NF)
 

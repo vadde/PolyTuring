@@ -4043,6 +4043,254 @@ end
         });
         assert!(decl_edge.is_some(), "Package should emit DECLARES edge to class GuidanceComputer");
     }
+
+    #[test]
+    fn test_r108_simulink_slx_opc_zip_extraction() {
+        use omni_graph::parser::CodeParser;
+        use std::io::{Cursor, Write};
+        use zip::write::SimpleFileOptions;
+        use zip::ZipWriter;
+
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<ModelInformation Version="1.0">
+  <Model>
+    <System>
+      <Block BlockType="Inport" Name="In1" SID="1" />
+      <Block BlockType="Gain" Name="Gain1" SID="2" />
+      <Block BlockType="SubSystem" Name="SensorFusion" SID="3">
+        <System>
+          <Block BlockType="Inport" Name="RawIn" SID="4" />
+          <Block BlockType="DiscreteFilter" Name="KalmanFilter" SID="5" />
+          <Block BlockType="Outport" Name="FilteredOut" SID="6" />
+          <Line>
+            <P Name="Src">4#out:1</P>
+            <P Name="Dst">5#in:1</P>
+          </Line>
+          <Line>
+            <P Name="Src">5#out:1</P>
+            <P Name="Dst">6#in:1</P>
+          </Line>
+        </System>
+      </Block>
+      <Block BlockType="Outport" Name="Out1" SID="7" />
+      <Line>
+        <P Name="Src">1#out:1</P>
+        <P Name="Dst">2#in:1</P>
+      </Line>
+      <Line>
+        <P Name="Src">2#out:1</P>
+        <P Name="Dst">3#in:1</P>
+      </Line>
+      <Line>
+        <P Name="Src">3#out:1</P>
+        <P Name="Dst">7#in:1</P>
+      </Line>
+    </System>
+  </Model>
+</ModelInformation>"#;
+
+        // Create in-memory .slx ZIP archive
+        let mut zip_bytes = Vec::new();
+        {
+            let mut writer = ZipWriter::new(Cursor::new(&mut zip_bytes));
+            writer
+                .start_file("simulink/blockdiagram.xml", SimpleFileOptions::default())
+                .expect("start_file");
+            writer.write_all(xml.as_bytes()).expect("write_all");
+            writer.finish().expect("finish");
+        }
+
+        let res = CodeParser::parse_simulink_slx("test-ws", "models/FlightController.slx", &zip_bytes)
+            .expect("Should parse .slx archive successfully");
+
+        // Verify model node
+        let model = res.nodes.iter().find(|n| n.kind == "model" && n.label == "FlightController")
+            .expect("FlightController model node");
+        assert_eq!(model.language, "simulink");
+
+        // Verify subsystem node
+        let sub = res.nodes.iter().find(|n| n.kind == "subsystem" && n.label == "SensorFusion")
+            .expect("SensorFusion subsystem node");
+        assert_eq!(sub.id, "test-ws:models/FlightController.slx:block:3");
+
+        // Verify leaf blocks
+        assert!(res.nodes.iter().any(|n| n.kind == "inport" && n.label == "In1"));
+        assert!(res.nodes.iter().any(|n| n.kind == "block" && n.label == "Gain1"));
+        assert!(res.nodes.iter().any(|n| n.kind == "block" && n.label == "KalmanFilter"));
+        assert!(res.nodes.iter().any(|n| n.kind == "outport" && n.label == "Out1"));
+
+        // Verify hierarchical containment: FlightController contains SensorFusion
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == model.id && e.target_label == "SensorFusion" && e.edge_type == "CONTAINS_BLOCK"
+        }));
+
+        // Verify nested containment: SensorFusion contains KalmanFilter
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == sub.id && e.target_label == "KalmanFilter" && e.edge_type == "CONTAINS_BLOCK"
+        }));
+
+        // Verify dataflow signal wires (SIGNAL_TO)
+        let in1_node = res.nodes.iter().find(|n| n.label == "In1").unwrap();
+        let gain1_node = res.nodes.iter().find(|n| n.label == "Gain1").unwrap();
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == in1_node.id && e.target_id == Some(gain1_node.id.clone()) && e.edge_type == "SIGNAL_TO" && e.category == "DATAFLOW"
+        }));
+
+        let kf_node = res.nodes.iter().find(|n| n.label == "KalmanFilter").unwrap();
+        let out_f_node = res.nodes.iter().find(|n| n.label == "FilteredOut").unwrap();
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == kf_node.id && e.target_id == Some(out_f_node.id.clone()) && e.edge_type == "SIGNAL_TO"
+        }));
+    }
+
+    #[test]
+    fn test_r108_simulink_model_reference_and_fanout() {
+        use omni_graph::parser::CodeParser;
+
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<ModelInformation Version="1.0">
+  <Model>
+    <System>
+      <Block BlockType="Inport" Name="SensorBus" SID="10" />
+      <Block BlockType="ModelReference" Name="ActuatorDynamics" SID="20">
+        <P Name="ModelName">ActuatorDynamicsModel.slx</P>
+      </Block>
+      <Block BlockType="Outport" Name="Telemetry" SID="30" />
+      <Line>
+        <P Name="Src">10#out:1</P>
+        <Branch>
+          <P Name="Dst">20#in:1</P>
+        </Branch>
+        <Branch>
+          <P Name="Dst">30#in:1</P>
+        </Branch>
+      </Line>
+    </System>
+  </Model>
+</ModelInformation>"#;
+
+        let res = CodeParser::parse_simulink_xml("test-ws", "models/GNCSystem.xml", xml)
+            .expect("Should parse simulink xml");
+
+        // Verify ModelReference block
+        let mdl_ref = res.nodes.iter().find(|n| n.kind == "model_reference" && n.label == "ActuatorDynamics")
+            .expect("ActuatorDynamics model_reference node");
+
+        // Verify cross-file REFERENCES_MODEL edge
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == mdl_ref.id && e.target_label == "ActuatorDynamicsModel" && e.edge_type == "REFERENCES_MODEL"
+        }));
+
+        // Verify branched fan-out signal wires
+        let src_node = res.nodes.iter().find(|n| n.label == "SensorBus").unwrap();
+        let dst1_node = res.nodes.iter().find(|n| n.label == "ActuatorDynamics").unwrap();
+        let dst2_node = res.nodes.iter().find(|n| n.label == "Telemetry").unwrap();
+
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == src_node.id && e.target_id == Some(dst1_node.id.clone()) && e.edge_type == "SIGNAL_TO"
+        }));
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == src_node.id && e.target_id == Some(dst2_node.id.clone()) && e.edge_type == "SIGNAL_TO"
+        }));
+    }
+
+    #[test]
+    fn test_r108_simulink_legacy_mdl_parity() {
+        use omni_graph::parser::CodeParser;
+
+        let mdl = r#"
+Model {
+  Name "Autopilot"
+  System {
+    Name "Autopilot"
+    Block {
+      BlockType Inport
+      Name "PitchCmd"
+      SID "1"
+    }
+    Block {
+      BlockType Gain
+      Name "PitchGain"
+      SID "2"
+    }
+    Block {
+      BlockType ModelReference
+      Name "ElevatorActuator"
+      SID "3"
+      ModelName "ActuatorModel.mdl"
+    }
+    Block {
+      BlockType Outport
+      Name "ElevatorCmd"
+      SID "4"
+    }
+    Line {
+      Src "1#out:1"
+      Dst "2#in:1"
+    }
+    Line {
+      Src "2#out:1"
+      Dst "3#in:1"
+    }
+    Line {
+      Src "3#out:1"
+      Dst "4#in:1"
+    }
+  }
+}
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "models/Autopilot.mdl", mdl)
+            .expect("Should parse .mdl model successfully");
+
+        // Verify model node
+        assert!(res.nodes.iter().any(|n| n.kind == "model" && n.label == "Autopilot"));
+
+        // Verify blocks
+        assert!(res.nodes.iter().any(|n| n.kind == "inport" && n.label == "PitchCmd"));
+        assert!(res.nodes.iter().any(|n| n.kind == "block" && n.label == "PitchGain"));
+        assert!(res.nodes.iter().any(|n| n.kind == "model_reference" && n.label == "ElevatorActuator"));
+
+        // Verify model reference edge
+        let actuator = res.nodes.iter().find(|n| n.label == "ElevatorActuator").unwrap();
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == actuator.id && e.target_label == "ActuatorModel" && e.edge_type == "REFERENCES_MODEL"
+        }));
+
+        // Verify signal dataflow
+        let gain = res.nodes.iter().find(|n| n.label == "PitchGain").unwrap();
+        assert!(res.edges.iter().any(|e| {
+            e.source_id == gain.id && e.target_id == Some(actuator.id.clone()) && e.edge_type == "SIGNAL_TO"
+        }));
+    }
+
+    #[test]
+    fn test_r108_simulink_broadcast_bus_degree_attenuation() {
+        use omni_graph::parser::CodeParser;
+
+        // Build XML with a broadcast line fanning out to 55 receiver blocks
+        let mut xml = String::from("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ModelInformation Version=\"1.0\">\n<Model>\n<System>\n");
+        xml.push_str("<Block BlockType=\"Inport\" Name=\"PowerBus28V\" SID=\"1\" />\n");
+        for i in 2..=57 {
+            xml.push_str(&format!("<Block BlockType=\"Gain\" Name=\"Load_{}\" SID=\"{}\" />\n", i, i));
+        }
+        xml.push_str("<Line>\n<P Name=\"Src\">1#out:1</P>\n");
+        for i in 2..=57 {
+            xml.push_str(&format!("<Branch><P Name=\"Dst\">{}#in:1</P></Branch>\n", i));
+        }
+        xml.push_str("</Line>\n</System>\n</Model>\n</ModelInformation>");
+
+        let res = CodeParser::parse_simulink_xml("test-ws", "models/PowerDistribution.xml", &xml)
+            .expect("Should parse power bus xml");
+
+        let bus_node = res.nodes.iter().find(|n| n.label == "PowerBus28V").unwrap();
+        let broadcast_edges: Vec<_> = res.edges.iter().filter(|e| {
+            e.source_id == bus_node.id && e.category == "DATAFLOW_BROADCAST" && e.edge_type == "SIGNAL_TO"
+        }).collect();
+
+        // 56 receivers > 50 fanout threshold -> classified as DATAFLOW_BROADCAST!
+        assert_eq!(broadcast_edges.len(), 56, "Should attenuate high-degree bus lines to DATAFLOW_BROADCAST");
+    }
 }
 
 
