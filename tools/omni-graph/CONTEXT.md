@@ -17,7 +17,7 @@ blockers: []
 ## Current State
 
 - **SDLC Phase**: `review`
-- **Version**: 0.5.0-rc1
+- **Version**: 0.6.0-rc1
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
@@ -26,6 +26,11 @@ blockers: []
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| AI-Native Cosmology & Modularity Guard (R-086, R-087) | Complete | — | 🟢 Purged Miller's Law clamp; enforced Affinity-Floor Invariant and delta Q guard |
+| Scale-Adaptive Subsystem Sizing (R-088) | Complete | — | 🟢 Sub-linear dynamic ceiling K_adaptive(N) bounding natural domains without forced merges |
+| Multi-Scale Hierarchical Zoom & Storage (R-089) | Complete | — | 🟢 Dual resolution (galaxy_id & community_id); caller override via max_galaxies |
+| Noise Floor Isolation (R-090) | Complete | — | 🟢 Isolated singletons (< 3 nodes) grouped into utilities namespace, preserving domain purity |
+| PolyTuring Database Synchronization | Complete | — | 🟢 Clean atomic purge resolved 13 vs 185 desync; both node & galaxy synchronized to 65 domains |
 | Two-Pass Ingestion Engine (R-078) | Complete | — | 🟢 In-memory SymbolTable decoupled declarations from cross-file linkage; forward references resolved 100% |
 | Pipeline Symmetry & Leiden Coarsening (R-077, R-084) | Complete | — | 🟢 Identical 15 macro-galaxies across Ingestion and Re-cluster; multi-level hierarchical contraction |
 | Retentive Delta-Sync Caller Preservation (R-079) | Complete | — | 🟢 relink_inbound_edges preserves inbound callers across live file re-indexing |

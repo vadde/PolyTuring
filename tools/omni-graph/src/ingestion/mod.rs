@@ -912,8 +912,8 @@ async fn execute_ingest(
                     };
 
                     let mut assignments = CommunityDetector::detect_with_seeds(&all_nodes, &all_links, 15, seeds.as_ref());
-                    CommunityDetector::consolidate_communities(&all_nodes, &all_links, &mut assignments, 5);
-                    CommunityDetector::coarsen_to_macro_galaxies(&all_nodes, &all_links, &mut assignments, 15);
+                    CommunityDetector::consolidate_communities(&all_nodes, &all_links, &mut assignments, 3);
+                    CommunityDetector::coarsen_to_macro_galaxies(&all_nodes, &all_links, &mut assignments, 0);
                     let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(workspace_name, &all_nodes, &all_links, &assignments);
                     clusters_computed = summaries.len();
                     if let Err(e) = db.update_communities(&assignments).await {

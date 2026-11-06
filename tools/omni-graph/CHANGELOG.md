@@ -5,6 +5,19 @@ All notable changes to this tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-rc1] - 2026-11-05
+
+### Added
+- **AI-Native Galaxy Cosmology (R-086, R-087)**: Purged the 1956 human Miller's Law working memory clamp ($K \le 15$) and toxic fallback `sizes.last()` cheat in favor of true natural bounded contexts.
+- **Affinity-Floor Invariant (R-086)**: Enforced strict prohibition against merging decoupled systems; communities sharing zero topological coupling ($k_{i, j} = 0$) and zero directory lineage are strictly preserved as independent domains.
+- **Newman Modularity Differential Guard (R-087)**: Coarsening maximizes $\Delta Q_{ij} = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2}$ and halts when merges would cause modularity degradation ($\Delta Q < -0.05$).
+- **Sub-Linear Scale-Adaptive Subsystem Sizing (R-088)**: Dynamic scale-adaptive ceiling $K_{\text{adaptive}}(N) = \text{clamp}(\lfloor 3.5 \cdot N^{0.35} \rfloor, 5, 150)$ scaling logarithmically from 5 to 150 subsystems.
+- **Noise Floor Isolation (R-090)**: Isolated singletons ($< 3$ nodes) gathered into designated utilities namespace, preventing pollution of core business domains.
+- **Multi-Scale API & Parameter Controls (R-089)**: Supported `max_galaxies` override on `/api/cluster` and `/api/galaxies`.
+
+### Fixed
+- **PolyTuring Database Desynchronization**: Clean atomic purge resolved 13 vs 185 desync across `node.community` and `galaxy` tables; synchronized both views to 65 natural bounded contexts.
+
 ## [0.5.0-rc1] - 2026-11-05
 
 ### Added

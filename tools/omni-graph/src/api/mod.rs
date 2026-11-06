@@ -117,6 +117,8 @@ pub struct WatchStopPayload {
 pub struct ClusterPayload {
     pub workspace: Option<String>,
     pub min_size: Option<usize>,
+    #[serde(alias = "limit")]
+    pub max_galaxies: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -1023,6 +1025,7 @@ async fn cluster_handler(
     let start = std::time::Instant::now();
     let raw_ws = payload_opt.as_ref().and_then(|p| p.workspace.clone());
     let min_size = payload_opt.as_ref().and_then(|p| p.min_size).unwrap_or(1);
+    let target_ceiling = payload_opt.as_ref().and_then(|p| p.max_galaxies).unwrap_or(0);
     let workspace = normalize_workspace(raw_ws.as_deref());
 
     // Record telemetry asynchronously
@@ -1060,8 +1063,8 @@ async fn cluster_handler(
         Ok((nodes, links)) => {
             let ws_name = workspace.clone().unwrap_or_else(|| "default".to_string());
             let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
-            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
-            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 15);
+            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, target_ceiling);
             let (summaries, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
             let filtered_summaries: Vec<_> = summaries.into_iter().filter(|s| s.node_count >= min_size).collect();
             let total_communities = filtered_summaries.len();
@@ -1186,8 +1189,8 @@ async fn galaxy_topology_handler(
             if !nodes.is_empty() {
                 let ws_name = ws.clone().unwrap_or_else(|| "default".to_string());
                 let mut assignments = CommunityDetector::detect(&nodes, &links, 15);
-                CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
-                CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 15);
+                CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+                CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 0);
                 let (_, computed_records) = CommunityDetector::compute_galaxy_metrics(&ws_name, &nodes, &links, &assignments);
                 let _ = state.db.update_communities(&assignments).await;
                 let _ = state.db.store_galaxies(&ws_name, &computed_records).await;

@@ -648,8 +648,8 @@ async fn run_watcher(
                                 }
                             }
                             let mut assignments = CommunityDetector::detect_with_seeds(&nodes, &links, 15, Some(&seeds));
-                            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 5);
-                            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 15);
+                            CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+                            CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 0);
                             let (_, galaxy_records) = CommunityDetector::compute_galaxy_metrics(&workspace, &nodes, &links, &assignments);
                             if let Err(e) = db.update_communities(&assignments).await {
                                 warn!("Failed to update communities during live auto-recluster for '{}': {}", workspace, e);

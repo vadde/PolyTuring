@@ -2843,6 +2843,209 @@ def create_account():
         assert!(g0.abstractness >= 0.0 && g0.abstractness <= 1.0);
         assert!(g0.distance >= 0.0 && g0.distance <= 1.0);
     }
+
+    #[test]
+    fn test_r086_affinity_floor_preserves_decoupled_domains() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::{DbLink, DbNode};
+        use std::collections::{HashMap, HashSet};
+
+        // Two completely decoupled domains: "auth" and "billing"
+        let nodes = vec![
+            DbNode {
+                id: "auth_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "login".to_string(),
+                kind: "function".to_string(),
+                file_path: "auth/service.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn login() {}".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            DbNode {
+                id: "auth_2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "verify".to_string(),
+                kind: "function".to_string(),
+                file_path: "auth/service.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 11,
+                line_end: 20,
+                text: "fn verify() {}".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            DbNode {
+                id: "billing_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "charge".to_string(),
+                kind: "function".to_string(),
+                file_path: "billing/gateway.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 10,
+                text: "fn charge() {}".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            DbNode {
+                id: "billing_2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "invoice".to_string(),
+                kind: "function".to_string(),
+                file_path: "billing/gateway.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 11,
+                line_end: 20,
+                text: "fn invoice() {}".to_string(),
+                community: None,
+                file_hash: None,
+            },
+        ];
+
+        // Internal edges only: auth_1 -> auth_2, billing_1 -> billing_2
+        // Zero cross-domain edges!
+        let links = vec![
+            DbLink {
+                id: "e_auth".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "auth_1".to_string(),
+                target: "auth_2".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+            DbLink {
+                id: "e_bill".to_string(),
+                workspace: Some("test-ws".to_string()),
+                source: "billing_1".to_string(),
+                target: "billing_2".to_string(),
+                edge_type: "CALLS".to_string(),
+                category: "EXTRACTED".to_string(),
+            },
+        ];
+
+        let mut assignments = HashMap::new();
+        assignments.insert("auth_1".to_string(), 0);
+        assignments.insert("auth_2".to_string(), 0);
+        assignments.insert("billing_1".to_string(), 1);
+        assignments.insert("billing_2".to_string(), 1);
+
+        // Attempt forced coarsening to max_target = 1
+        CommunityDetector::coarsen_to_macro_galaxies(&nodes, &links, &mut assignments, 1);
+
+        // R-086 Invariant: Because auth and billing have ZERO coupling and distinct directories,
+        // coarsening MUST halt and preserve them as 2 distinct domains!
+        let unique_cids: HashSet<i32> = assignments.values().copied().collect();
+        assert_eq!(unique_cids.len(), 2, "Decoupled domains MUST NOT be force-merged into 1!");
+        assert_ne!(
+            assignments.get("auth_1").unwrap(),
+            assignments.get("billing_1").unwrap(),
+            "Auth and billing must belong to different communities"
+        );
+    }
+
+    #[test]
+    fn test_r088_scale_adaptive_sizing() {
+        use omni_graph::analysis::CommunityDetector;
+
+        // Bounded limits for varying codebase complexity
+        let k_small = CommunityDetector::calculate_adaptive_target(37, None);
+        assert!((5..=15).contains(&k_small), "Small repo target: {}", k_small);
+
+        let k_medium = CommunityDetector::calculate_adaptive_target(2352, None);
+        assert!((20..=60).contains(&k_medium), "Medium repo target: {}", k_medium);
+
+        let k_titan = CommunityDetector::calculate_adaptive_target(1_000_000, None);
+        assert_eq!(k_titan, 150, "Titan ceiling capped at 150");
+
+        // Explicit user override
+        let k_custom = CommunityDetector::calculate_adaptive_target(2352, Some(22));
+        assert_eq!(k_custom, 22, "Explicit user override respected");
+    }
+
+    #[test]
+    fn test_r090_orphan_isolation() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::{DbLink, DbNode};
+        use std::collections::HashMap;
+
+        let nodes = vec![
+            // Core domain (size 3)
+            DbNode {
+                id: "core_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "c1".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/core.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 5,
+                text: "".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            DbNode {
+                id: "core_2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "c2".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/core.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 6,
+                line_end: 10,
+                text: "".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            DbNode {
+                id: "core_3".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "c3".to_string(),
+                kind: "function".to_string(),
+                file_path: "src/core.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 11,
+                line_end: 15,
+                text: "".to_string(),
+                community: None,
+                file_hash: None,
+            },
+            // Isolated orphan (size 1) in completely detached path
+            DbNode {
+                id: "orphan_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "orphan".to_string(),
+                kind: "function".to_string(),
+                file_path: "scratch/stray.rs".to_string(),
+                language: "rust".to_string(),
+                line_start: 1,
+                line_end: 5,
+                text: "".to_string(),
+                community: None,
+                file_hash: None,
+            },
+        ];
+
+        let links: Vec<DbLink> = vec![];
+        let mut assignments = HashMap::new();
+        assignments.insert("core_1".to_string(), 0);
+        assignments.insert("core_2".to_string(), 0);
+        assignments.insert("core_3".to_string(), 0);
+        assignments.insert("orphan_1".to_string(), 1);
+
+        // Consolidate with min_macro_size = 3
+        CommunityDetector::consolidate_communities(&nodes, &links, &mut assignments, 3);
+
+        // Orphan must NOT pollute core domain (cluster 0)
+        assert_ne!(
+            assignments.get("core_1").unwrap(),
+            assignments.get("orphan_1").unwrap(),
+            "Orphan must not pollute core cluster"
+        );
+    }
 }
 
 

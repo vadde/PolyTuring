@@ -1,7 +1,7 @@
 ---
 tool: omni-graph
 status: review
-version: 0.5.0-rc1
+version: 0.6.0-rc1
 language: rust
 category: GenAI
 created: 2026-09-24
@@ -10,6 +10,7 @@ owner: "@vadde"
 spec: ../../specs/catalog/omni-graph.md
 nextgen_spec: ../../specs/catalog/omni-graph-nextgen.md
 hardening_spec: ../../specs/catalog/omni-graph-two-pass-engine-hardening.md
+cosmology_spec: ../../specs/catalog/omni-graph-ai-native-galaxy-cosmology.md
 ---
 
 # SDLC Status
@@ -47,6 +48,7 @@ hardening_spec: ../../specs/catalog/omni-graph-two-pass-engine-hardening.md
 | 2026-11-05 | `in-progress` | `in-progress` | Deep forensic audit of ingestion pipeline desynchronization & forward-reference drop; author Enhancement Spec (R-077 to R-085: Two-Pass Ingestion, Inbound Edge Preservation, Transactional Read-Fencing & High-Throughput Bulk Engine) |
 | 2026-11-05 | `in-progress` | `testing` | Implement Two-Pass Ingestion Engine (`symbol_table.rs`), Retentive Delta-Sync (`relink_inbound_edges`), Transactional Read-Fence (HTTP 423), Vector Chunking (256/batch), AST Receiver Preservation, True HNSW KNN `<|k, ef|>`, Hierarchical Leiden Coarsening, and Uncle Bob metrics ($A, D$). 95 unit tests pass (100% green). |
 | 2026-11-05 | `testing` | `review` | Rebuilt Docker backend & UI, empirically verified live ingestion, HNSW KNN search (83ms), natural 15-galaxy convergence, and Uncle Bob metrics on django-sorcery. Traceability matrix 100% complete. |
+| 2026-11-05 | `review` | `review` | Implement AI-Native Galaxy Cosmology (R-086 to R-092): Purge Miller's Law clamp, enforce Affinity-Floor Invariant, modularity differential guard, sub-linear scale-adaptive sizing, and noise floor isolation. Synchronized PolyTuring (65 galaxies) and verified tutor-intelligence (68), DesignPatterns (49), and django-sorcery (53). 98 unit tests pass. |
 
 ---
 
