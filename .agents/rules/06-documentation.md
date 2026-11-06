@@ -1,6 +1,36 @@
 # Rule 06 — Documentation Standards
 
-> **Priority**: 🟡 Important — If it's not documented, it doesn't exist.
+> **Priority**: 🔴 Critical — If it's not documented, it doesn't exist. If public docs are cluttered with internal sprint tickets, you fail.
+
+---
+
+## 🏛️ The Public Showcase vs. Internal Governance Law (The Two-World Invariant)
+
+> **Constitutional Rule**: There is a strict, non-negotiable boundary between **Public Product Documentation (The Storefront)** and **Internal Engineering Governance (The Factory Floor)**. Never confuse the two.
+
+### World 1: Public-Facing Product Documentation (The Storefront)
+* **Scope**: `docs/site/index.html` (Living Portal / GitHub Pages), `vadde.github.io`, marketing presentations, and external landing pages.
+* **Target Audience**: Users, Buyers, AI Engineers, OSS Contributors, and Tech Leads evaluating or adopting the product.
+* **Core Objective**: Sell the capability, explain what it solves, demonstrate why existing tools (Tree-Sitter alone, raw grep, naive graph tools like Graphify) fail, and show how to run it in 60 seconds.
+* **Tone & Vocabulary**:
+  - Crisp, authoritative, crystal-clear, layperson-accessible language.
+  - Tangible capability cards, problem-solution matrices, and intuitive mental models (e.g. "Airplane airlock engine swap", "browser tab worktrees").
+* **⛔ ABSOLUTELY FORBIDDEN IN PUBLIC DOCS**:
+  1. **Zero Internal Ticket IDs**: NEVER mention `R-101`, `R-093`, `R-H083`, or sprint requirement codes. A customer buying an engine does not care about your sprint board ticket numbers.
+  2. **Zero Internal ADR References**: NEVER litter public pages with `ADR-002`, `ADR-003`, or internal architectural decision codes. ADRs belong in internal architecture archives.
+  3. **Zero Internal Defect / Gap Numbers**: NEVER dump internal audit notes like `Gap 1`, `Gap 2`, `Loophole 14` into customer-facing text.
+  4. **Zero Version Noise**: NEVER confuse users with competing version badges (e.g. `v0.4.0 Living Docs` vs `v0.7.0 Omni-Graph`). Public documentation always presents the **current live system** authoritatively without historical version chatter.
+  5. **Zero Gratuitous Math Vanity**: Avoid dumping raw formulas, Greek matrices, or academic complexity equations into public marketing sections unless accompanied by an immediate, intuitive plain-English explanation.
+
+### World 2: Internal Engineering Governance (The Factory Floor)
+* **Scope**: `specs/catalog/`, `docs/architecture/` (ADRs), `tools/<name>/STATUS.md`, `CONTEXT.md`, `DEVLOG.md`, `tests/`.
+* **Target Audience**: Core Maintainers, System Architects, Pair-Programming AI Agents.
+* **Core Objective**: Complete traceability, formal contracts, mathematical correctness, blast-radius boundaries, and unyielding SDD discipline.
+* **Mandated Contents**:
+  - Exact numbered requirements (`R-001` through `R-109`).
+  - Architecture Decision Records (`ADR-001`, `ADR-002`, `ADR-003`).
+  - Formal mathematical formulations, graph complexity proofs ($O(|E|)$), and algorithmic steps.
+  - Traceability matrices, test assertions, and append-only session devlogs.
 
 ---
 
