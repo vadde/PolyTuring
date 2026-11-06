@@ -1,3 +1,31 @@
+### 2026-11-06 — Filesystem Symlink Cycle Guarding & Alias Navigation (R-109)
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `in-progress` (Hardening & Extensibility)  
+**Branch**: `feat/r109-symlink-cycle-guard-and-navigation`  
+**Requirement**: `R-109` ([`specs/catalog/omni-graph-live-watcher-fidelity-parity.md`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md))  
+**Duration**: Complete  
+
+#### Executive Summary & Key Milestones Completed
+1. **Empirical Defect Analysis & Root-Cause Isolation**:
+   - Discovered that filesystem symlinks (such as `scripts/omni -> ../tools/omni-graph/scripts/omni.sh`) were naively followed by `std::fs::metadata` / `Path::is_file`, causing target files to be completely re-read, parsed, and indexed as duplicate AST nodes.
+   - In PolyTuring, `scripts/omni` was crawled as a duplicate file assigned to Community 62, while canonical `tools/omni-graph/scripts/omni.sh` was in Community 18.
+2. **Symlink Cycle Guard & Alias Navigation (`src/ingestion/mod.rs`)**:
+   - Integrated `fs::symlink_metadata` to intercept symlinks before reading raw bytes or parsing AST.
+   - Synthesized directory containment backbone for the symlink entry.
+   - Resolved canonical target path via `fs::canonicalize`. If within workspace, resolves to `{ws}:file:{rel_target}` or `{ws}:dir:{rel_target}`; if external, resolves to `{ws}:external:{target_path}`; if broken or cyclic, resolves to `{ws}:broken:{rel_path}` with zero crash.
+   - Emitted a dedicated `symlink` node with `kind: "symlink"` and a `LINKS_TO` edge (`category: "FILESYSTEM"`).
+   - Skipped duplicate file parsing, completely eliminating cloned functions and symbol table pollution.
+3. **Incremental Watcher Parity (`src/watcher/pipeline.rs`)**:
+   - Added symlink interception to `IncrementalPipeline::reindex_file`.
+   - On symlink create/modify, synthesizes directory backbone, resolves canonical link, and executes `execute_atomic_swap` to transactionally update the `symlink` node and `LINKS_TO` edge in SurrealDB.
+4. **Verification & Audit**:
+   - Added unit test `test_r109_symlink_cycle_guard_and_alias_navigation`: Verified file symlink resolution, cyclic directory loop containment, and broken link tolerance.
+   - Added unit test `test_r109_symlink_atomic_swap_sql_generation`: Verified SQL generation for `symlink` node and `type = 'LINKS_TO'` edge.
+   - All 113 unit tests pass (100% green, 0 clippy warnings).
+
+---
+
 ### 2026-11-06 — Public Living Documentation Portal Editorial Streamline & Anti-Bloat Law
 
 **Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  

@@ -174,6 +174,7 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | R-104 | Edge Relationship Deduplication & Call Weighting | `src/db/mod.rs` | `tests/unit_tests.rs:test_r104_edge_relationship_deduplication` | ✅ |
 | R-105 | Zero-Delay Community Inference for New Files | `src/analysis/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r105_zero_delay_community_inference_for_new_files` | ✅ |
 | R-106 | Language-Aware SAIR Scoping & Exact Match Fast-Path | `src/ingestion/symbol_table.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r106_language_aware_sair_scoping` | ✅ |
+| R-109 | Filesystem Symlink Cycle Guarding & Alias Navigation | `src/ingestion/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r109_symlink_cycle_guard_and_alias_navigation` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

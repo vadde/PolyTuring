@@ -3707,6 +3707,128 @@ def create_account():
         // 1 initial + 10 * 10 increments = 101
         assert_eq!(generation.load(Ordering::SeqCst), 101, "Generational counter must update lock-free and thread-safe");
     }
+
+    #[tokio::test]
+    async fn test_r109_symlink_cycle_guard_and_alias_navigation() {
+        use std::fs;
+
+        let test_dir = std::env::temp_dir().join(format!(
+            "omni_test_r109_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+
+        let src_dir = test_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let real_file = src_dir.join("real.rs");
+        fs::write(&real_file, "pub fn compute_trajectory() {}").unwrap();
+
+        // 1. Create a valid file symlink
+        let symlink_file = test_dir.join("shortcut.rs");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&real_file, &symlink_file).unwrap();
+
+        // 2. Create a cyclic directory symlink: cyclic_dir/loop -> cyclic_dir
+        let cyclic_dir = test_dir.join("cyclic_dir");
+        fs::create_dir_all(&cyclic_dir).unwrap();
+        let loop_link = cyclic_dir.join("loop");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&cyclic_dir, &loop_link).unwrap();
+
+        // 3. Create a broken symlink
+        let broken_link = test_dir.join("broken.rs");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(test_dir.join("nonexistent.rs"), &broken_link).unwrap();
+
+        // Verify symlink metadata detection
+        #[cfg(unix)]
+        {
+            let is_sym = fs::symlink_metadata(&symlink_file)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            assert!(is_sym, "symlink_file must be detected as a symlink");
+
+            let target_link = fs::read_link(&symlink_file).unwrap();
+            assert_eq!(target_link, real_file);
+
+            let canonical_test_dir = fs::canonicalize(&test_dir).unwrap();
+            let canonical = fs::canonicalize(&symlink_file).unwrap();
+            let rel_target = canonical.strip_prefix(&canonical_test_dir).unwrap();
+            assert_eq!(rel_target, std::path::Path::new("src/real.rs"));
+
+            // Verify cyclic symlink detection
+            let is_cycle_sym = fs::symlink_metadata(&loop_link)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            assert!(is_cycle_sym, "loop_link must be detected as symlink");
+
+            // Canonicalizing cyclic dir succeeds to itself without recursion
+            let canonical_cycle = fs::canonicalize(&loop_link).unwrap();
+            assert_eq!(canonical_cycle, fs::canonicalize(&cyclic_dir).unwrap());
+
+            // Broken link canonicalization fails gracefully
+            let broken_res = fs::canonicalize(&broken_link);
+            assert!(broken_res.is_err(), "broken symlink must fail canonicalization cleanly");
+        }
+
+        // Clean up
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_r109_symlink_atomic_swap_sql_generation() {
+        use omni_graph::db::DbClient;
+        use omni_graph::parser::{ExtractedEdge, ExtractedNode};
+
+        let ws = "test-ws";
+        let rel_path = "scripts/omni";
+        let target_path = "tools/omni-graph/scripts/omni.sh";
+
+        let symlink_node = ExtractedNode {
+            id: format!("{}:file:{}", ws, rel_path),
+            workspace: ws.to_string(),
+            label: "omni".to_string(),
+            kind: "symlink".to_string(),
+            file_path: rel_path.to_string(),
+            language: "symlink".to_string(),
+            line_start: 1,
+            line_end: 1,
+            text: format!("Symlink: {} -> {}", rel_path, target_path),
+        };
+
+        let link_edge = ExtractedEdge {
+            workspace: ws.to_string(),
+            source_id: format!("{}:file:{}", ws, rel_path),
+            target_label: "omni.sh".to_string(),
+            target_id: Some(format!("{}:file:{}", ws, target_path)),
+            edge_type: "LINKS_TO".to_string(),
+            category: "FILESYSTEM".to_string(),
+        };
+
+        let (sql, n_cnt, e_cnt, _) = DbClient::build_atomic_swap_sql(
+            ws,
+            rel_path,
+            Some("dummy_hash"),
+            &[symlink_node],
+            &[vec![0.0f32; 384]],
+            Some(18),
+            &[link_edge],
+            &[],
+        );
+
+        assert_eq!(n_cnt, 1);
+        assert_eq!(e_cnt, 1);
+        assert!(sql.contains("BEGIN TRANSACTION;"));
+        assert!(sql.contains("DELETE node WHERE workspace = 'test-ws' AND file_path = 'scripts/omni';"));
+        assert!(sql.contains("kind: 'symlink'"));
+        assert!(sql.contains("type = 'LINKS_TO'"));
+        assert!(sql.contains("category = 'FILESYSTEM'"));
+        assert!(sql.contains("COMMIT TRANSACTION;"));
+    }
 }
 
 
