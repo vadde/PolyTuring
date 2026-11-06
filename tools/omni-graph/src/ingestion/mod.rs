@@ -568,12 +568,147 @@ async fn execute_ingest(
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
 
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if file_name == ".DS_Store" || file_name == ".gitignore" || file_name == "Thumbs.db" {
+                continue;
+            }
+
+            // Symlink Cycle-Guarded Graph Traversal & Alias Navigation (R-109)
+            let is_symlink = fs::symlink_metadata(path)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+
+            if is_symlink {
+                let rel_path = path
+                    .strip_prefix(root)
+                    .unwrap_or(path)
+                    .to_string_lossy()
+                    .to_string();
+
+                let target_link = fs::read_link(path);
+                let canonical_res = fs::canonicalize(path);
+
+                // Collect directory hierarchy for Topological Containment Backbone (R-063)
+                let mut cur_dir = Path::new(&rel_path).parent();
+                while let Some(parent) = cur_dir {
+                    let p_str = parent.to_string_lossy().to_string();
+                    if p_str.is_empty() || p_str == "." {
+                        break;
+                    }
+                    discovered_dirs.insert(p_str);
+                    cur_dir = parent.parent();
+                }
+
+                let parent_dir = Path::new(&rel_path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let parent_id = if parent_dir.is_empty() || parent_dir == "." {
+                    format!("{}:workspace", workspace_name)
+                } else {
+                    format!("{}:dir:{}", workspace_name, parent_dir)
+                };
+
+                let (target_id, target_label) = match canonical_res {
+                    Ok(ref target_path) => {
+                        if let Ok(rel_target) = target_path.strip_prefix(root) {
+                            let rel_target_str = rel_target.to_string_lossy().to_string();
+                            let is_dir = target_path.is_dir();
+                            let id = if is_dir {
+                                format!("{}:dir:{}", workspace_name, rel_target_str)
+                            } else {
+                                format!("{}:file:{}", workspace_name, rel_target_str)
+                            };
+                            (id, rel_target_str)
+                        } else {
+                            (
+                                format!("{}:external:{}", workspace_name, target_path.display()),
+                                target_path.display().to_string(),
+                            )
+                        }
+                    }
+                    Err(_) => (
+                        format!("{}:broken:{}", workspace_name, rel_path),
+                        "broken_symlink".to_string(),
+                    ),
+                };
+
+                let target_display = target_link
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|_| "unknown".to_string());
+                let symlink_text = format!("Symlink: {} -> {}", rel_path, target_display);
+
+                let mut hasher = Sha256::new();
+                hasher.update(symlink_text.as_bytes());
+                let hash = hex::encode(hasher.finalize());
+
+                if !cache.is_stale(&rel_path, &hash).await {
+                    files_skipped += 1;
+                    continue;
+                }
+
+                files_scanned += 1;
+
+                let symlink_node_id = format!("{}:file:{}", workspace_name, rel_path);
+                let symlink_node = ExtractedNode {
+                    id: symlink_node_id.clone(),
+                    workspace: workspace_name.to_string(),
+                    label: file_name.to_string(),
+                    kind: "symlink".to_string(),
+                    file_path: rel_path.clone(),
+                    language: "symlink".to_string(),
+                    line_start: 1,
+                    line_end: 1,
+                    text: symlink_text.clone(),
+                };
+
+                let cont_edge = ExtractedEdge {
+                    workspace: workspace_name.to_string(),
+                    source_id: parent_id,
+                    target_label: file_name.to_string(),
+                    target_id: Some(symlink_node_id.clone()),
+                    edge_type: "CONTAINS".to_string(),
+                    category: "CONTAINMENT".to_string(),
+                };
+
+                let link_edge = ExtractedEdge {
+                    workspace: workspace_name.to_string(),
+                    source_id: symlink_node_id.clone(),
+                    target_label,
+                    target_id: Some(target_id),
+                    edge_type: "LINKS_TO".to_string(),
+                    category: "FILESYSTEM".to_string(),
+                };
+
+                pending_files.push(PendingBatchFile {
+                    rel_path: rel_path.clone(),
+                    hash: hash.clone(),
+                    nodes: vec![symlink_node],
+                    containment_edges: vec![cont_edge, link_edge],
+                    text_count: 1,
+                });
+                pending_texts.push(symlink_text);
+
+                if pending_files.len() >= 64 {
+                    flush_vector_batch(
+                        workspace_name,
+                        &mut pending_files,
+                        &mut pending_texts,
+                        embedder,
+                        db,
+                        cache,
+                        &mut files_indexed,
+                        &mut total_nodes,
+                        &mut total_edges,
+                    )
+                    .await;
+                }
+
+                continue;
+            }
+
+            if !path.is_file() {
                 continue;
             }
 

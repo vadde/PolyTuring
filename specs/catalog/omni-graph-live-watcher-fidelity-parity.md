@@ -88,6 +88,9 @@ A recursive divide-and-conquer code and database audit of `tools/omni-graph/src/
 - **AC-048**: `find_references` utilizes `idx_node_label` index, completing exact-match queries in $\le 5\text{ms}$.
 - **AC-049**: 100% of existing unit tests pass, and new tests validate all 14 requirements.
 - **AC-050**: Zero clippy warnings, living docs updated in lockstep.
+- **AC-051**: Traversing cyclic filesystem symlinks (e.g. `a/loop -> ..` or mutual circular links) terminates deterministically in $O(1)$ lookup per directory without recursion loop, process hang, or stack overflow.
+- **AC-052**: A symlinked file within the workspace is indexed as a dedicated `symlink` node with a `LINKS_TO` edge pointing directly to the canonical target file, producing zero duplicate AST function/symbol declarations and zero duplicate community assignments.
+- **AC-053**: The incremental watcher (`IncrementalPipeline`) safely resolves file or directory symlink modifications, deletions, or creations without panic.
 
 ### 2.3 Non-Functional Requirements (NF)
 

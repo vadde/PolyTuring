@@ -154,6 +154,127 @@ impl IncrementalPipeline {
             return self.delete_file(workspace, rel_path).await;
         }
 
+        // Symlink Cycle-Guarded Graph Traversal & Alias Navigation (R-109)
+        let is_symlink = fs::symlink_metadata(&full_path)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+
+        if is_symlink {
+            let target_link = fs::read_link(&full_path);
+            let canonical_res = fs::canonicalize(&full_path);
+
+            let root = Path::new(root_dir);
+            let (target_id, target_label) = match canonical_res {
+                Ok(ref target_path) => {
+                    if let Ok(rel_target) = target_path.strip_prefix(root) {
+                        let rel_target_str = rel_target.to_string_lossy().to_string();
+                        let is_dir = target_path.is_dir();
+                        let id = if is_dir {
+                            format!("{}:dir:{}", workspace, rel_target_str)
+                        } else {
+                            format!("{}:file:{}", workspace, rel_target_str)
+                        };
+                        (id, rel_target_str)
+                    } else {
+                        (
+                            format!("{}:external:{}", workspace, target_path.display()),
+                            target_path.display().to_string(),
+                        )
+                    }
+                }
+                Err(_) => (
+                    format!("{}:broken:{}", workspace, rel_path),
+                    "broken_symlink".to_string(),
+                ),
+            };
+
+            let target_display = target_link
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "unknown".to_string());
+            let symlink_text = format!("Symlink: {} -> {}", rel_path, target_display);
+
+            let mut hasher = Sha256::new();
+            hasher.update(symlink_text.as_bytes());
+            let hash = hex::encode(hasher.finalize());
+
+            if !self.cache.is_stale(rel_path, &hash).await {
+                return Ok(());
+            }
+
+            let file_name = Path::new(rel_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| rel_path.to_string());
+
+            let symlink_node_id = format!("{}:file:{}", workspace, rel_path);
+            let symlink_node = ExtractedNode {
+                id: symlink_node_id.clone(),
+                workspace: workspace.to_string(),
+                label: file_name.clone(),
+                kind: "symlink".to_string(),
+                file_path: rel_path.to_string(),
+                language: "symlink".to_string(),
+                line_start: 1,
+                line_end: 1,
+                text: symlink_text.clone(),
+            };
+
+            let (dir_nodes, dir_edges) = self.synthesize_directory_backbone(workspace, rel_path).await;
+            if !dir_nodes.is_empty() {
+                let _ = self.db.store_nodes(&dir_nodes, &[], None).await;
+                let _ = self.db.store_edges(&dir_edges).await;
+            }
+
+            let parent_dir = Path::new(rel_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let parent_id = if parent_dir.is_empty() || parent_dir == "." {
+                format!("{}:workspace", workspace)
+            } else {
+                format!("{}:dir:{}", workspace, parent_dir)
+            };
+
+            let cont_edge = ExtractedEdge {
+                workspace: workspace.to_string(),
+                source_id: parent_id,
+                target_label: file_name,
+                target_id: Some(symlink_node_id.clone()),
+                edge_type: "CONTAINS".to_string(),
+                category: "CONTAINMENT".to_string(),
+            };
+
+            let link_edge = ExtractedEdge {
+                workspace: workspace.to_string(),
+                source_id: symlink_node_id.clone(),
+                target_label,
+                target_id: Some(target_id),
+                edge_type: "LINKS_TO".to_string(),
+                category: "FILESYSTEM".to_string(),
+            };
+
+            let embeddings = match self.embedder.embed_batch(&[&symlink_text]).await {
+                Ok(embs) => embs,
+                Err(_) => vec![vec![0.0f32; 384]],
+            };
+
+            let modal_comm = self.db.get_directory_modal_community(workspace, rel_path).await.ok().flatten();
+
+            let _ = self.db.execute_atomic_swap(
+                workspace,
+                rel_path,
+                Some(&hash),
+                &[symlink_node],
+                &embeddings,
+                modal_comm,
+                &[cont_edge, link_edge],
+                &[],
+            ).await;
+
+            self.cache.update(rel_path, &hash).await;
+            return Ok(());
+        }
+
         let content = match fs::read_to_string(&full_path) {
             Ok(c) => c,
             Err(e) => {
