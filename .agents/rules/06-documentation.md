@@ -32,6 +32,35 @@
   - Formal mathematical formulations, graph complexity proofs ($O(|E|)$), and algorithmic steps.
   - Traceability matrices, test assertions, and append-only session devlogs.
 
+### 📜 The Public Static Pages Manifesto (Anti-Bloat, Anti-Fluff & Customer-Centric Storytelling Law)
+
+> **Core Philosophy**: A public documentation portal or static GitHub Page is a high-impact, curated storefront—NOT an unedited dump of sprint tickets, engineering devlogs, or fragmented micro-sections.
+
+1. **Sell the Transformation, Not the Plumbing**:
+   - Buyers and software engineers want to know: *What does this tool solve for me? Why does traditional tooling (Tree-Sitter alone, raw grep, naive graph tools like Graphify) fail? What makes this engine 10x more effective? How do I get started in 60 seconds?*
+   - Focus on tangible outcomes: eliminated hallucinations, sub-5ms blast-radius checks, strict token budgets ($\le 1,500$ tokens), zero broken caller edges during live edits.
+
+2. **The Anti-Bloat Principle (Never "Sedimentary Geology")**:
+   - **Never blindly append new sections chronologically at the bottom of the page**. Codebases evolve, but public pages must maintain a clean, coherent narrative arc.
+   - When a new capability is released (e.g. Scope-Aware Import Resolution or FIFO queue), it must be integrated into its rightful thematic home (e.g., "What Fuels the Engine"), rather than dumped as an isolated micro-section at the end of the document.
+   - Consolidate sprawling, fragmented sub-headings into **4 High-Signal Core Themes**:
+     - **Theme 1**: The 60-Second Value Pitch & Competitive Edge.
+     - **Theme 2**: What Fuels the Engine (Layman Deep Dives into superior Graph-RAG).
+     - **Theme 3**: Autonomous Architecture & Real-Time Sync (Live watching, clustering, atomic swaps).
+     - **Theme 4**: The Developer Experience (Plug, Play & Query: MCP, CLI, REST API, interactive sandboxes).
+
+3. **Layman Metaphors Over Geeky Mathematical Vanity**:
+   - Avoid dumping dry academic formulas or Greek matrix equations in isolation.
+   - Always lead with an immediate, intuitive plain-English mental model:
+     - *"The Airplane Airlock Engine Swap"*: Replacing code mid-flight with zero broken caller links.
+     - *"Browser Tabs for Code"*: How Git Worktrees allow multiple AI agents to work simultaneously without re-indexing.
+     - *"Language-Aware Disambiguation"*: Explaining why 14 functions named `new()` in different packages don't turn your dependency graph into a tangled hairball.
+   - Ground any necessary mathematics (such as token budgets or coupling metrics) in their practical engineering benefit to the user.
+
+4. **Zero Internal Clutter Policy**:
+   - Absolute prohibition of sprint ticket IDs (`R-101`, `R-093`), internal ADR references (`ADR-002`), internal test/gap numbers (`Loophole 14`), and conflicting version chatter (`v0.4.0` vs `v0.7.0`).
+   - If an internal engineering decision needs to be recorded, write it in `docs/architecture/` (ADR) or `tools/<name>/DEVLOG.md`, never on public-facing static pages.
+
 ---
 
 ## Documentation Hierarchy

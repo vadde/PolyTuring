@@ -219,21 +219,11 @@
         </div>
         <div class="nav-tree-children">
           <a href="#ch1-omni-graph" class="nav-tree-link">System Overview</a>
-          <a href="#sec-omni-advantage" class="nav-tree-link">✨ Why Omni-Graph? (Comparison)</a>
+          <a href="#sec-omni-advantage" class="nav-tree-link">✨ Competitive Edge Matrix</a>
           <a href="#sec-omni-arch" class="nav-tree-link">4-Tier Container Topology</a>
-          <a href="#sec-omni-galaxies" class="nav-tree-link">✨ Galaxy Subsystems &amp; Louvain/Leiden</a>
-          <a href="#sec-omni-cosmology" class="nav-tree-link">🌌 AI-Native Galaxy Cosmology</a>
-          <a href="#sec-omni-coupling" class="nav-tree-link">Coupling Metrics &amp; Blast Radius</a>
-          <a href="#sec-omni-twopass" class="nav-tree-link">⚡ Two-Pass Engine &amp; Read-Fence</a>
-          <a href="#sec-omni-live-sync" class="nav-tree-link">⚡ Real-Time Live Watcher &amp; Sync</a>
-          <a href="#sec-omni-ebf" class="nav-tree-link">Ephemeral Branch Fabric (EBF)</a>
-          <a href="#sec-omni-ast" class="nav-tree-link">Polyglot AST &amp; Struct Fields</a>
-          <a href="#sec-omni-budget" class="nav-tree-link">Two-Tier Token Budget Math</a>
-          <a href="#sec-omni-relational" class="nav-tree-link">SurrealDB Relational Indexing</a>
-          <a href="#sec-omni-triad" class="nav-tree-link">⚡ The Agentic Triad (MCP &amp; CLI)</a>
-          <a href="#sec-omni-topological" class="nav-tree-link">🕸️ Topological Backbone &amp; PPR</a>
-          <a href="#sec-omni-sair" class="nav-tree-link">🛡️ SAIR &amp; Content Partitioning</a>
-          <a href="#sec-omni-fifo" class="nav-tree-link">⚡ FIFO Queue &amp; OpenAPI 3.0</a>
+          <a href="#sec-omni-graph-rag" class="nav-tree-link">🧠 What Fuels Graph-RAG</a>
+          <a href="#sec-omni-realtime" class="nav-tree-link">⚡ Architecture &amp; Real-Time Sync</a>
+          <a href="#sec-omni-agentic-triad" class="nav-tree-link">🛠️ Developer Experience &amp; Triad</a>
           <a href="#token-simulator" class="nav-tree-link">Token Budget Simulator</a>
           <a href="#api-playground" class="nav-tree-link">REST API Playbook &amp; Curl</a>
         </div>
@@ -712,378 +702,349 @@ flowchart TB
             <div class="canvas-caption">Figure 1.3: Real-Time Agent Analytics — AST Call Efficiency, Context Window Preservation (90.7%), &amp; Multi-Language LSP Telemetry</div>
           </div>
 
-          <!-- Section: Galaxy Subsystems & Louvain / Leiden Modularity Clustering -->
-          <h3 class="section-h2" id="sec-omni-galaxies">Galaxy Subsystems &amp; Louvain / Leiden Modularity Clustering</h3>
-          <p>
-            Software codebases are not flat hierarchies of directories. In reality, modern applications are <strong>scale-free, directed multi-graphs</strong> of functions, types, interfaces, and traits linked by call invocations, type references, and implementations. When an autonomous coding agent attempts to modify a codebase without architectural clustering, it suffers from context blindness: it cannot distinguish tightly-coupled internal modules from loose external boundaries.
-          </p>
-          <p>
-            Omni-Graph solves this by partitioning the entire AST graph into self-contained, cohesive architectural clusters called <strong>Galaxy Subsystems</strong> using a dual-phase Louvain and Leiden community detection engine.
-          </p>
+          <!-- ==================================================================== -->
+          <!-- THEME 2: WHAT FUELS THE ENGINE — THE SECRET SAUCE BEHIND GRAPH-RAG   -->
+          <!-- ==================================================================== -->
+          <div style="margin-top: 48px; margin-bottom: 32px;">
+            <div class="chapter-badge" style="background: rgba(0, 242, 254, 0.12); color: var(--accent-cyan); margin-bottom: 8px;">Theme 2 · Core Engine</div>
+            <h3 class="section-h2" id="sec-omni-graph-rag" style="margin-top: 0; margin-bottom: 12px; font-size: 1.55rem;">
+              🧠 What Fuels the Engine: The Secret Sauce Behind Superior Graph-RAG
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.94rem; line-height: 1.65; margin-bottom: 20px;">
+              Most AI coding tools fail on enterprise codebases because they treat software like ordinary prose. Here is why traditional retrieval models break down—and how Omni-Graph's four foundational pillars deliver deterministic, high-signal intelligence for autonomous coding agents:
+            </p>
 
-          <div class="callout callout-theory">
-            <div class="callout-header">Mathematical Formulation: Modularity Optimization ($Q$)</div>
-            <div class="callout-body">
-              Omni-Graph discovers cohesive subsystems by maximizing Newman-Girvan network <strong>Modularity ($Q$)</strong> across directed, edge-weighted AST relations:
-              <br><br>
-              $$Q = \frac{1}{2m} \sum_{i,j} \left[ A_{ij} - \gamma \frac{k_i k_j}{2m} \right] \delta(c_i, c_j)$$
-              <br>
-              <strong>Parameters &amp; Invariants:</strong>
-              <ul style="margin-top: 8px; margin-left: 18px; line-height: 1.6;">
-                <li>$A_{ij}$: Weighted adjacency matrix representing architectural affinity between symbols $i$ and $j$.</li>
-                <li>$k_i = \sum_j A_{ij}$: Total degree (structural connectivity) of symbol node $i$.</li>
-                <li>$m = \frac{1}{2} \sum_{ij} A_{ij}$: Total edge weight across the entire repository graph.</li>
-                <li>$\gamma$: Resolution parameter governing community scale ($\gamma = 1.0$ standard, calibrated to prevent micro-cluster fragmentation).</li>
-                <li>$\delta(c_i, c_j)$: Kronecker delta ($\delta = 1$ if symbols $i$ and $j$ belong to the same Galaxy $c$, else $0$).</li>
-              </ul>
+            <!-- Layman Deep Dive: Why Traditional RAG & Tree-Sitter Alone Fail -->
+            <div class="glass-card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-cyan); padding: 20px 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 1.15rem;">⚡</span>
+                <h4 style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">Why Traditional RAG &amp; Standalone Tree-Sitter Break Down on Code</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-primary); margin-bottom: 12px;">
+                <strong>1. Flat Text Chunking Destroys Syntax:</strong> Traditional RAG slices source files into arbitrary 500-token chunks. It cuts functions in half, separates function signatures from their call bodies, and has zero understanding of who calls whom. When an agent asks to refactor a function, flat RAG serves fragmented snippets without caller context, leading to broken builds.
+              </p>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-primary); margin: 0;">
+                <strong>2. Standalone Tree-Sitter Stops at the File Boundary:</strong> While Tree-Sitter is an excellent grammar parser, it operates on single files in complete isolation. It can tell you what functions are inside <code>user_service.py</code>, but it cannot tell you that 14 controllers in <code>api/</code> and 6 background workers in <code>jobs/</code> call those functions. Omni-Graph bridges this gap by linking individual syntax trees into a global, cross-file repository knowledge graph.
+              </p>
             </div>
-          </div>
 
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>⚖️ Edge-Weighted Semantic Affinity</h4>
-              <p>Not all code links carry equal architectural weight. Omni-Graph applies strict domain weights: <code>IMPLEMENTS</code> ($w = 3.0$), <code>CALLS</code> ($w = 2.0$), <code>TYPE_REF</code> ($w = 1.5$), and <code>IMPORTS</code> ($w = 1.0$).</p>
-            </div>
-            <div class="glass-card">
-              <h4>🛡️ Louvain vs. Leiden Resolution</h4>
-              <p>While standard Louvain greedily aggregates nodes, it can trap symbols in disconnected sub-communities. Omni-Graph adopts the <strong>Leiden refinement step</strong>, guaranteeing that every discovered galaxy is internally well-connected.</p>
-            </div>
-            <div class="glass-card">
-              <h4>⚡ Two-Phase Dynamic Re-Clustering</h4>
-              <p><strong>Phase 1 (Instant Inheritance)</strong>: File edits preserve existing galaxy assignments in SurrealDB via <code>MERGE</code>.<br><strong>Phase 2 (Quiescent LPA)</strong>: After 3.5s of edit silence, seed-preserving Label Propagation updates macro boundaries with zero ID thrashing.</p>
-            </div>
-          </div>
-
-          <!-- Section: AI-Native Galaxy Cosmology & Modularity-Guarded Coarsening -->
-          <h3 class="section-h2" id="sec-omni-cosmology">AI-Native Galaxy Cosmology &amp; Modularity-Guarded Coarsening</h3>
-          <p>
-            Traditional graph visualization systems force repositories into an arbitrary human-centric limit: <strong>George Miller's 1956 working memory ceiling ($7 \pm 2$, or $K \le 15$ clusters)</strong>. While human working memory degrades when tracking more than 9 items simultaneously, modern LLMs and autonomous agents navigate codebases with multi-hundred-thousand token contexts. Forcing a 10-million line repository into 15 macro-galaxies causes severe architectural conflation, dumping orthogonal domains into artificial mega-clusters.
-          </p>
-          <p>
-            Omni-Graph overthrows this limitation with an <strong>AI-Native Scale-Adaptive Cosmology Engine</strong> governed by three mathematical invariants:
-          </p>
-
-          <div class="callout callout-theory">
-            <div class="callout-header">Mathematical Formulation: Dynamic Scale-Adaptive Target &amp; Modularity Guard</div>
-            <div class="callout-body">
-              <strong>1. Sub-Linear Scale-Adaptive Target:</strong> Rather than hardcoding $K = 15$, the target galaxy count $K_{\text{adaptive}}$ scales dynamically with total repository AST nodes ($N$):
-              <br><br>
-              $$K_{\text{adaptive}}(N) = \text{clamp}\left(\lfloor 3.5 \cdot N^{0.35} \rfloor, \, 5, \, 150\right)$$
-              <br>
-              • Small tools ($N \approx 100 \implies K \approx 17$)<br>
-              • Mid-tier monorepos ($N \approx 4,200 \implies K \approx 65$)<br>
-              • Large enterprise codebases ($N \ge 100,000 \implies K = 150$)
-              <br><br>
-              <strong>2. Newman Modularity Differential Guard ($\Delta Q$):</strong> Hierarchical agglomerative coarsening only merges two communities $c_i$ and $c_j$ if the merge does not degrade network modularity beyond tolerance $\epsilon = 0.05$:
-              <br><br>
-              $$\Delta Q = \frac{k_{ij}}{2m} - \frac{k_i k_j}{2m^2} \ge -\epsilon$$
-              <br>
-              If $\Delta Q &lt; -\epsilon$, coarsening halts immediately. Decoupled architectural boundaries are preserved rather than forced into unnatural unions.
-            </div>
-          </div>
-
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>🏛️ Affinity-Floor Invariant</h4>
-              <p>Eliminates the legacy fallback cheat where disconnected clusters were blindly merged into the largest community. If candidate communities have zero edge affinity ($k_{ij} = 0$) and zero directory lineage, merging strictly terminates.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🛡️ Clean Domain Isolation</h4>
-              <p>Isolated nodes and tiny micro-clusters ($&lt; 3$ nodes) that lack structural affinity are quarantined into designated noise-floor cluster <code>cid: 999_999</code>, preventing visual clutter while preserving 100% AST queryability.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🎯 Single Source of Truth Parity</h4>
-              <p>Guarantees strict bidirectional synchrony between individual node assignments (<code>node.community</code>) and macroscopic topology records (<code>galaxy</code> table), completely eliminating desynchronization bugs.</p>
-            </div>
-          </div>
-
-          <!-- Section: Robert C. Martin Coupling Metrics & Dynamic Blast Radius Contracts -->
-          <h3 class="section-h2" id="sec-omni-coupling">Robert C. Martin Coupling Metrics &amp; Dynamic Blast Radius Contracts</h3>
-          <p>
-            Once Galaxy Subsystems are clustered, Omni-Graph analyzes cross-boundary dependency vectors using Robert C. Martin's package metric formulations. This allows agents to quantify risk before writing a single line of refactored code:
-          </p>
-
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>📥 Afferent Coupling ($C_a$)</h4>
-              <p>The number of external symbols outside this galaxy that depend upon symbols inside this galaxy. Measures incoming responsibility.</p>
-            </div>
-            <div class="glass-card">
-              <h4>📤 Efferent Coupling ($C_e$)</h4>
-              <p>The number of external symbols that symbols inside this galaxy depend upon. Measures outgoing structural dependency.</p>
-            </div>
-            <div class="glass-card">
-              <h4>📐 Instability Metric ($I$)</h4>
-              <p>Calculates resistance to change: $$I = \frac{C_e}{C_a + C_e} \quad (0 \le I \le 1)$$ $I=0$ indicates maximum stability (hard to change); $I=1$ indicates maximum volatility (easy to change).</p>
-            </div>
-          </div>
-
-          <div class="table-wrapper" style="margin: 20px 0;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Architectural Role</th>
-                  <th>Instability Threshold</th>
-                  <th>Subsystem Characteristics</th>
-                  <th>Agent Modification Strategy</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>Core Foundation</code></td>
-                  <td>$I \le 0.25$</td>
-                  <td>Heavy incoming dependencies ($C_a \gg C_e$), shared domain types, zero external knowledge.</td>
-                  <td><strong style="color: #fb7185;">CRITICAL RISK:</strong> Wide blast radius. Agent must preserve backward-compatible signatures.</td>
-                </tr>
-                <tr>
-                  <td><code>Domain Service</code></td>
-                  <td>$0.25 < I \le 0.65$</td>
-                  <td>Balanced business logic, moderate internal abstractions with external service calls.</td>
-                  <td><strong style="color: #facc15;">MODERATE RISK:</strong> Agent must verify intra-galaxy and direct caller contracts.</td>
-                </tr>
-                <tr>
-                  <td><code>Orchestrator / Leaf</code></td>
-                  <td>$I > 0.65$</td>
-                  <td>High outgoing dependencies ($C_e \gg C_a$), API controllers, CLI command routers, leaves.</td>
-                  <td><strong style="color: #34d399;">LOW RISK:</strong> Contained blast radius. Agent can safely refactor implementation details.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="callout callout-success">
-            <div class="callout-header">Dynamic Blast Radius Endpoint: <code>GET /api/galaxy/boundary?symbol=X</code></div>
-            <div class="callout-body">
-              Before an agent refactors any symbol, the pre-tool hook queries the symbol's boundary contract. Omni-Graph returns:
-              <br><br>
-              • <strong>Containment Status:</strong> <code>🛡️ Contained Internal</code> (all callers reside in same galaxy), <code>⚠️ Boundary Crossing</code> (foreign callers detected), or <code>🔌 Isolated</code> (leaf / entrypoint).<br>
-              • <strong>Caller Provenance:</strong> Exact line numbers, files, and galaxy IDs of every external caller.<br>
-              • <strong>Agentic Advice:</strong> Concrete heuristics (e.g., <em>"Symbol is called by 14 external callers in galaxy 'api_gateway'. Do NOT alter parameters without default fallbacks."</em>).
-            </div>
-          </div>
-
-          <div class="callout callout-theory" style="margin-top: 20px;">
-            <div class="callout-header">Mathematical Formulation: Abstractness ($A$) &amp; Distance from Main Sequence ($D$)</div>
-            <div class="callout-body">
-              Robert C. Martin's Package Principles define the balance between abstractness and instability:
-              <br><br>
-              $$A = \frac{N_a}{N_c} \quad (0 \le A \le 1)$$
-              <br>
-              Where $N_a$ is the count of abstract types (interfaces, traits, abstract classes, function signatures) and $N_c$ is total symbol count.
-              <br><br>
-              The normalized <strong>Distance from the Normalized Main Sequence ($D$)</strong> measures architectural health:
-              <br><br>
-              $$D = |A + I - 1| \quad (0 \le D \le 1)$$
-              <br>
-              A galaxy lying on the Main Sequence ($D \approx 0$) balances abstractness and concrete dependency. Subsystems deviating significantly ($D \to 1$) fall into architectural antipattern zones:
-            </div>
-          </div>
-
-          <div class="table-wrapper" style="margin: 20px 0;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Architectural Zone</th>
-                  <th>Metric Bounds</th>
-                  <th>Subsystem Pathology</th>
-                  <th>Agent Engineering Guidance</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>Main Sequence</code></td>
-                  <td>$D \le 0.30$</td>
-                  <td>Optimal architectural equilibrium. Concrete modules are volatile; stable modules are abstract.</td>
-                  <td><strong style="color: #34d399;">IDEAL:</strong> Safe to extend through interfaces or modify leaves.</td>
-                </tr>
-                <tr>
-                  <td><code>Zone of Pain</code></td>
-                  <td>$A \le 0.20, \, I \le 0.20 \implies D \ge 0.60$</td>
-                  <td>Maximum concreteness coupled with maximum incoming dependence. Highly rigid, brittle, hard to refactor.</td>
-                  <td><strong style="color: #fb7185;">HIGH RISK:</strong> Decouple via dependency inversion (introduce interfaces/traits) before modifying.</td>
-                </tr>
-                <tr>
-                  <td><code>Zone of Uselessness</code></td>
-                  <td>$A \ge 0.80, \, I \ge 0.80 \implies D \ge 0.60$</td>
-                  <td>Maximum abstractness with zero incoming dependencies. Dead interfaces, premature over-engineering.</td>
-                  <td><strong style="color: #facc15;">CODE SMELL:</strong> Audit for orphan traits or uninstantiated type hierarchies.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Section: Two-Pass Ingestion Engine & Transactional Read-Fencing -->
-          <h3 class="section-h2" id="sec-omni-twopass">Two-Pass Ingestion Engine, Edge Preservation &amp; Transactional Read-Fencing</h3>
-          <p>
-            During real-world ingestion of large enterprise codebases, single-pass indexing architectures exhibit three critical failure modes:
-            <strong>1. Forward-Reference Edge Loss:</strong> When a file calls functions declared in files visited later in directory traversal order, targets do not yet exist in the database, silently dropping &gt;84% of cross-file call edges.
-            <strong>2. Delta-Sync Inbound Annihilation:</strong> When a developer edits a single file, naive delta watchers drop all incoming call edges from unaffected files across the codebase.
-            <strong>3. Transitional Read Contamination:</strong> Autonomous agents querying the graph or running Graph-RAG while ingestion is active read half-baked, inconsistent intermediate states.
-          </p>
-          <p>
-            Omni-Graph resolves these failure modes with a hardened Two-Pass pipeline and atomic transactional read-fencing:
-          </p>
-
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>🚀 Pass 1: AST &amp; Vector Ingestion</h4>
-              <p>Scans files via Tree-Sitter, parses polyglot AST declarations, computes 384-dimensional dense embeddings in batches of 32 via TEI, and builds an in-memory Global Symbol Table mapping symbol identifiers to canonical node IDs.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🔗 Pass 2: Forward Edge Resolution</h4>
-              <p>Iterates unresolved caller references against the Global Symbol Table. Because all codebase symbols are known, forward and circular cross-file references resolve with 100% deterministic edge completeness.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🔒 Transactional Read-Fencing (HTTP 423)</h4>
-              <p>All read endpoints (<code>/api/graph</code>, <code>/api/query</code>, <code>/api/galaxies</code>, <code>/api/search</code>, <code>/api/condense</code>, <code>/api/symbol</code>, <code>/api/references</code>) lock during background indexing, returning HTTP 423 with progress and retry advice.</p>
-            </div>
-          </div>
-
-          <div class="callout callout-theory">
-            <div class="callout-header">Why Single-Pass Indexers Fail on Monorepos</div>
-            <div class="callout-body">
-              <strong>The Forward-Reference Problem:</strong> When codebase indexers traverse files sequentially, File A frequently calls a helper function in File Z that hasn't been parsed yet. Single-pass indexers silently drop these connections because the destination symbol does not yet exist.
-              <br><br>
-              <strong>The Omni-Graph Multi-Pass Guarantee:</strong> By decoupling symbol declaration scanning (Pass 1) from cross-file relationship resolution (Pass 2), Omni-Graph builds a complete global symbol registry before wiring call edges. Forward calls, recursive calls, and circular dependencies resolve with 100% completeness.
-            </div>
-          </div>
-
-          <!-- Section: Real-Time Live Watcher & Dynamic Sync -->
-          <h3 class="section-h2" id="sec-omni-live-sync">Real-Time Live Watcher: Instant Code Updates with Zero Broken Links</h3>
-          <p>
-            When developers or autonomous AI agents edit code in an active workspace, older indexers suffer from <strong>torn reads and dropped callers</strong>: modifying a single function would drop all incoming caller edges from the rest of the project or serve half-written AST states. Omni-Graph solves this with a real-time reactive live watcher that guarantees <strong>100% relational integrity</strong> across every file edit.
-          </p>
-
-          <!-- Layman Mental Model Callout -->
-          <div class="callout callout-theory" style="margin-bottom: 24px;">
-            <div class="callout-header">💡 Layman's Mental Model: The Airplane Airlock Engine Swap</div>
-            <div class="callout-body">
-              <strong>Imagine replacing a jet engine mid-flight without spilling a single drop of fuel:</strong>
-              <br><br>
-              In traditional code indexers, saving a file was like unplugging an engine: all fuel lines (caller links) from other parts of the plane snapped, and for several seconds the system flew with missing parts. If an AI agent queried the codebase during those seconds, it read half-missing code and hallucinated broken imports.
-              <br><br>
-              <strong>The Omni-Graph Invariant:</strong> Omni-Graph builds a pressurized airlock around the modified file. Before touching a single line, it catalogs all incoming caller lines from the rest of the repository. It updates the code and reconnects every foreign caller in a single atomic microsecond swap. The AI agent never sees a torn read, never loses caller lineages, and never waits on slow full-project re-indexes.
-            </div>
-          </div>
-
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>🔒 Atomic Microsecond Swaps</h4>
-              <p>Updates AST nodes, relationships, and foreign callers inside a single atomic database transaction. AI agents never experience torn reads or half-deleted states during live edits.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🎯 Smart Reverse-Caller Relinking</h4>
-              <p>When you edit a shared function, Omni-Graph automatically relinks all incoming calls from foreign modules across the project without needing to re-scan those foreign files on disk.</p>
-            </div>
-            <div class="glass-card">
-              <h4>⏳ Transactional Convergence Barrier</h4>
-              <p>Read endpoints automatically synchronize with the live watcher, guaranteeing that AI agents always receive fresh, fully-converged AST truth without race conditions.</p>
-            </div>
-          </div>
-
-          <div class="card-grid" style="margin-top: 16px;">
-            <div class="glass-card">
-              <h4>⚡ Instant Architectural Alignment</h4>
-              <p>Newly created files immediately inherit the modular subsystem (galaxy) of their connected neighbors in &lt;0.05ms, preserving clean architectural boundaries on the fly.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🌿 Autonomous Directory Hierarchy</h4>
-              <p>Creating files inside newly created deep directories automatically generates parent directory nodes and containment links up to the project root with zero dangling pointers.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🔬 Built-in Parity Diagnostics</h4>
-              <p>A built-in diagnostic endpoint and CLI command (<code>./scripts/omni watch fidelity</code>) continuously verify that 100% of codebase references and directory paths are valid.</p>
-            </div>
-          </div>
-
-          <!-- Live Diagnostic Readout Card -->
-          <div class="callout callout-theory" style="margin-top: 24px; margin-bottom: 28px;">
-            <div class="callout-header">📊 Live Fidelity Diagnostics: Instant Relational Health Check</div>
-            <div class="callout-body">
-              You can verify the exact health and relational completeness of any indexed workspace with a single CLI command:
-              <br><br>
-              <code>$ ./scripts/omni watch fidelity PolyTuring</code>
-              <br><br>
-              <pre style="background: var(--code-bg); padding: 12px; border-radius: 6px; font-size: 0.85rem; color: var(--code-text); margin: 0;">
-🔬 Nanometer Fidelity Diagnostics for [PolyTuring]:
-
-  • Fidelity Score:            1.0000 (100% Relational Parity)
-  • Convergence State:         CONVERGED
-  • Total Graph Nodes:         4,461
-  • Total Graph Edges:         10,580
-  • Dangling Directory Edges:  0
-  • Unresolved Forward Edges:  0</pre>
-              <br>
-              <strong>Model-Based Systems Engineering (MBSE) Preview:</strong> Built-in extensible grammar architecture preparing support for aerospace &amp; automotive systems engineering, including MathWorks MATLAB (<code>.m</code>) class hierarchies and Simulink (<code>.slx</code> / <code>.mdl</code>) block diagram signal graphs.
-            </div>
-          </div>
-
-          <h3 class="section-h2" id="sec-omni-ebf">Ephemeral Branch Fabric (EBF) & Git Worktrees</h3>
-          <p>
-            Coding agents frequently branch or create Git worktrees to isolate experimental code and execute parallel strategies. Traditional code indexing tools either re-index the entire multi-gigabyte repository from scratch or fail completely. Omni-Graph solves this with the <strong>Ephemeral Branch Fabric (EBF)</strong>:
-          </p>
-
-          <!-- Layman Explanation: Git Worktrees -->
-          <div class="callout callout-theory" style="margin-bottom: 24px;">
-            <div class="callout-header">💡 Layman's Mental Model: What is a Git Worktree?</div>
-            <div class="callout-body">
-              <strong>Think of Git Worktrees like having multiple browser tabs open for the exact same website at the same time:</strong>
-              <br><br>
-              In normal Git, if you want to switch from a payment feature to fix an urgent checkout bug, you must run <code>git stash</code>, run <code>git checkout bugfix</code>, and restart your compiler or local dev server.
-              <br><br>
-              With <strong>Git Worktrees</strong>, you have multiple physical folders on disk sharing the same underlying Git history. You (or 4 parallel AI agents) can work on <code>feat-stripe-v2</code> and <code>refactor-auth-jwt</code> <em>simultaneously</em> in separate folders without branch switching conflicts.
-              <br><br>
-              <strong>The Problem with other indexers:</strong> They get confused, treat each folder as an unrelated duplicate repository, or force you to re-index the whole project from scratch on every branch switch.
-              <br>
-              <strong>The Omni-Graph Solution:</strong> Point Omni-Graph at the main project folder once. It automatically discovers all active worktree folders, links their lineage, indexes them in parallel, and live-updates whichever folder you edit in real time!
-            </div>
-          </div>
-
-          <div class="card-grid">
-            <div class="glass-card">
-              <h4>⚡ O(1) Worktree Pointer Peeking</h4>
-              <p>Instead of spawning slow subshells (<code>git rev-parse</code>), Omni-Graph reads the <code>.git</code> worktree pointer file directly in Rust in under 5 microseconds, resolving parent repository root, branch name, and lineage.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🚀 Top-Down Fleet Auto-Cascade</h4>
-              <p>Ingesting a trunk parent repo automatically inspects <code>.git/worktrees/*</code>, locates all active sibling checkouts, asynchronously indexes each branch, and attaches concurrent live file watchers.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🌱 Prior LPA Seed Inheritance</h4>
-              <p>When clustering a new worktree, Omni-Graph inherits community IDs from the parent workspace. Only modified files shift, preserving 99% cluster visual stability across branches.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🔄 Dynamic Fleet Synchronizer</h4>
-              <p><code>POST /api/worktrees/sync</code> sweeps registered workspaces, discovers newly checked-out worktrees, cascades indexing, and aligns watcher daemons without restarts.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🧹 Automatic Dead Worktree GC</h4>
-              <p>When an agent deletes a temporary worktree, <code>/api/workspaces</code> immediately sweeps SurrealDB and purges dead nodes, edges, and watchers, eliminating zombie workspace pollution.</p>
-            </div>
-            <div class="glass-card">
-              <h4>🌲 Worktree Hierarchy & Delta UI</h4>
-              <p>Worktrees are cleanly nested under their parent repository (<code>worktrees: [...]</code>), with branch selectors and glowing delta halos for modified AST nodes in Cosmograph.</p>
-            </div>
-          </div>
-
-          <!-- Interactive Zoomable Canvas: EBF Multi-Worktree Architecture -->
-          <div class="canvas-container">
-            <div class="canvas-header-bar">
-              <span class="canvas-type-tag">Architecture Blueprint · Ephemeral Branch Fabric (EBF)</span>
-              <div class="canvas-controls-group">
-                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
-                <span class="zoom-level-badge">100%</span>
-                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
-                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
-                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-                  <span>Theater</span>
-                </button>
+            <!-- Pillar 1: Deterministic Multi-Pass Ingestion & AST Intelligence -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🔗</span>
+                <h4 id="sec-omni-twopass" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">1. Deterministic Multi-Pass Ingestion &amp; Polyglot AST Intelligence</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 14px;">
+                In any real-world codebase, files frequently call functions declared in files visited much later during directory traversal. Single-pass indexers silently drop these connections because the destination symbol does not exist yet. Omni-Graph solves this by decoupling ingestion into a hardened two-pass architecture:
+              </p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px;">
+                  <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.88rem; margin-bottom: 6px;">Pass 1: Declaration &amp; Vector Indexing</div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.55;">
+                    Scans all polyglot files using native Rust Tree-Sitter grammars, extracts symbol declarations and signatures, computes dense 384-dimensional embeddings in batches of 32 via TEI, and builds a comprehensive Global Symbol Table in memory.
+                  </p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px;">
+                  <div style="font-weight: 700; color: var(--accent-emerald); font-size: 0.88rem; margin-bottom: 6px;">Pass 2: Forward &amp; Cross-File Linking</div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.55;">
+                    Iterates all call sites and import statements against the Global Symbol Table. Because every symbol in the repository is now known, forward references, circular calls, and cross-package dependencies resolve with 100% deterministic completeness.
+                  </p>
+                </div>
+              </div>
+              <div id="sec-omni-ast">
+                <p style="font-size: 0.88rem; line-height: 1.55; color: var(--text-primary); margin-bottom: 8px;">
+                  <strong>Polyglot AST Modeling:</strong> Supports rich language semantics across <strong>Rust</strong> (functions, traits, impl methods, struct fields), <strong>Go</strong> (packages, receiver methods, struct fields, imports), <strong>TypeScript / JavaScript</strong> (classes, arrow functions, interface properties, named imports), and <strong>Python</strong> (async coroutines, classes, inheritance, decorators).
+                </p>
+                <div class="callout callout-math" style="margin: 0; padding: 10px 14px;">
+                  <div style="font-size: 0.82rem; color: var(--text-muted);">
+                    <strong>Directed Edge Schema:</strong> Every relation in the <code>linked_to</code> table models:
+                    $$\text{Node}_{\text{source}} \xrightarrow[\text{category}]{\text{edge\_type}} \text{Node}_{\text{target}} \quad \text{where } \text{edge\_type} \in \{\text{CALLS}, \text{IMPORTS}, \text{CONTAINS}, \text{IMPLEMENTS}, \text{REFERENCES}\}$$
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="canvas-viewport">
-              <div class="canvas-content-surface">
-                <pre class="mermaid">
+
+            <!-- Pillar 2: Language-Aware Disambiguation (SAIR) -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🛡️</span>
+                <h4 id="sec-omni-sair" style="font-size: 1.05rem; color: var(--accent-emerald); margin: 0; font-weight: 700;">2. Language-Aware Disambiguation (SAIR): Preventing Polyglot Monorepo Spaghetti</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                In any enterprise codebase, common function names like <code>new()</code>, <code>run()</code>, <code>init()</code>, <code>parse()</code>, or <code>build()</code> appear dozens of times across different packages. Naive graph indexers indiscriminately link all calls to any matching symbol name, cross-wiring unrelated packages into an incoherent hairball.
+              </p>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-primary); margin-bottom: 14px;">
+                Omni-Graph eliminates spurious links with a <strong>4-Tier Scope-Aware Import Resolution (SAIR)</strong> engine:
+              </p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.84rem; margin-bottom: 4px;">Tier 1: Local File Scope</div>
+                  <div style="font-size: 0.80rem; color: var(--text-muted); line-height: 1.5;">Resolves symbols declared within the same file first, ensuring private helpers bind accurately.</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.84rem; margin-bottom: 4px;">Tier 2: Language &amp; Extension Scoping</div>
+                  <div style="font-size: 0.80rem; color: var(--text-muted); line-height: 1.5;">Rust calls only match Rust targets (<code>.rs</code>); Go only matches Go (<code>.go</code>), preventing cross-language collisions.</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.84rem; margin-bottom: 4px;">Tier 3: Namespace &amp; Module Hierarchy</div>
+                  <div style="font-size: 0.80rem; color: var(--text-muted); line-height: 1.5;">Matches directory subpaths against import statements to bind callers to the exact target package.</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.84rem; margin-bottom: 4px;">Tier 4: Generic Verb Suppression</div>
+                  <div style="font-size: 0.80rem; color: var(--text-muted); line-height: 1.5;">Suppresses speculative cross-package linking for common generic verbs unless explicitly qualified.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pillar 3: Dual-Tier Partitioning & Topological Containment Backbone -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🕸️</span>
+                <h4 id="sec-omni-topological" style="font-size: 1.05rem; color: var(--accent-violet); margin: 0; font-weight: 700;">3. Dual-Tier Partitioning &amp; Topological Containment Backbone</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 14px;">
+                To guarantee lightning-fast retrieval without noise, Omni-Graph decouples source code AST from prose documentation and enforces hierarchical project reachability:
+              </p>
+              <ul style="color: var(--text-primary); font-size: 0.88rem; line-height: 1.6; padding-left: 20px; margin-bottom: 16px;">
+                <li><strong>Dual-Tier Content Partitioning:</strong> Storage and vector spaces are strictly partitioned into code and documentation tiers. Graph-RAG queries default to <code>include_docs=false</code>, preventing verbose markdown changelogs from semantically shadowing concise code signatures.</li>
+                <li><strong>Topological Containment Backbone:</strong> Real software call graphs are naturally sparse ($\langle k \rangle \approx 1.07$). Without structural scaffolding, codebases break into disconnected orphan clusters. Omni-Graph synthesizes containment edges connecting Workspaces $\to$ Folders $\to$ Files $\to$ Declared Symbols, guaranteeing 100% DAG reachability from root.</li>
+              </ul>
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Edge Type</th>
+                      <th>Source $\to$ Target</th>
+                      <th>Weight ($w$)</th>
+                      <th>Operational Purpose</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>IMPLEMENTS</code></td>
+                      <td>Struct $\to$ Trait / Interface</td>
+                      <td><code>3.0</code></td>
+                      <td>Strong polymorphism binding across abstractions.</td>
+                    </tr>
+                    <tr>
+                      <td><code>CALLS</code></td>
+                      <td>Function $\to$ Function / Method</td>
+                      <td><code>2.0</code></td>
+                      <td>Deterministic execution control-flow path.</td>
+                    </tr>
+                    <tr>
+                      <td><code>TYPE_REF</code></td>
+                      <td>Variable $\to$ Struct / Class Type</td>
+                      <td><code>1.5</code></td>
+                      <td>Structural type dependency and contract relationship.</td>
+                    </tr>
+                    <tr>
+                      <td><code>IMPORTS</code></td>
+                      <td>File $\to$ External Symbol / Package</td>
+                      <td><code>1.0</code></td>
+                      <td>Module dependency boundary linkage.</td>
+                    </tr>
+                    <tr>
+                      <td><code>CONTAINS</code></td>
+                      <td>File $\to$ Declared Symbol</td>
+                      <td><code>0.8</code></td>
+                      <td>Syntactic lexical containment within source file.</td>
+                    </tr>
+                    <tr>
+                      <td><code>CONTAINS_FILE</code></td>
+                      <td>Directory $\to$ Contained File</td>
+                      <td><code>0.4</code></td>
+                      <td>Filesystem directory containment hierarchy.</td>
+                    </tr>
+                    <tr>
+                      <td><code>CONTAINS_DIR</code></td>
+                      <td>Workspace / Parent Dir $\to$ Subdirectory</td>
+                      <td><code>0.2</code></td>
+                      <td>Top-level project scaffolding reachability.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pillar 4: Strict Context Condensation & Token Budget Math -->
+            <div class="glass-card" style="margin-bottom: 24px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">⚖️</span>
+                <h4 id="sec-omni-budget" style="font-size: 1.05rem; color: #f59e0b; margin: 0; font-weight: 700;">4. Strict Context Condensation &amp; Token Budget Math (&le; 1,500 Tokens)</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                A primary reason AI coding agents hallucinate is <strong>context starvation</strong>: a retrieval tool dumps 20,000 tokens of raw file text, exhausting the model's working window. Omni-Graph solves this with a two-tier condenser backed by Personalized PageRank (PPR):
+              </p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px;">
+                  <div style="font-weight: 700; color: #f59e0b; font-size: 0.88rem; margin-bottom: 6px;">Personalized PageRank (PPR) Ranking</div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.55;">
+                    Runs power-iteration ($\alpha = 0.85$, 25 iterations) centered on the root symbol vector $\mathbf{p}_0$. Hub callers and tightly-coupled orchestrators are prioritized, while leaf helpers are gracefully deprioritized.
+                  </p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px;">
+                  <div style="font-weight: 700; color: #34d399; font-size: 0.88rem; margin-bottom: 6px;">Strict Mathematical Budget SLA</div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.55;">
+                    Assuming 1 token $\approx 4$ characters, total response characters are capped at $C_{\text{max}} = 6,000$ ($C_{\text{root}} \le 300$, $C_{\text{neighbors}} \le 3,800$, $C_{\text{edges}} \ge 1,800$). SLA guarantees $\le 1,500$ tokens regardless of graph size!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ==================================================================== -->
+          <!-- THEME 3: AUTONOMOUS ARCHITECTURE & REAL-TIME SYNC                    -->
+          <!-- ==================================================================== -->
+          <div style="margin-top: 48px; margin-bottom: 32px;">
+            <div class="chapter-badge" style="background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); margin-bottom: 8px;">Theme 3 · Architectural Intelligence</div>
+            <h3 class="section-h2" id="sec-omni-realtime" style="margin-top: 0; margin-bottom: 12px; font-size: 1.55rem;">
+              ⚡ Autonomous Architecture &amp; Real-Time Sync: Consistency Under Active Editing
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.94rem; line-height: 1.65; margin-bottom: 20px;">
+              Enterprise codebases are living organisms that change every second. Omni-Graph provides continuous architectural clarity, quantified blast-radius analysis, and instantaneous synchronization across file edits and Git worktrees:
+            </p>
+
+            <!-- Subsystem 1: AI-Native Galaxy Subsystems & Clustering -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🌌</span>
+                <h4 id="sec-omni-galaxies" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">AI-Native Galaxy Subsystems &amp; Louvain / Leiden Modularity Clustering</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                Software repositories are not flat folder trees—they are scale-free directed networks. Omni-Graph partitions codebases into cohesive, self-contained architectural domains called <strong>Galaxy Subsystems</strong> using Louvain and Leiden community detection:
+              </p>
+              <div id="sec-omni-cosmology">
+                <div class="callout callout-theory" style="margin-bottom: 14px;">
+                  <div class="callout-header">Overcoming George Miller's Human Working Memory Ceiling ($7 \pm 2$ or $K \le 15$)</div>
+                  <div class="callout-body" style="font-size: 0.86rem; line-height: 1.6;">
+                    Legacy tools artificially force codebases into a maximum of 15 clusters to match human working memory limits. On a large enterprise repository, this causes severe architectural conflation, dumping orthogonal domains into artificial mega-blobs. Because LLMs have vast context capacity, Omni-Graph deploys a <strong>Scale-Adaptive Cosmology Engine</strong>:
+                    <br><br>
+                    <strong>1. Sub-Linear Adaptive Target:</strong> Scales dynamically with total repository AST nodes:
+                    $$K_{\text{adaptive}}(N) = \text{clamp}\left(\lfloor 3.5 \cdot N^{0.35} \rfloor, \, 5, \, 150\right)$$
+                    <br>
+                    <strong>2. Newman Modularity Differential Guard ($\Delta Q$):</strong> Only merges communities if modularity degradation $\Delta Q \ge -\epsilon$ ($\epsilon = 0.05$). Decoupled architectural boundaries are preserved rather than forced into unnatural unions.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subsystem 2: Robert C. Martin Coupling & Blast-Radius Contracts -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">📐</span>
+                <h4 id="sec-omni-coupling" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">Robert C. Martin Coupling Metrics &amp; Dynamic Blast-Radius Analysis</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                Before an autonomous agent refactors a symbol, it must know the exact blast radius. Omni-Graph calculates afferent coupling ($C_a$), efferent coupling ($C_e$), instability ($I = \frac{C_e}{C_a + C_e}$), abstractness ($A$), and distance from the Main Sequence ($D = |A + I - 1|$):
+              </p>
+              <div class="table-wrapper" style="margin-bottom: 16px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Architectural Role</th>
+                      <th>Instability ($I$)</th>
+                      <th>Subsystem Characteristics</th>
+                      <th>Agent Modification Strategy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>Core Foundation</code></td>
+                      <td>$I \le 0.25$</td>
+                      <td>Heavy incoming callers ($C_a \gg C_e$), shared domain types, zero external knowledge.</td>
+                      <td><strong style="color: #fb7185;">CRITICAL RISK:</strong> High blast radius. Must preserve backward-compatible signatures.</td>
+                    </tr>
+                    <tr>
+                      <td><code>Domain Service</code></td>
+                      <td>$0.25 < I \le 0.65$</td>
+                      <td>Balanced business logic, moderate internal abstractions with external service calls.</td>
+                      <td><strong style="color: #facc15;">MODERATE RISK:</strong> Verify intra-galaxy callers and direct interface contracts.</td>
+                    </tr>
+                    <tr>
+                      <td><code>Orchestrator / Leaf</code></td>
+                      <td>$I > 0.65$</td>
+                      <td>High outgoing dependencies ($C_e \gg C_a$), API controllers, CLI routers, leaves.</td>
+                      <td><strong style="color: #34d399;">LOW RISK:</strong> Contained blast radius. Safe to refactor implementation details.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="callout callout-success" style="margin: 0;">
+                <div class="callout-header">Dynamic Blast-Radius Contract: <code>GET /api/galaxy/boundary?symbol=X</code></div>
+                <div class="callout-body" style="font-size: 0.86rem; line-height: 1.6;">
+                  Returns instantaneous containment analysis: <code>🛡️ Contained Internal</code> (safe, all callers inside galaxy), <code>⚠️ Boundary Crossing</code> (foreign callers detected with exact file/line provenance), or <code>🔌 Isolated</code> (leaf / entrypoint).
+                </div>
+              </div>
+            </div>
+
+            <!-- Subsystem 3: Real-Time Live Watcher & The Airplane Airlock -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">👁️</span>
+                <h4 id="sec-omni-live-sync" style="font-size: 1.05rem; color: var(--accent-emerald); margin: 0; font-weight: 700;">Real-Time Live Watcher: Instant Code Updates with Zero Broken Links</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                When developers or coding agents modify code, older indexers suffer from <strong>torn reads and severed foreign callers</strong>. Omni-Graph solves this with a reactive watcher guaranteeing 100% relational integrity across every edit:
+              </p>
+              <!-- Layman Mental Model Callout -->
+              <div class="callout callout-theory" style="margin-bottom: 16px;">
+                <div class="callout-header">💡 Layman's Mental Model: The Airplane Airlock Engine Swap</div>
+                <div class="callout-body" style="font-size: 0.86rem; line-height: 1.6;">
+                  <strong>Replacing an engine mid-flight without spilling a drop of fuel:</strong> In traditional indexers, modifying a file was like ripping out an engine: foreign caller links across the codebase snapped, and for several seconds queries returned half-missing data. Omni-Graph builds a pressurized airlock around the edited file: it catalogs all incoming caller lines, swaps the AST and vectors in a single atomic database transaction, and reconnects every foreign caller simultaneously. AI agents never experience torn reads or severed caller edges!
+                </div>
+              </div>
+              <div class="callout callout-theory" style="margin: 0;">
+                <div class="callout-header">📊 Live Nanometer Fidelity Diagnostics</div>
+                <div class="callout-body" style="font-size: 0.86rem; line-height: 1.6;">
+                  Verify codebase health anytime via CLI: <code>./scripts/omni watch fidelity PolyTuring</code>
+                  <br><br>
+                  <pre style="background: var(--code-bg); padding: 10px 12px; border-radius: 6px; font-size: 0.82rem; color: var(--code-text); margin: 0;">
+🔬 Nanometer Fidelity Diagnostics for [PolyTuring]:
+  • Fidelity Score:            1.0000 (100% Relational Parity)
+  • Convergence State:         CONVERGED
+  • Total Graph Nodes:         4,461 | Total Graph Edges: 10,580
+  • Dangling Directory Edges:  0     | Unresolved Forward Edges: 0</pre>
+                  <br>
+                  <em>MBSE Extensible Grammar Architecture: Preparing support for MATLAB (<code>.m</code>) and Simulink (<code>.slx</code>) signal graphs.</em>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subsystem 4: Ephemeral Branch Fabric (EBF) & Git Worktrees -->
+            <div class="glass-card" style="margin-bottom: 24px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🌿</span>
+                <h4 id="sec-omni-ebf" style="font-size: 1.05rem; color: var(--accent-emerald); margin: 0; font-weight: 700;">Ephemeral Branch Fabric (EBF) &amp; Git Worktrees</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                Modern AI pair-programming agents frequently create Git worktrees to test experimental refactors in parallel. Omni-Graph handles this automatically without full-repo re-indexing:
+              </p>
+              <div class="callout callout-theory" style="margin-bottom: 16px;">
+                <div class="callout-header">💡 Layman's Mental Model: Browser Tabs for Code</div>
+                <div class="callout-body" style="font-size: 0.86rem; line-height: 1.6;">
+                  Think of Git Worktrees like having multiple browser tabs open for the same web application. You or 4 parallel AI agents can work on <code>feat-checkout</code> and <code>refactor-auth</code> simultaneously in separate directories without branch-switching friction. Omni-Graph discovers active worktrees in &lt;5 microseconds, indexes them concurrently, and live-updates whichever folder you edit.
+                </div>
+              </div>
+
+              <!-- Interactive Zoomable Canvas: EBF Multi-Worktree Architecture -->
+              <div class="canvas-container">
+                <div class="canvas-header-bar">
+                  <span class="canvas-type-tag">Architecture Blueprint · Ephemeral Branch Fabric (EBF)</span>
+                  <div class="canvas-controls-group">
+                    <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                    <span class="zoom-level-badge">100%</span>
+                    <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                    <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                    <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                      <span>Theater</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="canvas-viewport">
+                  <div class="canvas-content-surface">
+                    <pre class="mermaid">
 flowchart TB
     Trunk["🌳 Trunk Workspace (Parent)<br/>e.g. ecommerce-platform"]
 
@@ -1116,114 +1077,56 @@ flowchart TB
     Cascade --> WatcherPool
     LPAInherit --> Storage
     WatcherPool -.->|Live Invalidation| Storage
-                </pre>
+                    </pre>
+                  </div>
+                </div>
+                <div class="canvas-caption">Figure 1.4: Ephemeral Branch Fabric (EBF) Multi-Worktree Auto-Cascade &amp; Live-Watch Dataflow</div>
               </div>
             </div>
-            <div class="canvas-caption">Figure 1.2: Ephemeral Branch Fabric (EBF) Multi-Worktree Auto-Cascade & Live-Watch Dataflow</div>
           </div>
 
-          <div class="callout callout-theory">
-            <div class="callout-header">Multi-Worktree Concurrency & Branch Isolation</div>
-            <div class="callout-body">
-              When parallel AI agents develop multiple strategies simultaneously (such as <code>feat-stripe-v2</code>, <code>refactor-auth-jwt</code>, and <code>hotfix-cart-lock</code>), EBF enforces strict SurrealDB record-level partition isolation (<code>workspace = "&lt;worktree_id&gt;"</code>) while sharing the parent LPA community cluster seeds. Each worktree enjoys independent sub-100ms incremental file watching without cross-talk or lock contention.
-            </div>
-          </div>
+          <!-- ==================================================================== -->
+          <!-- THEME 4: THE DEVELOPER EXPERIENCE — PLUG, PLAY & QUERY               -->
+          <!-- ==================================================================== -->
+          <div style="margin-top: 48px; margin-bottom: 24px;">
+            <div class="chapter-badge" style="background: rgba(168, 85, 247, 0.12); color: var(--accent-violet); margin-bottom: 8px;">Theme 4 · Tooling &amp; Developer Experience</div>
+            <h3 class="section-h2" id="sec-omni-agentic-triad" style="margin-top: 0; margin-bottom: 12px; font-size: 1.55rem;">
+              🛠️ The Developer Experience: Plug, Play &amp; Query
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.94rem; line-height: 1.65; margin-bottom: 20px;">
+              Whether your autonomous agent runs inside an IDE with Model Context Protocol (MCP), in a terminal via CLI, or via REST APIs in CI/CD, Omni-Graph provides zero-friction developer tooling:
+            </p>
 
-          <h3 class="section-h2" id="sec-omni-ast">Polyglot AST Grammar & Struct Field Extraction</h3>
-          <p>
-            Omni-Graph utilizes Tree-Sitter grammars compiled natively in Rust. Unlike shallow regex matchers, Omni-Graph models true language semantics across four enterprise languages:
-          </p>
-
-          <ul>
-            <li><strong>Rust</strong>: Functions, methods in <code>impl</code> blocks (with <code>DECLARES</code> edges from structs), <code>struct</code> declarations with child <code>field_declaration</code> nodes (with <code>CONTAINS</code> and <code>REFERENCES</code> edges), <code>enum_item</code>, <code>trait_item</code>, <code>macro_definition</code>, and <code>macro_invocation</code>.</li>
-            <li><strong>Go</strong>: Package declarations, function declarations, method declarations with pointer receiver binding, <code>type_spec</code> structs with member <code>field_declaration</code> nodes, and discrete <code>import_spec</code> symbols.</li>
-            <li><strong>TypeScript / JavaScript</strong>: Lexical arrow functions, classes, <code>interface_declaration</code> with child <code>property_signature</code> nodes, type aliases, and multi-symbol named imports (<code>import { A, B }</code>).</li>
-            <li><strong>Python</strong>: Synchronous and <code>async</code> coroutine definitions, class definitions with multi-inheritance tracking, call sites, and multi-symbol imports (<code>from m import A, B</code>).</li>
-          </ul>
-
-          <div class="callout callout-math">
-            <div class="callout-header">Relational Edge Graph Schema</div>
-            <div class="callout-body">
-              Every edge in the <code>linked_to</code> table models directed relationships:
-              <br>
-              $$\text{Node}_{\text{source}} \xrightarrow[\text{category}]{\text{edge\_type}} \text{Node}_{\text{target}}$$
-              Where $\text{edge\_type} \in \{\text{CALLS}, \text{IMPORTS}, \text{CONTAINS}, \text{IMPLEMENTS}, \text{REFERENCES}\}$ and $\text{category} \in \{\text{EXTRACTED}, \text{INFERRED}\}$.
-            </div>
-          </div>
-
-          <h3 class="section-h2" id="sec-omni-budget">Two-Tier Context Condenser & Graph-RAG Token Budget Math</h3>
-          <p>
-            A common failure mode in code assistants is <strong>context starvation</strong>: a retrieval tool dumps 8,000 tokens of raw source code, blowing past agent context windows and truncating essential architectural call graphs. Omni-Graph enforces a mathematical token budget guarantee:
-          </p>
-
-          <div class="callout callout-theory">
-            <div class="callout-header">Mathematical Budget SLA: $\le 1,500$ Tokens</div>
-            <div class="callout-body">
-              Given that 1 LLM token $\approx 4$ characters of source code, the total character budget is capped at $C_{\text{max}} = 6,000$ characters:
-              <br><br>
-              $$C_{\text{total}} = C_{\text{root}} + \min(C_{\text{neighbors}}, 3800) + C_{\text{edges}} + C_{\text{macro}} \le 6,000 \text{ chars}$$
-              <br>
-              1. <strong>Seed / Root Symbols ($C_{\text{root}}$)</strong>: Receive full code snippets (bounded to 300 chars max).<br>
-              2. <strong>1-Hop Neighbors ($C_{\text{neighbors}}$)</strong>: Compressed to concise 1-line signatures (e.g. <code>fn authenticate(user: &User) -> Result</code>), strictly bounded at 3,800 characters.<br>
-              3. <strong>Structural Graph Traces ($C_{\text{edges}}$)</strong>: Reserved $\ge 1,800$ characters for structural relations: <code>source ──[CALLS]──▶ target</code>.<br>
-              4. <strong>Result</strong>: Guaranteed $\le 1,500$ tokens regardless of graph density or codebase scale!
-            </div>
-          </div>
-
-          <h3 class="section-h2" id="sec-omni-relational">SurrealDB Relational Indexing & Zero-Blackout Re-indexing</h3>
-          <p>
-            SurrealDB v2 handles both relational graph traversals and HNSW vector searches. In Round 4, four dedicated relational indexes were added to <code>linked_to</code>:
-          </p>
-
-          <div class="code-container">
-            <div class="code-header">
-              <div class="code-header-left">
-                <span class="code-lang-tag">SURREALQL</span>
-                <span class="code-file-path">src/db/schema.surql</span>
+            <!-- The Unified Agentic Triad -->
+            <div class="glass-card" style="margin-bottom: 20px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">⚡</span>
+                <h4 id="sec-omni-triad" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">The Unified Agentic Triad: Brain, Nervous System &amp; Hands</h4>
               </div>
-              <button class="copy-btn" data-target="surql-indexes" title="Copy code snippet">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Copy</span>
-              </button>
-            </div>
-            <pre><code id="surql-indexes">-- Sub-millisecond graph edge traversals & caller lookups
-DEFINE INDEX idx_edge_workspace ON TABLE linked_to FIELDS workspace;
-DEFINE INDEX idx_edge_in        ON TABLE linked_to FIELDS in;
-DEFINE INDEX idx_edge_out       ON TABLE linked_to FIELDS out;
-DEFINE INDEX idx_edge_out_ws    ON TABLE linked_to FIELDS workspace, out;
-DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code></pre>
-          </div>
-
-          <p>
-            During live file modifications, the live watcher daemon performs an <strong>atomic zero-blackout swap</strong>: the HuggingFace TEI vector embedding is computed <em>prior</em> to pruning previous AST nodes. This eliminates the 404 deletion gap from ~250ms down to $\approx 1$ms.
-          </p>
-
-          <h3 class="section-h2" id="sec-omni-triad">The Unified Agentic Triad: Native MCP, Ergonomic CLI &amp; Cognitive Playbook</h3>
-          <p>
-            Modern AI coding assistants operate across diverse host environments—from IDE-integrated agents with structured function-calling to autonomous terminal agents and automated CI/CD pipelines. Omni-Graph coordinates across three complementary, zero-friction execution modalities backed by the same high-performance Rust core:
-          </p>
-
-          <div class="canvas-container">
-            <div class="canvas-header-bar">
-              <span class="canvas-type-tag">Agentic Architecture · The Triad Blueprint</span>
-              <div class="canvas-controls-group">
-                <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
-                <span class="zoom-level-badge">100%</span>
-                <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
-                <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
-                <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-                  <span>Theater</span>
-                </button>
-              </div>
-            </div>
-            <div class="canvas-viewport">
-              <div class="canvas-content-surface">
-                <pre class="mermaid">
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 14px;">
+                Omni-Graph coordinates across three complementary modalities backed by the same high-performance Rust core:
+              </p>
+              <div class="canvas-container">
+                <div class="canvas-header-bar">
+                  <span class="canvas-type-tag">Agentic Architecture · The Triad Blueprint</span>
+                  <div class="canvas-controls-group">
+                    <button class="canvas-tool-btn zoom-out-btn" title="Zoom Out">−</button>
+                    <span class="zoom-level-badge">100%</span>
+                    <button class="canvas-tool-btn zoom-in-btn" title="Zoom In">+</button>
+                    <button class="canvas-tool-btn zoom-reset-btn" title="Reset Zoom">⟲</button>
+                    <button class="canvas-tool-btn fullscreen-btn" title="View Fullscreen Theater">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                      <span>Theater</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="canvas-viewport">
+                  <div class="canvas-content-surface">
+                    <pre class="mermaid">
 flowchart TB
     subgraph Brain["🧠 The Brain: Agent Skill (SKILL.md)"]
         S1["Tactical Mental Model"]
-        S2["Reconnaissance Progression: Macro → Meso → Micro"]
+        S2["Reconnaissance Ladder: Macro → Meso → Micro"]
         S3["Guardrail: Bounded 1500-Token Slicing"]
     end
 
@@ -1243,27 +1146,24 @@ flowchart TB
     Brain -->|Falls Back in Terminal| Hands
     Nervous -->|Fast AST Queries| CoreDaemon["omni-rust-app (:8080)"]
     Hands -->|Fast Local Execution| CoreDaemon
-</pre>
+                    </pre>
+                  </div>
+                </div>
+                <div class="canvas-caption">Figure 1.5: The Unified Agentic Triad — Cognitive Skill, Native MCP, &amp; Ergonomic CLI</div>
               </div>
-            </div>
-          </div>
 
-          <p>
-            The native Model Context Protocol (MCP) server executes hermetically via <strong><code>uv run --script</code></strong> (PEP 723 inline dependency metadata). It guarantees zero environment drift, requires no manual virtualenv lifecycle management, and provides first-class native tool dispatch for Claude Desktop, Cursor, Windsurf, Roo Code, and the Antigravity CLI:
-          </p>
-
-          <div class="code-container">
-            <div class="code-header">
-              <div class="code-header-left">
-                <span class="code-lang-tag">JSON</span>
-                <span class="code-file-path">claude_desktop_config.json</span>
-              </div>
-              <button class="copy-btn" data-target="mcp-config" title="Copy code snippet">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Copy</span>
-              </button>
-            </div>
-            <pre><code id="mcp-config">{
+              <div class="code-container" style="margin-top: 16px;">
+                <div class="code-header">
+                  <div class="code-header-left">
+                    <span class="code-lang-tag">JSON</span>
+                    <span class="code-file-path">claude_desktop_config.json / cursor_config.json</span>
+                  </div>
+                  <button class="copy-btn" data-target="mcp-config" title="Copy code snippet">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy</span>
+                  </button>
+                </div>
+                <pre><code id="mcp-config">{
   "mcpServers": {
     "omni-graph": {
       "command": "uv",
@@ -1279,114 +1179,45 @@ flowchart TB
     }
   }
 }</code></pre>
-          </div>
-
-          <h3 class="section-h2" id="sec-omni-topological">Topological Containment Backbone &amp; Personalized PageRank (PPR)</h3>
-          <p>
-            In a random software call graph $G(V, E)$, a giant connected component only exists when the average vertex degree exceeds the percolation threshold $\langle k \rangle = \frac{2|E|}{|V|} > 1.0$. Because software call graphs are naturally sparse ($|E|/|V| \approx 1.07$), codebases break into disjoint orphan clusters without containment.
-          </p>
-          <p>
-            Omni-Graph introduces <strong>Topological Containment Edges</strong> connecting workspaces $\to$ folders $\to$ files $\to$ declared symbols, ensuring 100% DAG reachability from root:
-          </p>
-
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Edge Type</th>
-                  <th>Source $\to$ Target</th>
-                  <th>Weight ($w$)</th>
-                  <th>Purpose</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>IMPLEMENTS</code></td>
-                  <td>Struct $\to$ Trait / Interface</td>
-                  <td><code>3.0</code></td>
-                  <td>Strong semantic polymorphism binding</td>
-                </tr>
-                <tr>
-                  <td><code>CALLS</code></td>
-                  <td>Function $\to$ Function / Method</td>
-                  <td><code>2.0</code></td>
-                  <td>Control flow execution chain</td>
-                </tr>
-                <tr>
-                  <td><code>TYPE_REF</code></td>
-                  <td>Variable $\to$ Struct / Class Type</td>
-                  <td><code>1.5</code></td>
-                  <td>Structural type dependency</td>
-                </tr>
-                <tr>
-                  <td><code>IMPORTS</code></td>
-                  <td>File $\to$ External Symbol / Package</td>
-                  <td><code>1.0</code></td>
-                  <td>Module dependency boundary</td>
-                </tr>
-                <tr>
-                  <td><code>CONTAINS</code></td>
-                  <td>File $\to$ Declared Symbol</td>
-                  <td><code>0.8</code></td>
-                  <td>Syntactic lexical containment</td>
-                </tr>
-                <tr>
-                  <td><code>CONTAINS_FILE</code></td>
-                  <td>Directory $\to$ Contained File</td>
-                  <td><code>0.4</code></td>
-                  <td>Filesystem directory containment</td>
-                </tr>
-                <tr>
-                  <td><code>CONTAINS_DIR</code></td>
-                  <td>Workspace / Parent Dir $\to$ Subdirectory</td>
-                  <td><code>0.2</code></td>
-                  <td>Hierarchical project scaffolding</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <p>
-            To prevent naive FIFO truncation from dropping critical orchestrators when neighbor sets exceed 60 nodes, Omni-Graph executes <strong>Personalized PageRank (PPR) power iteration</strong> ($\alpha = 0.85$, 25 iterations) centered on the root symbol vector $\mathbf{p}_0$:
-          </p>
-
-          <div class="callout-card" style="border-left: 4px solid var(--accent-violet);">
-            <div class="callout-header">
-              <span class="callout-icon">📐</span>
-              <span class="callout-title">Power-Iteration PPR Mathematical Formulation</span>
+              </div>
             </div>
-            <div class="callout-body">
-              $$\mathbf{p}^{(t+1)} = \alpha \mathbf{A}^\top \mathbf{D}^{-1} \mathbf{p}^{(t)} + (1 - \alpha) \mathbf{p}_0$$
-              where $\mathbf{A}$ is the weighted adjacency matrix, $\mathbf{D}$ is the diagonal degree matrix, and $\mathbf{p}_0$ distributes initial restart mass uniformly across root symbols. Neighbors are sorted by $\mathbf{p}^*$ stationary scores, guaranteeing that interconnected hub callers rank significantly higher than isolated leaf functions.
+
+            <!-- SurrealDB Relational Indexing & High-Throughput FIFO Queue -->
+            <div class="glass-card" style="margin-bottom: 24px; padding: 22px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 1.1rem;">🗄️</span>
+                <h4 id="sec-omni-relational" style="font-size: 1.05rem; color: var(--accent-cyan); margin: 0; font-weight: 700;">SurrealDB Relational Indexing &amp; Enterprise FIFO Ingestion Queue</h4>
+              </div>
+              <p style="font-size: 0.90rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 12px;">
+                SurrealDB v2 handles both relational graph traversals and HNSW vector searches. Five dedicated B-tree indexes guarantee sub-millisecond edge lookups:
+              </p>
+              <div class="code-container" style="margin-bottom: 16px;">
+                <div class="code-header">
+                  <div class="code-header-left">
+                    <span class="code-lang-tag">SURREALQL</span>
+                    <span class="code-file-path">src/db/schema.surql</span>
+                  </div>
+                  <button class="copy-btn" data-target="surql-indexes" title="Copy code snippet">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy</span>
+                  </button>
+                </div>
+                <pre><code id="surql-indexes">-- Sub-millisecond graph edge traversals &amp; caller lookups
+DEFINE INDEX idx_edge_workspace ON TABLE linked_to FIELDS workspace;
+DEFINE INDEX idx_edge_in        ON TABLE linked_to FIELDS in;
+DEFINE INDEX idx_edge_out       ON TABLE linked_to FIELDS out;
+DEFINE INDEX idx_edge_out_ws    ON TABLE linked_to FIELDS workspace, out;
+DEFINE INDEX idx_edge_in_ws     ON TABLE linked_to FIELDS workspace, in;</code></pre>
+              </div>
+              <div id="sec-omni-fifo">
+                <ul style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.6; padding-left: 20px; margin: 0;">
+                  <li><strong>Tokio FIFO Ingestion Queue:</strong> Serializes background indexing tasks through a bounded <code>tokio::sync::mpsc</code> channel to eliminate SurrealDB v2 write conflicts, enforcing atomic workspace purges with zero zombie nodes.</li>
+                  <li><strong>3-Layer Hybrid Ripgrep Filter:</strong> Dynamic <code>.gitignore</code> hot-reloading with static Layer 1 invariants, eliminating event storms and indexing bloat.</li>
+                  <li><strong>Interactive OpenAPI 3.0.3 Explorer:</strong> Accessible at <code>/api-docs</code> and <code>/api/openapi.json</code>, featuring Year 2500 cosmic liquid-glass styling, full schema definitions for all 9 endpoints, live query runner, and latency telemetry.</li>
+                </ul>
+              </div>
             </div>
           </div>
-
-          <h3 class="section-h2" id="sec-omni-sair">Enterprise Disambiguation: Scope-Aware Import Resolution (SAIR) &amp; Content Partitioning</h3>
-          <p>
-            In enterprise polyglot repositories, high-precision code intelligence requires solving two fundamental computational challenges:
-          </p>
-          <ol style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>Lexical Scope Ambiguity</strong>: Common polymorphic function identifiers (such as <code>new()</code>, <code>run()</code>, <code>init()</code>, <code>parse()</code>) demand lexical namespace scoping to prevent false-positive dependency edges across unrelated packages.</li>
-            <li><strong>Cross-Modal Semantic Shadowing</strong>: Verbose architectural documentation and narrative changelogs can semantically overshadow concise code signatures during dense vector retrieval.</li>
-          </ol>
-          <p>
-            Omni-Graph solves both challenges with mathematical precision:
-          </p>
-          <ul style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>3-Tier SAIR Resolution Ladder</strong>: Local file scope first $\to$ Directory/module namespace second $\to$ Generic Verb Blacklist (preventing spurious cross-package edge synthesis for common generic verbs).</li>
-            <li><strong>Dual-Tier Content Partitioning</strong>: Storage and vector indexes are partitioned into dedicated code and documentation tiers. Vector search and Graph-RAG queries default to <code>include_docs=false</code>, querying verified source code AST nodes with sub-millisecond precision unless architectural documentation is explicitly requested.</li>
-          </ul>
-
-          <h3 class="section-h2" id="sec-omni-fifo">Enterprise Ingestion: FIFO Task Queue, OpenAPI 3.0 &amp; Cognitive AST Intelligence</h3>
-          <p>
-            Omni-Graph features enterprise-grade ingestion serialization, public API documentation, and path-aware AST resolution:
-          </p>
-          <ul style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>Tokio FIFO Ingestion Queue</strong>: Serializes background indexing tasks through a bounded <code>tokio::sync::mpsc</code> channel to eliminate SurrealDB v2 write-conflict aborts (<code>1001: Commit transaction resulted in a conflict</code>). Automatically enforces atomic workspace purge for 100% clean graphs with zero zombie nodes.</li>
-            <li><strong>3-Layer Hybrid Ripgrep Filter</strong>: Dynamic <code>.gitignore</code> hot-reloading with static Layer 1 invariants and non-git directory fallback, eliminating live-watcher event storms and indexing bloat.</li>
-            <li><strong>Interactive OpenAPI 3.0.3 Explorer</strong>: Accessible at <code>/api-docs</code> and <code>/api/openapi.json</code>, featuring Year 2500 cosmic liquid-glass styling, full schema definitions for all 9 endpoints, live query runner, and latency telemetry.</li>
-            <li><strong>Path-Based AST &amp; Line Intelligence</strong>: First-class symbol, reference, and condensation queries for exact file paths (e.g. <code>src/watcher/mod.rs</code>) and directories, accompanied by the 5-step Agent Reconnaissance Ladder in <code>SKILL.md</code>.</li>
-          </ul>
         </div>
       </section>
 
