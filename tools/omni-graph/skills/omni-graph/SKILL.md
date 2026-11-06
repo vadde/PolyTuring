@@ -51,7 +51,7 @@ When executing an Omni-Graph task, follow this strict decision hierarchy:
 
 ```
                   ┌────────────────────────────────────────┐
-                  │ Does your environment expose native   │
+                  │ Does your environment expose native    │
                   │ 'omni_*' tools in its active toolset?  │
                   └───────────────────┬────────────────────┘
                                       │
