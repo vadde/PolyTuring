@@ -91,6 +91,13 @@ A recursive divide-and-conquer code and database audit of `tools/omni-graph/src/
 - **AC-051**: Traversing cyclic filesystem symlinks (e.g. `a/loop -> ..` or mutual circular links) terminates deterministically in $O(1)$ lookup per directory without recursion loop, process hang, or stack overflow.
 - **AC-052**: A symlinked file within the workspace is indexed as a dedicated `symlink` node with a `LINKS_TO` edge pointing directly to the canonical target file, producing zero duplicate AST function/symbol declarations and zero duplicate community assignments.
 - **AC-053**: The incremental watcher (`IncrementalPipeline`) safely resolves file or directory symlink modifications, deletions, or creations without panic.
+- **AC-054**: MATLAB `.m` files with single-return or multi-return functions (`function [y1, y2] = name(x1, x2)`) are parsed into first-class `function` nodes with accurate line boundaries and in-body `CALLS` edges.
+- **AC-055**: MATLAB `classdef` definitions with single or multiple inheritance (`classdef Foo < Bar & Baz`) emit `class` nodes and valid `EXTENDS` edges to all base classes.
+- **AC-056**: Properties inside MATLAB `properties` blocks emit `property` nodes linked with `CONTAINS` edges from the enclosing class.
+- **AC-057**: Class methods emit `method` or `constructor` nodes with `DECLARES` or `CONTAINS` edges from the enclosing class.
+- **AC-058**: Method invocations with receiver targets (e.g. `FilterEngine.calculate(x)`) preserve root receiver objects as `REFERENCES` edges.
+- **AC-059**: MATLAB `import` statements (e.g. `import control.guidance.NavSystem;` or `import math.filters.*;`) emit `import` nodes and `IMPORTS` edges.
+- **AC-060**: Package directory hierarchies prefixed with `+` (e.g. `+control/+guidance/NavSystem.m`) synthesize `package` nodes (`control.guidance`) with `DECLARES` edges to contained classes and functions.
 
 ### 2.3 Non-Functional Requirements (NF)
 

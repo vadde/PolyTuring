@@ -3829,6 +3829,220 @@ def create_account():
         assert!(sql.contains("category = 'FILESYSTEM'"));
         assert!(sql.contains("COMMIT TRANSACTION;"));
     }
+
+    #[test]
+    fn test_r107_matlab_function_extraction() {
+        use omni_graph::parser::CodeParser;
+
+        let code = r#"
+function [filtered, residual] = filterSignals(raw_sig, threshold)
+    % Multi-return signal filtering function
+    gain = 2.5;
+    residual = raw_sig - threshold;
+    filtered = applyGain(residual, gain);
+    saturate(filtered);
+end
+
+function y = singleOutput(x)
+    y = x * 10;
+end
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "signals/filterSignals.m", code)
+            .expect("Should parse MATLAB file successfully");
+
+        // Verify function nodes
+        let f1 = res.nodes.iter().find(|n| n.label == "filterSignals").expect("filterSignals function node");
+        assert_eq!(f1.kind, "function");
+        assert_eq!(f1.language, "matlab");
+        assert_eq!(f1.line_start, 2);
+
+        let f2 = res.nodes.iter().find(|n| n.label == "singleOutput").expect("singleOutput function node");
+        assert_eq!(f2.kind, "function");
+        assert_eq!(f2.language, "matlab");
+        assert_eq!(f2.line_start, 10);
+
+        // Verify CALLS edges inside filterSignals
+        let calls_apply_gain = res.edges.iter().find(|e| {
+            e.source_id == f1.id && e.target_label == "applyGain" && e.edge_type == "CALLS"
+        });
+        assert!(calls_apply_gain.is_some(), "Should extract applyGain call");
+
+        let calls_saturate = res.edges.iter().find(|e| {
+            e.source_id == f1.id && e.target_label == "saturate" && e.edge_type == "CALLS"
+        });
+        assert!(calls_saturate.is_some(), "Should extract saturate call");
+    }
+
+    #[test]
+    fn test_r107_matlab_classdef_and_inheritance() {
+        use omni_graph::parser::CodeParser;
+
+        let code = r#"
+classdef FlightController < BaseController & Observable
+    properties (Access = public)
+        Kp double = 1.0
+        Ki double = 0.05
+        Kd double = 0.2
+    end
+    methods
+        function obj = FlightController(p, i, d)
+            obj.Kp = p;
+            obj.Ki = i;
+            obj.Kd = d;
+        end
+        function [u, state] = step(obj, error)
+            integral = computeIntegral(error);
+            u = obj.Kp * error + obj.Ki * integral;
+            state = obj.updateState(u);
+        end
+    end
+end
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "control/FlightController.m", code)
+            .expect("Should parse MATLAB classdef successfully");
+
+        // Verify class node
+        let cls = res.nodes.iter().find(|n| n.label == "FlightController" && n.kind == "class")
+            .expect("FlightController class node");
+        assert_eq!(cls.kind, "class");
+        assert_eq!(cls.language, "matlab");
+
+        // Verify multiple inheritance EXTENDS edges
+        let ext_base = res.edges.iter().find(|e| {
+            e.source_id == cls.id && e.target_label == "BaseController" && e.edge_type == "EXTENDS"
+        });
+        assert!(ext_base.is_some(), "Should emit EXTENDS edge to BaseController");
+
+        let ext_obs = res.edges.iter().find(|e| {
+            e.source_id == cls.id && e.target_label == "Observable" && e.edge_type == "EXTENDS"
+        });
+        assert!(ext_obs.is_some(), "Should emit EXTENDS edge to Observable");
+
+        // Verify properties
+        for prop_name in &["Kp", "Ki", "Kd"] {
+            assert!(
+                res.nodes.iter().any(|n| n.label == *prop_name && n.kind == "property"),
+                "Property node {} missing",
+                prop_name
+            );
+            let c_edge = res.edges.iter().find(|e| {
+                e.source_id == cls.id && e.target_label == *prop_name && e.edge_type == "CONTAINS"
+            });
+            assert!(c_edge.is_some(), "Should emit CONTAINS edge for property {}", prop_name);
+        }
+
+        // Verify constructor
+        let ctor = res.nodes.iter().find(|n| n.label == "FlightController" && n.kind == "constructor")
+            .expect("Constructor node");
+        assert_eq!(ctor.kind, "constructor");
+        let ctor_edge = res.edges.iter().find(|e| {
+            e.source_id == cls.id && e.target_label == "FlightController" && e.edge_type == "CONTAINS"
+        });
+        assert!(ctor_edge.is_some(), "Should emit CONTAINS edge to constructor");
+
+        // Verify method
+        let method = res.nodes.iter().find(|n| n.label == "step" && n.kind == "method")
+            .expect("step method node");
+        assert_eq!(method.kind, "method");
+        let method_edge = res.edges.iter().find(|e| {
+            e.source_id == cls.id && e.target_label == "step" && e.edge_type == "DECLARES"
+        });
+        assert!(method_edge.is_some(), "Should emit DECLARES edge to step method");
+
+        // Verify calls inside step method
+        let call_integral = res.edges.iter().find(|e| {
+            e.source_id == method.id && e.target_label == "computeIntegral" && e.edge_type == "CALLS"
+        });
+        assert!(call_integral.is_some(), "Should emit CALLS edge to computeIntegral");
+
+        let call_update = res.edges.iter().find(|e| {
+            e.source_id == method.id && e.target_label == "updateState" && e.edge_type == "CALLS"
+        });
+        assert!(call_update.is_some(), "Should emit CALLS edge to updateState");
+    }
+
+    #[test]
+    fn test_r107_matlab_receiver_preservation() {
+        use omni_graph::parser::CodeParser;
+
+        let code = r#"
+function runSimulation()
+    raw = SensorClient.readData();
+    FilterEngine.calculate(raw);
+end
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "sim/runSimulation.m", code)
+            .expect("Should parse MATLAB file successfully");
+
+        let fn_node = res.nodes.iter().find(|n| n.label == "runSimulation").expect("runSimulation node");
+
+        // Callee calls
+        assert!(res.edges.iter().any(|e| e.source_id == fn_node.id && e.target_label == "readData" && e.edge_type == "CALLS"));
+        assert!(res.edges.iter().any(|e| e.source_id == fn_node.id && e.target_label == "calculate" && e.edge_type == "CALLS"));
+
+        // Receiver preservation
+        assert!(res.edges.iter().any(|e| e.source_id == fn_node.id && e.target_label == "SensorClient" && e.edge_type == "REFERENCES"));
+        assert!(res.edges.iter().any(|e| e.source_id == fn_node.id && e.target_label == "FilterEngine" && e.edge_type == "REFERENCES"));
+    }
+
+    #[test]
+    fn test_r107_matlab_import_commands() {
+        use omni_graph::parser::CodeParser;
+
+        let code = r#"
+import control.guidance.NavSystem;
+import math.filters.*;
+
+function run()
+    x = 1;
+end
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "main.m", code)
+            .expect("Should parse MATLAB file with imports");
+
+        // Verify import nodes
+        let imports: Vec<_> = res.nodes.iter().filter(|n| n.kind == "import").collect();
+        assert_eq!(imports.len(), 2, "Should extract 2 import statements");
+
+        // Verify IMPORTS edges
+        assert!(res.edges.iter().any(|e| e.target_label == "NavSystem" && e.edge_type == "IMPORTS"));
+        assert!(res.edges.iter().any(|e| e.target_label == "filters" && e.edge_type == "IMPORTS"));
+    }
+
+    #[test]
+    fn test_r107_matlab_package_hierarchy() {
+        use omni_graph::parser::CodeParser;
+
+        let code = r#"
+classdef GuidanceComputer
+    methods
+        function compute(obj)
+        end
+    end
+end
+"#;
+
+        let res = CodeParser::parse_file("test-ws", "src/+aerospace/+gnc/GuidanceComputer.m", code)
+            .expect("Should parse package-scoped MATLAB file");
+
+        // Verify package node
+        let pkg_node = res.nodes.iter().find(|n| n.kind == "package" && n.label == "aerospace.gnc")
+            .expect("aerospace.gnc package node");
+        assert_eq!(pkg_node.file_path, "src/+aerospace/+gnc/GuidanceComputer.m");
+
+        // Verify DECLARES edge from package to class
+        let cls_node = res.nodes.iter().find(|n| n.kind == "class" && n.label == "GuidanceComputer")
+            .expect("GuidanceComputer class node");
+
+        let decl_edge = res.edges.iter().find(|e| {
+            e.source_id == pkg_node.id && e.target_id == Some(cls_node.id.clone()) && e.edge_type == "DECLARES"
+        });
+        assert!(decl_edge.is_some(), "Package should emit DECLARES edge to class GuidanceComputer");
+    }
 }
 
 

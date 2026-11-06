@@ -1,3 +1,35 @@
+### 2026-11-06 — MathWorks MATLAB (`.m`) AST Ingestion Engine (R-107)
+
+**Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  
+**SDLC Phase**: `testing` (AST Parser Expansion & Polyglot Hardening)  
+**Branch**: `feat/r107-matlab-ast-ingestion`  
+**Requirement**: `R-107` ([`specs/catalog/omni-graph-live-watcher-fidelity-parity.md`](file:///Users/aparv/Library/CloudStorage/OneDrive-Personal/G-Drive/Interviews/knowledge/PolyTuring/specs/catalog/omni-graph-live-watcher-fidelity-parity.md))  
+**Duration**: Complete  
+
+#### Executive Summary & Key Milestones Completed
+1. **Grammar Sub-Crate Engine Setup (`grammars/tree-sitter-matlab/`)**:
+   - Vendored official ABI 14 `tree-sitter-matlab` parser (`parser.c` and `scanner.c`) in `tools/omni-graph/grammars/tree-sitter-matlab/`.
+   - Resolved tree-sitter crate version pinning and ABI 15 incompatibilities with `tree-sitter = "0.22"`.
+2. **MATLAB Parser Wiring (`src/parser/mod.rs`)**:
+   - Added `"m"` file extension dispatch in `CodeParser::parse_file` utilizing `tree_sitter_matlab::language()`.
+   - Extracted standalone and multi-return functions (`function [y1, y2] = name(x1, x2)`) emitting `function` nodes and internal `CALLS` edges.
+   - Extracted `classdef` OOP classes with single and multiple inheritance (`classdef Foo < Bar & Baz`) emitting `class` nodes and `EXTENDS` edges.
+   - Extracted class properties inside `properties` blocks emitting `property` nodes linked with `CONTAINS` edges from the enclosing class.
+   - Extracted class methods and constructors (`parent_name == name`) emitting `constructor` (with `CONTAINS` edge) and `method` (with `DECLARES` edge).
+   - Preserved AST receivers on method/function invocations (e.g. `FilterEngine.calculate(x)`) emitting `REFERENCES` edges to the root receiver.
+   - Extracted MATLAB `import` commands (`import control.guidance.NavSystem;` and `import math.filters.*;`) emitting `import` nodes and `IMPORTS` edges.
+   - Synthesized package namespace nodes for `+pkg1/+pkg2` directory structures (e.g. `+aerospace/+gnc/GuidanceComputer.m` -> `aerospace.gnc`) with `DECLARES` edges to contained classes and functions.
+3. **Verification & Testing (`tests/unit_tests.rs`)**:
+   - Authored 5 dedicated unit tests:
+     - `test_r107_matlab_function_extraction`: Verifies multi-return functions and internal call graph edges.
+     - `test_r107_matlab_classdef_and_inheritance`: Verifies multiple inheritance (`EXTENDS`), properties (`CONTAINS`), constructors (`CONTAINS`), and methods (`DECLARES`).
+     - `test_r107_matlab_receiver_preservation`: Verifies receiver preservation (`REFERENCES` to `SensorClient`, `FilterEngine`).
+     - `test_r107_matlab_import_commands`: Verifies specific and wildcard import command extraction.
+     - `test_r107_matlab_package_hierarchy`: Verifies `+pkg` directory package node synthesis.
+   - All 118 unit tests pass (100% green, 0 clippy warnings).
+
+---
+
 ### 2026-11-06 — Filesystem Symlink Cycle Guarding & Alias Navigation (R-109)
 
 **Agent/Author**: Antigravity (Google DeepMind) & `@vadde`  

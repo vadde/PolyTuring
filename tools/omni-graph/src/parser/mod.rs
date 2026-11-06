@@ -108,6 +108,11 @@ impl CodeParser {
                 p.set_language(&tree_sitter_cpp::language()).ok()?;
                 ("cpp", p)
             }
+            "m" => {
+                let mut p = Parser::new();
+                p.set_language(&tree_sitter_matlab::language()).ok()?;
+                ("matlab", p)
+            }
             _ => return None,
         };
 
@@ -125,6 +130,45 @@ impl CodeParser {
             &mut nodes,
             &mut edges,
         );
+
+        // Package namespace extraction for MATLAB (+pkg1/+pkg2/...) (R-107)
+        if language_name == "matlab" && file_path.contains('+') {
+            let pkg_segments: Vec<&str> = file_path
+                .split('/')
+                .filter(|seg| seg.starts_with('+'))
+                .map(|seg| seg.trim_start_matches('+'))
+                .collect();
+
+            if !pkg_segments.is_empty() {
+                let package_name = pkg_segments.join(".");
+                let pkg_id = format!("{}:{}:package:{}", workspace, file_path, package_name);
+                nodes.push(ExtractedNode {
+                    id: pkg_id.clone(),
+                    workspace: workspace.to_string(),
+                    label: package_name.clone(),
+                    kind: "package".to_string(),
+                    file_path: file_path.to_string(),
+                    language: "matlab".to_string(),
+                    line_start: 1,
+                    line_end: 1,
+                    text: format!("package {}", package_name),
+                });
+
+                // Link package to all top-level classes and functions in this file
+                for n in &nodes {
+                    if n.id != pkg_id && (n.kind == "class" || n.kind == "function") {
+                        edges.push(ExtractedEdge {
+                            workspace: workspace.to_string(),
+                            source_id: pkg_id.clone(),
+                            target_label: n.label.clone(),
+                            target_id: Some(n.id.clone()),
+                            edge_type: "DECLARES".to_string(),
+                            category: "EXTRACTED".to_string(),
+                        });
+                    }
+                }
+            }
+        }
 
         Some(ParseResult { nodes, edges })
     }
@@ -312,6 +356,27 @@ impl CodeParser {
                     }
                 }
             }
+        } else if language == "matlab" {
+            // Examples:
+            // "import control.guidance.NavSystem;"
+            // "import math.filters.*;"
+            if let Some(import_part) = trimmed.strip_prefix("import ") {
+                let clean_import = import_part.trim().trim_end_matches(';').trim();
+                if clean_import.ends_with(".*") {
+                    let pkg_part = clean_import.trim_end_matches(".*");
+                    if let Some(last_seg) = pkg_part.rsplit('.').next() {
+                        let clean = last_seg.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        if !clean.is_empty() && !symbols.contains(&clean.to_string()) {
+                            symbols.push(clean.to_string());
+                        }
+                    }
+                } else if let Some(last_seg) = clean_import.rsplit('.').next() {
+                    let clean = last_seg.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                    if !clean.is_empty() && !symbols.contains(&clean.to_string()) {
+                        symbols.push(clean.to_string());
+                    }
+                }
+            }
         }
 
         symbols
@@ -376,6 +441,14 @@ impl CodeParser {
                     "constructor"
                 } else if kind == "macro_definition" {
                     "macro"
+                } else if language == "matlab" && current_parent_id.is_some() {
+                    let parent = current_parent_id.unwrap_or_default();
+                    let parent_name = parent.split(':').nth(2).unwrap_or("");
+                    if parent_name == name {
+                        "constructor"
+                    } else {
+                        "method"
+                    }
                 } else {
                     "function"
                 };
@@ -394,7 +467,7 @@ impl CodeParser {
                 });
 
                 if let Some(parent) = current_parent_id {
-                    let edge_type = if parent.ends_with(&name.to_string()) {
+                    let edge_type = if parent.ends_with(&name.to_string()) || node_kind == "constructor" {
                         "CONTAINS"
                     } else {
                         "DECLARES"
@@ -711,6 +784,32 @@ impl CodeParser {
                     }
                 }
 
+                // MATLAB: extract class inheritance (< SuperClass & SuperClass2) (R-107)
+                if kind == "class_definition" && language == "matlab" {
+                    let mut c_cursor = node.walk();
+                    for child in node.children(&mut c_cursor) {
+                        if child.kind() == "superclasses" {
+                            let mut s_cursor = child.walk();
+                            for super_child in child.children(&mut s_cursor) {
+                                if super_child.kind() == "property_name" || super_child.kind() == "identifier" {
+                                    let raw_name = &content[super_child.byte_range()];
+                                    let clean_name = raw_name.rsplit('.').next().unwrap_or(raw_name).trim();
+                                    if !clean_name.is_empty() {
+                                        edges.push(ExtractedEdge {
+                                            workspace: workspace.to_string(),
+                                            source_id: id.clone(),
+                                            target_label: clean_name.to_string(),
+                                            target_id: None,
+                                            edge_type: "EXTENDS".to_string(),
+                                            category: "EXTRACTED".to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 node_id = Some(id);
             }
         }
@@ -741,18 +840,21 @@ impl CodeParser {
         // Rust & Go: field_declaration
         // TS/JS: property_signature, public_field_definition, field_definition, property_definition
         // Java: field_declaration (variable_declarator)
+        // MATLAB: property (R-107)
         else if (kind == "field_declaration"
             || kind == "property_signature"
             || kind == "public_field_definition"
             || kind == "field_definition"
-            || kind == "property_definition")
+            || kind == "property_definition"
+            || (kind == "property" && language == "matlab"))
             // Prevent detached object literal properties (such as React inline styles: { cursor: 'pointer', color: '#fff' })
             // from creating isolated orphan nodes that collapse community clustering (R-062).
             && !(current_parent_id.is_none()
                 && (kind == "property_definition"
                     || kind == "property_signature"
                     || kind == "field_definition"
-                    || kind == "public_field_definition"))
+                    || kind == "public_field_definition"
+                    || kind == "property"))
         {
             let mut field_names = Vec::new();
             if let Some(name_node) = node.child_by_field_name("name").or_else(|| node.child_by_field_name("property")) {
@@ -778,12 +880,13 @@ impl CodeParser {
                 let snippet = &content[node.byte_range()];
                 let text = Self::safe_truncate(snippet, 300);
 
+                let field_kind = if kind == "property" { "property" } else { "field" };
                 let id = format!("{}:{}:{}:{}", workspace, file_path, name, start_pos.row + 1);
                 nodes.push(ExtractedNode {
                     id: id.clone(),
                     workspace: workspace.to_string(),
                     label: name.to_string(),
-                    kind: "field".to_string(),
+                    kind: field_kind.to_string(),
                     file_path: file_path.to_string(),
                     language: language.to_string(),
                     line_start: start_pos.row + 1,
@@ -847,6 +950,7 @@ impl CodeParser {
         // Rust: call_expression, method_call_expression, macro_invocation
         // JS/TS: call_expression, new_expression
         // Java: method_invocation, object_creation_expression
+        // MATLAB: function_call (R-107)
         else if kind == "call_expression"
             || kind == "method_call_expression"
             || kind == "call"
@@ -854,6 +958,7 @@ impl CodeParser {
             || kind == "macro_invocation"
             || kind == "method_invocation"
             || kind == "object_creation_expression"
+            || kind == "function_call"
         {
             if let Some(caller_id) = current_parent_id {
                 let callee_opt = node
@@ -887,11 +992,11 @@ impl CodeParser {
                         });
                     }
 
-                    // AST Receiver Preservation (R-082):
+                    // AST Receiver Preservation (R-082, R-107):
                     // When encountering chained method calls (e.g. User.objects.create() or DbClient::new()),
                     // extract the root receiver object ("User", "DbClient") and emit a REFERENCES edge.
                     let stripped_callee = callee_name.strip_prefix("crate::").unwrap_or(callee_name);
-                    let root_receiver = stripped_callee
+                    let mut root_receiver = stripped_callee
                         .split('.')
                         .next()
                         .unwrap_or("")
@@ -900,9 +1005,17 @@ impl CodeParser {
                         .unwrap_or("")
                         .trim();
 
+                    if language == "matlab" && root_receiver == clean_callee {
+                        if let Some(parent) = node.parent().filter(|p| p.kind() == "field_expression") {
+                            if let Some(obj_child) = parent.child_by_field_name("object") {
+                                root_receiver = content[obj_child.byte_range()].trim();
+                            }
+                        }
+                    }
+
                     if !root_receiver.is_empty()
                         && root_receiver != clean_callee
-                        && !matches!(root_receiver.to_lowercase().as_str(), "self" | "this" | "cls" | "super" | "crate" | "std")
+                        && !matches!(root_receiver.to_lowercase().as_str(), "self" | "this" | "cls" | "super" | "crate" | "std" | "obj")
                     {
                         edges.push(ExtractedEdge {
                             workspace: workspace.to_string(),
@@ -923,12 +1036,14 @@ impl CodeParser {
         // JS/TS: import_statement
         // Java: import_declaration
         // C/C++: preproc_include
+        // MATLAB: command (starting with "import ") (R-107)
         else if kind == "use_declaration"
             || kind == "import_statement"
             || kind == "import_from_statement"
             || kind == "import_spec"
             || (kind == "import_declaration" && language == "java")
             || kind == "preproc_include"
+            || (kind == "command" && language == "matlab" && content[node.byte_range()].trim().starts_with("import "))
         {
             let snippet = &content[node.byte_range()];
             let id = format!("{}:{}:import:{}", workspace, file_path, start_pos.row + 1);

@@ -53,6 +53,7 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | 2026-11-05 | `review` | `review` | Forensic resolution of watcher 392s subquery bottleneck: Integrated in-memory SymbolTable (R-078/R-091) into IncrementalPipeline with parameterized batch edge resolution, dedicated 1s quiescent auto-cluster trigger, and test_r091 (99 unit tests pass). |
 | 2026-11-06 | `review` | `in-progress` | Launch v0.7.0 Live Watcher Fidelity Parity & Concurrency Overhaul (ADR-002, SPEC-OMNI-005, R-093 to R-109): Closing 14 forensic loopholes across transactional atomic batch swap, reactive reverse dependencies, unresolved retention pool, deduplication, and non-blocking Louvain actor. |
 | 2026-11-06 | `in-progress` | `testing` | Completed Milestones 1 through 6 (R-093 to R-106): SymbolTable hardening, directory backbone synthesis, transactional atomic swap, edge deduplication, dual-tier modularity, non-blocking Louvain actor, convergence barrier (wait_for_sync), nanometer fidelity diagnostics, and lock-free generational versioning. 111 unit tests pass (100% green, 0 clippy warnings). |
+| 2026-11-06 | `testing` | `testing` | Completed R-109 (Filesystem Symlink Cycle Guarding & Alias Navigation) and R-107 (MathWorks MATLAB AST Ingestion): Vendored ABI 14 tree-sitter-matlab grammar, extracted classdef, multiple inheritance EXTENDS, properties, constructors, methods, receiver preservation, import commands, and package hierarchy. 118 unit tests pass (100% green, 0 clippy warnings). |
 
 ---
 
@@ -60,8 +61,8 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 78 | 80 | 97.5% |
-| Acceptance Criteria (AC-XXX) | 35 | 37 | 94.6% |
+| Requirements (R-XXX) | 80 | 81 | 98.8% |
+| Acceptance Criteria (AC-XXX) | 44 | 45 | 97.8% |
 | Non-Functional (NF-XXX) | 15 | 15 | 100% |
 
 ---
@@ -174,6 +175,8 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | R-104 | Edge Relationship Deduplication & Call Weighting | `src/db/mod.rs` | `tests/unit_tests.rs:test_r104_edge_relationship_deduplication` | ✅ |
 | R-105 | Zero-Delay Community Inference for New Files | `src/analysis/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r105_zero_delay_community_inference_for_new_files` | ✅ |
 | R-106 | Language-Aware SAIR Scoping & Exact Match Fast-Path | `src/ingestion/symbol_table.rs`, `src/db/mod.rs` | `tests/unit_tests.rs:test_r106_language_aware_sair_scoping` | ✅ |
+| R-107 | MathWorks MATLAB (`.m`) AST & Classdef Ingestion | `src/parser/mod.rs`, `grammars/tree-sitter-matlab` | `tests/unit_tests.rs:test_r107_matlab_*` | ✅ |
+| R-108 | MathWorks Simulink (`.slx` / `.mdl`) Block Diagram MBSE Ingestion | `src/parser/simulink.rs`, `src/ingestion/mod.rs` | Spec/Research spike complete, queued for Phase 3 | ⬜ |
 | R-109 | Filesystem Symlink Cycle Guarding & Alias Navigation | `src/ingestion/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r109_symlink_cycle_guard_and_alias_navigation` | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
