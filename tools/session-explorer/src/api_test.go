@@ -711,4 +711,55 @@ func TestAPI_HandleFile(t *testing.T) {
 	}
 }
 
+func TestAPI_HandleSessions_TimezoneOffsetFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Session created at 2026-11-07T00:15:00Z (which corresponds to 2026-11-06 19:15:00 EST / UTC-5)
+	contentEve := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-07T00:15:00Z","content":"<USER_REQUEST>Evening session</USER_REQUEST>"}`
+	createMockSession(t, tmpDir, "session-evening", contentEve)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("failed to scan test index: %v", err)
+	}
+
+	handler := NewAPIHandler(idx, false)
+
+	// 1. Query with EST timezone offset (tz_offset=300 minutes) for 2026-11-06 to 2026-11-06
+	reqEST := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-11-06&to=2026-11-06&tz_offset=300", nil)
+	recEST := httptest.NewRecorder()
+	handler.HandleSessions(recEST, reqEST)
+
+	if recEST.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recEST.Code)
+	}
+
+	var respEST SessionsResponse
+	if err := json.NewDecoder(recEST.Body).Decode(&respEST); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(respEST.Sessions) != 1 {
+		t.Fatalf("expected 1 session with EST tz_offset, got %d", len(respEST.Sessions))
+	}
+	if respEST.Sessions[0].ID != "session-evening" {
+		t.Errorf("expected session-evening, got %s", respEST.Sessions[0].ID)
+	}
+
+	// 2. Query with UTC timezone offset (tz_offset=0) for 2026-11-06 to 2026-11-06
+	// In UTC, 2026-11-07T00:15:00Z is on the next day, so it should NOT be returned.
+	reqUTC := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-11-06&to=2026-11-06&tz_offset=0", nil)
+	recUTC := httptest.NewRecorder()
+	handler.HandleSessions(recUTC, reqUTC)
+
+	var respUTC SessionsResponse
+	if err := json.NewDecoder(recUTC.Body).Decode(&respUTC); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(respUTC.Sessions) != 0 {
+		t.Fatalf("expected 0 sessions with UTC tz_offset=0 for 2026-11-06, got %d", len(respUTC.Sessions))
+	}
+}
+
 

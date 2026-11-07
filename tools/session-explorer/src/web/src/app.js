@@ -240,7 +240,7 @@ const state = {
   sessionStepSort: 'step_desc', // sort mode for steps within active session detail ('step_desc' by default, 'step_asc', 'time_desc', 'time_asc', 'tools_desc', 'length_desc')
   projectFilters: {
     search: '',
-    sort: 'active_desc',
+    sort: 'active',
     dateFrom: '',
     dateTo: '',
     datePreset: 'all',
@@ -1225,6 +1225,7 @@ async function loadSessions() {
     if (state.sortOrder) params.append('sort_order', state.sortOrder);
     if (state.dateFrom) params.append('from', state.dateFrom);
     if (state.dateTo) params.append('to', state.dateTo);
+    params.append('tz_offset', new Date().getTimezoneOffset());
 
     const res = await fetch(`/api/sessions?${params.toString()}`);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1340,6 +1341,7 @@ async function executeSearch(query) {
     const params = new URLSearchParams({ q: query });
     const effectiveWorkspace = state.filterWorkspace || (state.groupBy === 'project' && state.drilledProject ? state.drilledProject : '');
     if (effectiveWorkspace) params.append('workspace', effectiveWorkspace);
+    params.append('tz_offset', new Date().getTimezoneOffset());
 
     const res = await fetch(`/api/search?${params.toString()}`);
     if (!res.ok) throw new Error(`Search error: ${res.status}`);
@@ -1531,29 +1533,28 @@ function renderProjectHub() {
         });
       }
 
-      // 2. In-Project Date Filter (Tri-Modal Temporal Lens R-049)
+      // 2. In-Project Date Filter (inclusive lifetime overlap in local browser time)
       if (state.projectFilters.dateFrom || state.projectFilters.dateTo) {
-        const fromTime = state.projectFilters.dateFrom ? new Date(state.projectFilters.dateFrom + 'T00:00:00Z').getTime() : 0;
-        const toTime = state.projectFilters.dateTo ? new Date(state.projectFilters.dateTo + 'T23:59:59.999Z').getTime() : Infinity;
-        const pMode = state.projectFilters.dateMode || state.dateFilterMode || 'active';
+        const fromTime = state.projectFilters.dateFrom ? new Date(state.projectFilters.dateFrom + 'T00:00:00').getTime() : 0;
+        const toTime = state.projectFilters.dateTo ? new Date(state.projectFilters.dateTo + 'T23:59:59.999').getTime() : Infinity;
 
         list = list.filter(s => {
           const cTime = new Date(s.created_at).getTime();
           const lTime = s.last_message_at ? new Date(s.last_message_at).getTime() : cTime;
-          if (pMode === 'created') {
-            return (cTime >= fromTime) && (cTime <= toTime);
-          } else if (pMode === 'overlap') {
-            return (lTime >= fromTime) && (cTime <= toTime);
-          } else { // 'active'
-            return (lTime >= fromTime) && (lTime <= toTime);
-          }
+          return (lTime >= fromTime) && (cTime <= toTime);
         });
       }
 
       // 3. In-Project Sort (Dual-Temporal Sorting R-048)
-      const pSort = state.projectFilters.sort || 'active_desc';
+      const pSort = state.projectFilters.sort || 'active';
       list.sort((a, b) => {
         switch (pSort) {
+          case 'active':
+          case 'active_desc': {
+            const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : new Date(a.created_at).getTime();
+            const timeB = b.last_message_at ? new Date(b.last_message_at).getTime() : new Date(b.created_at).getTime();
+            return timeB - timeA;
+          }
           case 'date_asc':
             return new Date(a.created_at) - new Date(b.created_at);
           case 'date_desc':
@@ -1566,7 +1567,6 @@ function renderProjectHub() {
             return (b.tool_call_count || 0) - (a.tool_call_count || 0);
           case 'size_desc':
             return (b.transcript_size_bytes || 0) - (a.transcript_size_bytes || 0);
-          case 'active_desc':
           default: {
             const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : new Date(a.created_at).getTime();
             const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : new Date(b.created_at).getTime();
@@ -1584,7 +1584,7 @@ function renderProjectHub() {
       state.projectFilters.dateFrom ||
       state.projectFilters.dateTo ||
       state.projectFilters.datePreset !== 'all' ||
-      state.projectFilters.sort !== 'active_desc'
+      state.projectFilters.sort !== 'active'
     );
 
     // Show Hero Banner & In-Project Session Stack Toolbar
@@ -1623,9 +1623,9 @@ function renderProjectHub() {
           <div class="filter-group">
             <span class="filter-label">Sort:</span>
             <select id="projectSortSelect" class="select-custom" aria-label="Sort sessions in this project">
-              <option value="active_desc" ${state.projectFilters.sort === 'active_desc' ? 'selected' : ''}>⚡ Last Active (Recent First)</option>
-              <option value="date_desc" ${state.projectFilters.sort === 'date_desc' ? 'selected' : ''}>🌱 Inception Date (Newest First)</option>
-              <option value="date_asc" ${state.projectFilters.sort === 'date_asc' ? 'selected' : ''}>⏮️ Oldest Inception</option>
+              <option value="active" ${state.projectFilters.sort === 'active' || state.projectFilters.sort === 'active_desc' ? 'selected' : ''}>⚡ Last Touched</option>
+              <option value="date_desc" ${state.projectFilters.sort === 'date_desc' ? 'selected' : ''}>🌱 Initiated (Newest)</option>
+              <option value="date_asc" ${state.projectFilters.sort === 'date_asc' ? 'selected' : ''}>🌱 Initiated (Oldest)</option>
               <option value="steps_desc" ${state.projectFilters.sort === 'steps_desc' ? 'selected' : ''}>Most Steps</option>
               <option value="messages_desc" ${state.projectFilters.sort === 'messages_desc' ? 'selected' : ''}>Most Prompts</option>
               <option value="tools_desc" ${state.projectFilters.sort === 'tools_desc' ? 'selected' : ''}>Most Tool Calls</option>
@@ -1659,7 +1659,7 @@ function renderProjectHub() {
       document.getElementById('projectHeroBackBtn')?.addEventListener('click', () => {
         state.drilledProject = null;
         state.filterWorkspace = '';
-        state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+        state.projectFilters = { search: '', sort: 'active', dateFrom: '', dateTo: '', datePreset: 'all' };
         if (el.workspaceSelect) el.workspaceSelect.value = '';
         window.location.hash = '#/';
       });
@@ -1762,7 +1762,7 @@ function renderProjectHub() {
 
       // Reset Project Filters Button
       document.getElementById('resetProjectFiltersBtn')?.addEventListener('click', () => {
-        state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+        state.projectFilters = { search: '', sort: 'active', dateFrom: '', dateTo: '', datePreset: 'all' };
         renderProjectHub();
       });
     }
@@ -1778,7 +1778,7 @@ function renderProjectHub() {
           </div>
         `;
         document.getElementById('emptyResetBtn')?.addEventListener('click', () => {
-          state.projectFilters = { search: '', sort: 'active_desc', dateFrom: '', dateTo: '', datePreset: 'all' };
+          state.projectFilters = { search: '', sort: 'active', dateFrom: '', dateTo: '', datePreset: 'all' };
           renderProjectHub();
         });
       } else {
@@ -1801,7 +1801,7 @@ function renderProjectHub() {
         state.projectFilters.dateFrom ||
         state.projectFilters.dateTo ||
         state.projectFilters.datePreset !== 'all' ||
-        state.projectFilters.sort !== 'date_desc'
+        state.projectFilters.sort !== 'active'
       );
       if (resetBtn) {
         resetBtn.style.display = hasFilters ? 'inline-block' : 'none';
@@ -2007,8 +2007,9 @@ function renderDateGroupedView() {
     older: { title: isByLastActive ? '🗓️ Active Earlier' : '🗓️ Initiated Earlier', sessions: [] }
   };
 
+  const useActiveTime = state.sortBy === 'active' || state.sortBy === '';
   sessions.forEach(s => {
-    const targetDate = isByLastActive
+    const targetDate = (isByLastActive || useActiveTime)
       ? (s.last_message_at ? new Date(s.last_message_at) : new Date(s.created_at))
       : new Date(s.created_at);
 

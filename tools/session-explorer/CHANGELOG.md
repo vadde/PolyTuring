@@ -9,8 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-11-06
 
+### Fixed
+- **Timezone Boundary Skew & Local Time Offset Alignment (R-010, R-049)**:
+  - Resolved timezone skew bug where evening sessions created after 00:00:00 UTC (e.g. 7:00 PM EST) fell onto the next UTC calendar day, causing them to be prematurely dropped by naive UTC midnight boundary checks in `Today` and `7 Days` filters.
+  - Implemented dynamic client timezone offset transmission (`tz_offset`) via API query parameters and `resolveLocation(tzStr)` in Go backend (`time.FixedZone` with fallback to `time.Local`), ensuring date ranges evaluate full 24-hour windows in the user's local timezone.
+  - Fixed client-side in-project date filtering in `getFilteredAndSortedProjSessions` by removing hardcoded UTC `Z` specifiers, aligning with local browser day boundaries.
+  - Added `active` (`⚡ Last Touched`) as primary sort option to in-project toolbar dropdown and synchronized Date Grouped view partitioning.
+
 ### Added
 - **Inclusive Lifetime Date Filtering Engine (R-049)**:
+
   - Date filtering naturally evaluates inclusive lifetime overlap (`lastActive >= from && createdAt <= to`), surfacing all sessions active or initiated in the window without cluttering the toolbar.
 - **Session Trail Dual-Temporal Quantum Capsule (R-050)**:
   - Upgraded Session Trail detail header to `.detail-temporal-capsule` rendering `⚡ Active <relativeTime>` with neon pulse dot, `🌱 Initiated: <formattedDate>`, and dynamic `⏳ Multi-Day Span: Xd (<start> ➔ <end>)` pill.

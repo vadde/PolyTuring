@@ -1544,7 +1544,47 @@
    - Synchronized `CONTEXT.md` and `CHANGELOG.md` for v0.4.0.
    - Updated Living Documentation Portal in `docs/site/index.html` (Figure 2.8).
    - Committed changes as `feat(session-explorer): release v0.4.0 - dual-temporal telemetry, quantum trail capsule, 1-click UUID copy, and single-line lifespan pills` (commit `3b1d90d`) and tagged `session-explorer-v0.4.0`.
-   - Cleanly stopped background daemon task and freed port 9876. Working tree is 100% clean.
+
+---
+
+### Session: 2026-11-06 — Timezone Offset Alignment & Evening Session Preservation Investigation
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `released` (v0.4.0 patch)  
+**Duration**: ~18m  
+**Target Tool**: `tools/session-explorer`
+
+#### Problem Statement
+User observed that session `7efd4f68-0d1d-44fc-8a74-2e45f171bbcf` on `Default` and brand-new session `1561d7cf-03b1-40f6-87f2-0959b1816ded` on `django-sorcery` (both started within minutes) showed up under `All Time` filter, but completely disappeared when filtering by `Today` or `7 Days`, even though both were active in real time.
+
+#### Forensic Root Cause Isolation
+1. **Timezone Boundary Skew in Backend**:
+   - The user runs in EST (UTC-5). Sessions initiated in the evening (after 7:00 PM EST / 19:00 local) receive UTC timestamps on the *next calendar day* (e.g. `2026-11-07T00:05:16Z` and `2026-11-07T00:13:34Z`).
+   - The Go backend `parseDate("2026-11-06", true)` parsed the end-date strictly as `2026-11-06 23:59:59.999 UTC`.
+   - In `scanner.go`: `s.CreatedAt.After(to)` compared `2026-11-07 00:05:16 UTC` against `2026-11-06 23:59:59 UTC`. Because the session timestamp was after UTC midnight, the backend dropped the session as falling into tomorrow, even though in local time it was Friday evening!
+   - In `7 Days`, the end date was also `2026-11-06`, dropping the session identically.
+2. **Hardcoded UTC Specifiers in Client Project Hub**:
+   - In `app.js:getFilteredAndSortedProjSessions`, `fromTime` and `toTime` appended `'T00:00:00Z'` and `'T23:59:59.999Z'`.
+   - The hardcoded `Z` forced UTC in the browser, evaluating `toTime` as 6:59:59 PM EST. Any session started after 7:00 PM EST failed `cTime <= toTime`.
+3. **In-Project Sort Dropdown Omission**:
+   - In-project `#projectSortSelect` did not include `active` (`⚡ Last Touched`), defaulting to `date_desc` (Initiated).
+4. **Date Grouped View Partitioning**:
+   - `renderDateGroupedView` partitioned exclusively by `s.created_at`, failing to honor `s.last_message_at` when sorted by active.
+
+#### What Was Done
+1. **Backend Timezone Resolution (`src/api.go`)**:
+   - Added `resolveLocation(tzStr string) *time.Location`: parses `tz_offset` minutes from query params, constructing `time.FixedZone("ClientZone", -offsetMin*60)` with seamless fallback to `time.Local`.
+   - Updated `parseDate(s string, isEnd bool, loc *time.Location)`: parses `YYYY-MM-DD` in the client's location, expanding full 24-hour day boundaries (`00:00:00` to `23:59:59.999999999`) in local time.
+2. **Frontend Timezone Transmission (`src/web/src/app.js`)**:
+   - Added `params.append('tz_offset', new Date().getTimezoneOffset())` in `loadSessions()` and `handleModalSearch()`.
+   - Removed `Z` in `getFilteredAndSortedProjSessions`, evaluating start/end timestamps in the browser's local timezone.
+   - Added `active` (`⚡ Last Touched`) as default option in `#projectSortSelect`.
+   - Updated `renderDateGroupedView` to partition by `s.last_message_at || s.created_at` when sorting by active, accurately placing active sessions into `🌟 Active Today`.
+3. **Automated Verification**:
+   - Added unit test `TestAPI_HandleSessions_TimezoneOffsetFilter` in `src/api_test.go` verifying boundary filtering with positive and zero timezone offsets. All 38 tests pass.
+   - Re-bundled web assets with Bun in 102ms and recompiled binary `bin/session-explorer`.
+   - Verified via Playwright: both `7efd4f68` (`Default`) and `1561d7cf` (`django-sorcery`) appear as #1 under `Today`, `7 Days`, and `🌟 Active Today`.
+
 
 
 

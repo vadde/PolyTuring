@@ -94,8 +94,9 @@ func (h *APIHandler) HandleSessions(w http.ResponseWriter, r *http.Request) {
 		sortOrder = "desc"
 	}
 
-	from := parseDate(q.Get("from"), false)
-	to := parseDate(q.Get("to"), true)
+	loc := resolveLocation(q.Get("tz_offset"))
+	from := parseDate(q.Get("from"), false, loc)
+	to := parseDate(q.Get("to"), true, loc)
 
 	dateMode := q.Get("date_mode")
 	if dateMode == "" {
@@ -167,8 +168,9 @@ func (h *APIHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	query := q.Get("q")
 	workspace := q.Get("workspace")
 	msgType := q.Get("type")
-	from := parseDate(q.Get("from"), false)
-	to := parseDate(q.Get("to"), true)
+	loc := resolveLocation(q.Get("tz_offset"))
+	from := parseDate(q.Get("from"), false, loc)
+	to := parseDate(q.Get("to"), true, loc)
 
 	if query == "" {
 		writeJSON(w, SearchResponse{Results: []SearchResult{}, TotalCount: 0, Query: ""})
@@ -319,19 +321,34 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-func parseDate(s string, isEnd bool) time.Time {
+func resolveLocation(tzStr string) *time.Location {
+	if tzStr != "" {
+		if offsetMin, err := strconv.Atoi(strings.TrimSpace(tzStr)); err == nil {
+			// JavaScript getTimezoneOffset() returns positive minutes for timezones west of UTC (e.g. +300 for EST / UTC-5)
+			// and negative minutes for timezones east of UTC (e.g. -330 for IST / UTC+5:30).
+			// time.FixedZone takes offset in seconds east of UTC, so negate offsetMin.
+			return time.FixedZone("ClientZone", -offsetMin*60)
+		}
+	}
+	return time.Local
+}
+
+func parseDate(s string, isEnd bool, loc *time.Location) time.Time {
 	if s == "" {
 		return time.Time{}
+	}
+	if loc == nil {
+		loc = time.Local
 	}
 	s = strings.TrimSpace(s)
 	// If date-only string (e.g., "2026-09-18")
 	if len(s) == 10 {
-		if t, err := time.Parse("2006-01-02", s); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", s, loc); err == nil {
 			if isEnd {
-				// Cover the entire 24 hours of the end day
-				return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), time.UTC)
+				// Cover the entire 24 hours of the end day in the target timezone
+				return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), loc)
 			}
-			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		}
 	}
 
