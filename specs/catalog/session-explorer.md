@@ -103,6 +103,14 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-042 | Empirical Skill Invocation Telemetry & Standby Decomposition: 3-tier epistemic taxonomy, step indices, invocation triggers, scope deduplication, and holographic skill card UI/UX | Must | ✅ | 🧪 | context_scanner.go, src/types.go, context_test.go, src/web/ |
 | R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix: EC2-style greedy shortest-column container placement, 3-column panoramic widescreen expansion (width: min(1560px, 94vw)), and zero-vertical-gap flow | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
 | R-044 | Live Reactive Telemetry Synchronization & Session Trail Refresh: Real-time dynamic updates of Files & Artifacts and Agent Context during SSE live following, tactile counter pulse animations, and dedicated non-destructive Session Trail refresh button (`#refreshTrailBtn`) | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-045 | Universal Session Files & Artifacts Holographic Matrix: Year 2500 panoramic widescreen dialog shell (`width: min(1560px, 94vw)`), 4 forensic lenses (Universal Catalog, Deliverables & Artifacts, Codebase Mutations, Churn & Blast Radius Telemetry), 5-capsule telemetry ribbon, multi-spectrum filter chips, EC2-style greedy bin-packing, timeline step jump navigation, and native file inspection | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-046 | Universal Multi-Dimensional Forensic Sorting Engine: Interactive holographic sort capsules across Files & Artifacts, In-Session Agent Brain, and Global Machine matrix modals supporting churn intensity, deliverable priority, step recency, chronological flow, read volume, token bloat, and touch span telemetry | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-047 | 1-Click Interactive Session UUID Copy Capsule: Top-left session trail navigation header renders an isomorphic aero-mica capsule with 1-click clipboard copy button, kinetic icon transition (`📋` → `✓`), and tactile toast notification | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-048 | Dual-Temporal Telemetry, Active Recency Engine & Multi-Day Lifespan Tracking: Session tiles render both ⚡ Last Active recency (with live neon pulse) and 🌱 Inception Date; multi-day lifespan badges (span: $t_{\text{init}} \rightarrow t_{\text{active}}$); Date Grouped View partitions by effective recency ($\max(t_{\text{active}}, t_{\text{init}})$); sorting engine supports `active_desc` (Last Active Recent First) across backend and frontend | Must | ✅ | 🧪 | src/scanner.go, src/api.go, src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-049 | Inclusive Lifetime Date Filtering Engine: Date range filtering (`from`/`to` and presets `Today`, `7d`, `30d`) naturally evaluates inclusive lifetime overlap (`lastActive >= from && createdAt <= to`), surfacing all sessions touched or initiated in the window without cluttering toolbar elements | Must | ✅ | 🧪 | src/scanner.go, src/api.go, src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-050 | Session Trail Dual-Temporal Quantum Capsule & Live Recency Telemetry: Top-left Session Trail header modernizes `#detailTime` into a liquid-glass dual-temporal capsule rendering `⚡ Active <relativeTime>` with live neon pulse dot, `🌱 Initiated: <formattedDate>`, and multi-day span pill | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
+| R-051 | Session Card 1-Click UUID Copy & Layout Harmonization: Main dashboard session tiles render a subtle 1-click UUID copy button on card header; standardized metadata rows eliminate masonry baseline jitter; line-height padding fixes prompt snippet glyph slicing | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-052 | Step Counter & Filter State Integrity: Toggling message filter chips (`💬 Dialogue`, `Prompts`, etc.) and clicking `Refresh` preserves filter context and accurately displays `Showing X of Y steps` without losing step subset telemetry | Must | ✅ | 🧪 | src/web/src/app.js |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -534,6 +542,46 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-074 | Given the Session Trail toolbar (`.tail-stream-control`), a dedicated Refresh button (`#refreshTrailBtn`) allows on-demand non-destructive reload of all steps, agent context, and files/artifacts without full browser reload | R-044 |
 | AC-075 | Given the user resumes live streaming or toggles Follow Live, the engine triggers an automatic catch-up refresh of session trail messages, agent context, and files/artifacts | R-044 |
 | AC-076 | Given active turn filters (e.g. Dialogue, Prompts, Search query), live SSE incoming turns and session trail refreshes strictly preserve the filter slice and maintain the 'Showing X of Y steps' counter summary without wiping filter telemetry | R-044 |
+| AC-077 | Given the Files & Artifacts button (`#detailFilesBtn`) is clicked, the modal opens in widescreen panoramic dimensions (`width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh;`) with liquid glass backdrop blur, glowing icon pulse, and ESC/close controls | R-045 |
+| AC-078 | Given `#sessionFilesModal` is open, user can switch between 4 forensic lenses: `🗂️ Universal Catalog`, `✨ Artifacts & Deliverables`, `✏️ Codebase Mutations`, and `📊 Churn & Blast Radius Telemetry` | R-045 |
+| AC-079 | Given session file data, the ribbon renders 5 color-coded metric capsules: `✨ Deliverables`, `✏️ Code Mutations`, `👁️ Inspected Files`, `🎯 Blast Radius`, and `📈 Reconnaissance Ratio ($R_{\text{RW}}$)` | R-045 |
+| AC-080 | Given the active lens, filter chips allow 1-click filtering: `🌐 All Files`, `✨ Artifacts`, `✏️ Modified Code`, `👁️ Read Files`, `🔗 Markdown References`, and dynamic language chips (`.go`, `.js`, etc.) with counters | R-045 |
+| AC-081 | Given $N$ variable-height forensic file cards, cards are distributed across 3 columns (desktop), 2 columns (tablet), or 1 column (mobile) using greedy bin-packing with zero vertical voids | R-045 |
+| AC-082 | Given any file card with step markers (`#X`), clicking a step pill closes the files modal, scrolls smoothly to that exact turn in the conversation timeline, and triggers an animated neon pulse highlight | R-045 |
+| AC-083 | Given any file card, clicking `Open ↗` opens the target file inside the embedded Native File Viewer (R-038) with syntax highlighting, line gutter, and anchor scrolling; clicking `📋` copies the path with micro-feedback | R-045 |
+| AC-084 | Given generated artifacts, the card renders artifact summaries, user-facing delivery badges, and file preview anchors | R-045 |
+| AC-085 | Given real-time SSE streaming or manual Session Trail refresh (`#refreshTrailBtn`), incoming steps dynamically re-aggregate forensic file data, update the `#detailFilesCountBadge` counter with pulse animations, and re-render the open files matrix in-place with zero layout shift | R-045 |
+| AC-086 | Given `#sessionFilesModal` is open, the toolbar renders `.agent-matrix-sort-box` with select dropdown `#sessionFilesSortSelect` offering 7 sorting dimensions | R-046 |
+| AC-087 | Given user selects `🔥 Churn Intensity (High → Low)`, files are sorted by mutation count descending ($C(f)$), placing heavily edited files at the top of the bin-packed columns | R-046 |
+| AC-088 | Given user selects `⏮️ First Touched (Chronological)`, files are sorted by their first appearance turn index ($s_{\text{first}}$) from earliest to latest | R-046 |
+| AC-089 | Given user selects `🏷️ File Extension`, files are clustered alphabetically by file extension (.go, .js, .md, .py) and then by name | R-046 |
+| AC-090 | Given `#sessionContextModal` is open, the toolbar renders `#sessionMatrixSortSelect` offering execution frequency, step recency, token bloat, precedence, and alphabetical sorting | R-046 |
+| AC-091 | Given `#agentMatrixModal` is open, the toolbar renders `#agentMatrixSortSelect` offering token bloat, line count, scope, and name sorting | R-046 |
+| AC-092 | Given any active filter chip or search query, changing the sort selection preserves active filter slices, re-computes the bin-pack layout in < 16ms (60 FPS), and maintains zero vertical gaps | R-046 |
+| AC-093 | Given file cards in `#sessionFilesModal`, each card displays a subtle monospace touch span badge (`Span: #X ➔ #Y` or turn count) indicating the step range across which the file was accessed | R-046 |
+| AC-094 | Given `#detailView` navigation header, clicking the session ID capsule or copy button copies the full session UUID to clipboard and displays instant visual confirmation (`✓ Copied!`) and toast notification | R-047 |
+| AC-095 | Given `#copySessionIdBtn`, the button renders a Year 2500 aero-mica glass capsule with smooth hover elevation and tactile click pulse | R-047 |
+| AC-096 | Given any session card on the main dashboard or in project drilldown, the card renders both **⚡ Last Active** recency and **🌱 Inception Date** | R-048 |
+| AC-097 | Given a session active within the last 3 hours, the card displays an illuminated neon green/amber pulse dot indicating live or ongoing recency | R-048 |
+| AC-098 | Given a session spanning $\ge 24\text{ hours}$ between inception and last message, the card displays a monospace Multi-Day Lifespan badge indicating duration and boundary dates | R-048 |
+| AC-099 | Given Date Grouped View (`renderDateGroupedView`), sessions are bucketed by effective recency ($\max(t_{\text{active}}, t_{\text{init}})$), ensuring sessions active today appear under `🌟 Today` | R-048 |
+| AC-100 | Given `#sortBySelect` and `#projectSortSelect`, the dropdowns offer `⚡ Last Active (Recent First)` as the primary sort option alongside Inception Date options | R-048 |
+| AC-101 | Given `GET /api/sessions?sort_by=active`, the Go backend sorts sessions by `LastMessageAt` descending | R-048 |
+| AC-102 | Given date range filters (`from`/`to` or presets `today`, `7d`, `30d`), multi-day sessions touched within the window are correctly surfaced | R-048 |
+| AC-103 | Given all automated tests and Playwright headless runs, verification passes with 100% assertions and zero visual regressions | R-047, R-048 |
+| AC-104 | Given `/api/sessions`, the endpoint accepts `date_mode` query parameter supporting `active` (default), `created`, and `overlap` | R-049 |
+| AC-105 | Given `date_mode=active`, sessions match if `last_message_at >= from && last_message_at <= to` (falling back to `created_at` for single-turn sessions) | R-049 |
+| AC-106 | Given `date_mode=created`, sessions match if `created_at >= from && created_at <= to` | R-049 |
+| AC-107 | Given `date_mode=overlap`, sessions match if `last_message_at >= from && created_at <= to` | R-049 |
+| AC-108 | Given global date filter toolbar, the UI renders a clean, uncluttered layout `Date: [From] to [To] [Presets]` without intrusive sandwiched buttons, seamlessly delegating sort order to `#sortBySelect` | R-049 |
+| AC-109 | Given in-project drilldown toolbar (`getFilteredAndSortedProjSessions`), temporal date filtering mirrors tri-modal date logic seamlessly | R-049 |
+| AC-110 | Given Session Trail navigation header, `#detailTime` is upgraded to `.detail-temporal-capsule` rendering `⚡ Active <relativeTime>` with neon pulse dot, `🌱 Initiated: <formattedDate>`, and multi-day span pill | R-050 |
+| AC-111 | Given any element in the detail temporal capsule, hovering surfaces a high-precision ISO-8601 tooltip | R-050 |
+| AC-112 | Given any session card on the main dashboard grid, the card header renders a subtle 1-click UUID copy button (`.card-copy-btn`) | R-051 |
+| AC-113 | Given user clicks `.card-copy-btn`, the full UUID is copied to clipboard with `✓` feedback without triggering card drilldown navigation | R-051 |
+| AC-114 | Given session cards grid, multi-day span pills are placed in a standardized metadata row to ensure aligned prompt snippet baselines across columns | R-051 |
+| AC-115 | Given prompt snippets in session cards, line-height padding prevents vertical glyph clipping on multi-line text | R-051 |
+| AC-116 | Given Session Trail step filters, toggling message types and refreshing the trail maintains `Showing X of Y steps` state integrity | R-052 |
 
 ---
 
@@ -611,3 +659,5 @@ Tests that MUST pass for this spec to be considered satisfied:
 | 2026-09-18 | @vadde | Complete specification with all requirements |
 | 2026-10-19 | @vadde | Add R-037 (Bounded Diagram Viewports & Fullscreen Theater Mode) and R-038 (Native In-Browser File & Artifact Viewer) |
 | 2026-11-04 | @vadde | Add R-040 (Session Agent Brain & MCP Behavioral Matrix), R-041 (Command Execution & Tool Breakdown), and R-042 (Empirical Skill Invocation Telemetry & Standby Decomposition) |
+| 2026-11-05 | @vadde | Add R-043 (Bin-Packing Spatial Density & Panoramic Masonry Matrix), R-044 (Live Reactive Telemetry Sync), and R-045 (Session Files & Artifacts Holographic Matrix) |
+| 2026-11-06 | @vadde | Add R-046 (Universal Multi-Dimensional Forensic Sorting Engine & Touch Span Telemetry) |

@@ -208,6 +208,125 @@ func TestAPI_HandleSessions_SortDateAsc(t *testing.T) {
 	}
 }
 
+func TestAPI_HandleSessions_SortActive(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// session-old: created on Sept 1, but last message on Sept 20
+	contentOld := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-01T10:00:00Z","content":"<USER_REQUEST>Old</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-20T10:00:00Z","content":"Late response"}`
+	createMockSession(t, tmpDir, "session-old", contentOld)
+
+	// session-new: created on Sept 15, last message on Sept 15
+	contentNew := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-15T10:00:00Z","content":"<USER_REQUEST>New</USER_REQUEST>"}`
+	createMockSession(t, tmpDir, "session-new", contentNew)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("failed to scan test index: %v", err)
+	}
+
+	handler := NewAPIHandler(idx, false)
+
+	// Query sort_by=active (most recently active first)
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions?sort_by=active", nil)
+	rec := httptest.NewRecorder()
+	handler.HandleSessions(rec, req)
+
+	var resp SessionsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp.Sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(resp.Sessions))
+	}
+	// session-old was active on Sept 20, whereas session-new was active on Sept 15.
+	// Therefore session-old MUST be first when sorting by active recency!
+	if resp.Sessions[0].ID != "session-old" {
+		t.Errorf("expected session-old (active Sept 20) first with sort_by=active, got %s", resp.Sessions[0].ID)
+	}
+}
+
+func TestAPI_HandleSessions_TriModalDateFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// session-old: created on Sept 1, active until Sept 20
+	contentOld := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-01T10:00:00Z","content":"<USER_REQUEST>Old</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-20T10:00:00Z","content":"Late response"}`
+	createMockSession(t, tmpDir, "session-old", contentOld)
+
+	// session-new: created on Sept 15, active until Sept 15
+	contentNew := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-15T10:00:00Z","content":"<USER_REQUEST>New</USER_REQUEST>"}`
+	createMockSession(t, tmpDir, "session-new", contentNew)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("failed to scan test index: %v", err)
+	}
+
+	handler := NewAPIHandler(idx, false)
+
+	// 1. date_mode=active for 2026-09-20: session-old active on Sept 20 matches; session-new does not
+	{
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-09-20&to=2026-09-20&date_mode=active", nil)
+		rec := httptest.NewRecorder()
+		handler.HandleSessions(rec, req)
+
+		var resp SessionsResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Sessions) != 1 || resp.Sessions[0].ID != "session-old" {
+			t.Fatalf("expected only session-old for date_mode=active on Sept 20, got %d sessions", len(resp.Sessions))
+		}
+	}
+
+	// 2. date_mode=created for 2026-09-20: neither session was created on Sept 20 -> 0 sessions
+	{
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-09-20&to=2026-09-20&date_mode=created", nil)
+		rec := httptest.NewRecorder()
+		handler.HandleSessions(rec, req)
+
+		var resp SessionsResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Sessions) != 0 {
+			t.Fatalf("expected 0 sessions for date_mode=created on Sept 20, got %d", len(resp.Sessions))
+		}
+	}
+
+	// 3. date_mode=created for 2026-09-15: session-new was created on Sept 15 -> matches session-new
+	{
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-09-15&to=2026-09-15&date_mode=created", nil)
+		rec := httptest.NewRecorder()
+		handler.HandleSessions(rec, req)
+
+		var resp SessionsResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Sessions) != 1 || resp.Sessions[0].ID != "session-new" {
+			t.Fatalf("expected session-new for date_mode=created on Sept 15, got %d sessions", len(resp.Sessions))
+		}
+	}
+
+	// 4. date_mode=overlap for 2026-09-10: session-old (created Sept 1, active Sept 20) spans Sept 10
+	{
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-09-10&to=2026-09-10&date_mode=overlap", nil)
+		rec := httptest.NewRecorder()
+		handler.HandleSessions(rec, req)
+
+		var resp SessionsResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Sessions) != 1 || resp.Sessions[0].ID != "session-old" {
+			t.Fatalf("expected session-old for date_mode=overlap on Sept 10, got %d sessions", len(resp.Sessions))
+		}
+	}
+}
+
 func TestAPI_HandleRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -589,6 +708,57 @@ func TestAPI_HandleFile(t *testing.T) {
 	handler.HandleFile(recRestricted, reqRestricted)
 	if recRestricted.Code != http.StatusForbidden {
 		t.Errorf("expected status 403 for restricted .ssh path, got %d", recRestricted.Code)
+	}
+}
+
+func TestAPI_HandleSessions_TimezoneOffsetFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Session created at 2026-11-07T00:15:00Z (which corresponds to 2026-11-06 19:15:00 EST / UTC-5)
+	contentEve := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-07T00:15:00Z","content":"<USER_REQUEST>Evening session</USER_REQUEST>"}`
+	createMockSession(t, tmpDir, "session-evening", contentEve)
+
+	idx := NewSessionIndex(tmpDir, false)
+	if err := idx.ScanAll(); err != nil {
+		t.Fatalf("failed to scan test index: %v", err)
+	}
+
+	handler := NewAPIHandler(idx, false)
+
+	// 1. Query with EST timezone offset (tz_offset=300 minutes) for 2026-11-06 to 2026-11-06
+	reqEST := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-11-06&to=2026-11-06&tz_offset=300", nil)
+	recEST := httptest.NewRecorder()
+	handler.HandleSessions(recEST, reqEST)
+
+	if recEST.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recEST.Code)
+	}
+
+	var respEST SessionsResponse
+	if err := json.NewDecoder(recEST.Body).Decode(&respEST); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(respEST.Sessions) != 1 {
+		t.Fatalf("expected 1 session with EST tz_offset, got %d", len(respEST.Sessions))
+	}
+	if respEST.Sessions[0].ID != "session-evening" {
+		t.Errorf("expected session-evening, got %s", respEST.Sessions[0].ID)
+	}
+
+	// 2. Query with UTC timezone offset (tz_offset=0) for 2026-11-06 to 2026-11-06
+	// In UTC, 2026-11-07T00:15:00Z is on the next day, so it should NOT be returned.
+	reqUTC := httptest.NewRequest(http.MethodGet, "/api/sessions?from=2026-11-06&to=2026-11-06&tz_offset=0", nil)
+	recUTC := httptest.NewRecorder()
+	handler.HandleSessions(recUTC, reqUTC)
+
+	var respUTC SessionsResponse
+	if err := json.NewDecoder(recUTC.Body).Decode(&respUTC); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(respUTC.Sessions) != 0 {
+		t.Fatalf("expected 0 sessions with UTC tz_offset=0 for 2026-11-06, got %d", len(respUTC.Sessions))
 	}
 }
 

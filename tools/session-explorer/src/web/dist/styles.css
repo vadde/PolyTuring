@@ -1101,15 +1101,17 @@ body {
 .prompt-snippet {
   font-size: 0.88rem;
   color: var(--text-primary);
-  line-height: 1.45;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   background: var(--bg-glass);
-  padding: 0.65rem 0.85rem;
+  padding: 0.75rem 0.9rem;
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--accent-primary);
+  min-height: 4.8rem;
+  box-sizing: border-box;
 }
 
 .card-metrics {
@@ -4453,4 +4455,835 @@ mark.find-match.find-match-current {
   color: #fff;
   box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
 }
+
+/* ==========================================================================
+   Year 2500 Holographic Session Files & Artifacts Matrix (R-045)
+   ========================================================================== */
+@keyframes holoFilesPulse {
+  0%, 100% { filter: drop-shadow(0 0 4px #c084fc); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 14px #38bdf8); transform: scale(1.12); }
+}
+
+.holo-files-pulse {
+  display: inline-block;
+  animation: holoFilesPulse 3.5s ease-in-out infinite;
+}
+
+/* Telemetry Ribbon Capsules for Files Matrix */
+.telemetry-pill.artifacts {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #c084fc;
+}
+.telemetry-pill.artifacts .telemetry-val {
+  color: #e9d5ff;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.telemetry-pill.mutations {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+.telemetry-pill.mutations .telemetry-val {
+  color: #fde68a;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.telemetry-pill.reads {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+.telemetry-pill.reads .telemetry-val {
+  color: #7dd3fc;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.telemetry-pill.blast {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+.telemetry-pill.blast .telemetry-val {
+  color: #6ee7b7;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.telemetry-pill.intensity {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+.telemetry-pill.intensity .telemetry-val {
+  color: #fecdd3;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Holographic File Cards */
+.session-file-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.session-file-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.12);
+}
+
+.session-file-card.is-artifact {
+  border-color: rgba(168, 85, 247, 0.25);
+  background: linear-gradient(145deg, rgba(168, 85, 247, 0.05), rgba(15, 23, 42, 0.7));
+}
+.session-file-card.is-artifact:hover {
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(168, 85, 247, 0.2);
+}
+
+.session-file-card.is-modified {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.05), rgba(15, 23, 42, 0.7));
+}
+.session-file-card.is-modified:hover {
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 158, 11, 0.2);
+}
+
+.session-file-card.is-read {
+  border-color: rgba(56, 189, 248, 0.2);
+}
+.session-file-card.is-read:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.18);
+}
+
+.session-file-card.is-reference {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+.session-file-card.is-reference:hover {
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(148, 163, 184, 0.15);
+}
+
+.session-file-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.session-file-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.session-file-card-icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.session-file-card-name {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-file-card-ext-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  flex-shrink: 0;
+}
+
+.session-file-card-op-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.session-file-card-op-pill.artifact {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+}
+
+.session-file-card-op-pill.modified {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+}
+
+.session-file-card-op-pill.read {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+}
+
+.session-file-card-op-pill.reference {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #cbd5e1;
+}
+
+.session-file-card-path {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.session-file-card-path-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.session-file-card-quick-copy {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 3px;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.session-file-card-quick-copy:hover {
+  color: #38bdf8;
+  transform: scale(1.15);
+}
+
+.session-file-card-summary {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  background: rgba(168, 85, 247, 0.08);
+  border-left: 3px solid #a855f7;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 0.15rem;
+}
+
+.session-file-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+}
+
+.session-file-card-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.session-file-tool-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.session-file-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: auto;
+}
+
+.session-file-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.session-file-open-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+}
+
+.session-file-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.session-file-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   Lens 4: Forensic Churn & Blast Radius Telemetry Dashboard
+   ========================================================================== */
+.files-telemetry-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.files-spectrum-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  backdrop-filter: blur(16px);
+}
+
+.files-spectrum-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.files-spectrum-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.files-spectrum-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.files-spectrum-segment {
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.files-spectrum-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding-top: 0.3rem;
+}
+
+.files-spectrum-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.files-spectrum-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.files-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.15rem;
+  width: 100%;
+}
+
+.files-telemetry-col-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  backdrop-filter: blur(16px);
+}
+
+.files-telemetry-col-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.churn-hotspot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.78rem;
+}
+
+.churn-hotspot-name {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.churn-hotspot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.blast-dir-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  color: #38bdf8;
+}
+
+.blast-dir-count {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Year 2500 Holographic Multi-Dimensional Sorting Capsule & Touch Spans (R-046)
+   ========================================================================== */
+.agent-matrix-sort-box {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  padding: 0 0.6rem;
+  height: 36px;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.agent-matrix-sort-box:hover,
+.agent-matrix-sort-box:focus-within {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.16);
+}
+
+.sort-icon {
+  font-size: 0.88rem;
+  color: #38bdf8;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.holo-matrix-select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+.holo-matrix-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px 10px;
+}
+
+.touch-span-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+  margin-left: auto;
+}
+
+/* ==========================================================================
+   Aero-Mica Holographic Session Identity Capsule (R-047)
+   ========================================================================== */
+.detail-session-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 9999px;
+  padding: 0.22rem 0.45rem 0.22rem 0.65rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.detail-session-capsule:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.detail-session-capsule .capsule-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.detail-session-capsule .detail-session-id {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #38bdf8;
+  letter-spacing: -0.01em;
+  padding: 0;
+  background: transparent;
+  border: none;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy-session-id-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-sans, inherit);
+  color: #f1f5f9;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  line-height: 1.2;
+}
+
+.copy-session-id-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.copy-session-id-btn.copied {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.65);
+  color: #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+/* ==========================================================================
+   Dual Temporal Telemetry & Active Recency Matrix (R-048)
+   ========================================================================== */
+.temporal-badge-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.session-active-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-family: var(--font-mono, monospace);
+  color: #38bdf8;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.session-active-time.is-live {
+  color: #34d399;
+}
+
+.session-active-time .time-label {
+  font-size: 0.68rem;
+  color: var(--text-dim, #94a3b8);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.session-created-time {
+  font-size: 0.68rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.session-created-time .time-label {
+  font-size: 0.64rem;
+  color: var(--text-dim, #94a3b8);
+  font-weight: 500;
+}
+
+.active-pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #34d399;
+  box-shadow: 0 0 8px #34d399;
+  animation: neonPulseDot 1.8s infinite ease-in-out;
+}
+
+@keyframes neonPulseDot {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+    box-shadow: 0 0 6px #34d399;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+    box-shadow: 0 0 14px #34d399;
+  }
+}
+
+.session-lifespan-row {
+  margin-bottom: 0.5rem;
+}
+
+.session-lifespan-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   Session Trail Dual-Temporal Quantum Capsule (R-050)
+   ========================================================================== */
+.detail-temporal-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  padding: 0.28rem 0.85rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.detail-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.detail-active-pill.is-live {
+  color: #34d399;
+}
+
+.detail-created-pill {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 0.5rem;
+}
+
+.detail-lifespan-pill {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 9999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Card-Level 1-Click UUID Copy & Layout Harmonization (R-051)
+   ========================================================================== */
+.card-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.68rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1;
+}
+
+.card-copy-btn:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.card-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.65);
+  color: #34d399;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.session-lifespan-row {
+  min-height: 1.6rem;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+
+
 

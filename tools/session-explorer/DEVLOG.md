@@ -6,6 +6,60 @@
 
 ---
 
+### 2026-11-06 — Universal Session Files & Artifacts Holographic Matrix (R-045) & Multi-Dimensional Forensic Sorting Engine (R-046)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Version 0.4.0-wip)
+**Duration**: ~1h 10m
+
+#### What Was Done
+- **User Intent & Architecture Evolution**:
+  1. *Facelift & Futuristic Evolution of Files & Artifacts*: Re-architected `#sessionFilesModal` into a Year 2500 panoramic widescreen command bridge matching the Agent Context holographic liquid glass design system (`width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh;`).
+  2. *Forensic Telemetry & Multi-Lens System (R-045)*:
+     - 4 Forensic Lenses: `🗂️ Universal Catalog`, `✨ Artifacts & Deliverables`, `✏️ Codebase Mutations`, `📊 Churn & Blast Radius Telemetry`.
+     - 5-Capsule Holographic Telemetry Ribbon: Deliverables count, Code Mutations count, Inspected Files count, Blast Radius metric, and Reconnaissance Ratio ($R_{\text{RW}} = \text{Reads} / \text{Writes}$).
+     - Dynamic language & extension spectrum breakdown bar with color-coded segments and telemetry cards.
+     - EC2-style greedy shortest-column bin-packing spatial placement with zero vertical gaps.
+     - 1-click step navigation pills (`#X`) with smooth scroll and animated neon pulse highlight.
+  3. *Universal Multi-Dimensional Forensic Sorting Engine (R-046)*:
+     - Created interactive Year 2500 `.agent-matrix-sort-box` with holographic select dropdowns styled in aero-mica liquid glass.
+     - **Files & Artifacts Sorting (7 Dimensions)**:
+       - `type_priority`: Deliverable Priority (Artifacts → Mutations → Reads → References).
+       - `churn_desc`: Churn Intensity (High → Low mutation count $C(f)$).
+       - `last_touch`: Last Touched (Most recent step recency $s_{\text{last}}$).
+       - `first_touch`: First Touched (Chronological timeline order $s_{\text{first}}$).
+       - `reads_desc`: Read Volume (Most inspected reconnaissance files).
+       - `name_asc`: Alphabetical by filename (A → Z).
+       - `ext_asc`: Clustered by file extension (.go, .js, .md, .py, etc.).
+     - **In-Session Agent Brain Matrix Sorting (5 Dimensions)**:
+       - `calls_desc`: Execution Frequency (Most invoked tools/skills).
+       - `last_step`: Recency (Last step invoked).
+       - `bloat_desc`: Token Bloat (Largest footprint in prompt context).
+       - `precedence`: Hierarchy (Workspace → Global → Standby).
+       - `name_asc`: Alphabetical (A → Z).
+     - **Global Machine Agent Matrix Sorting (4 Dimensions)**:
+       - `bloat_desc`: Token Bloat descending.
+       - `lines_desc`: Line Count (Longest → Shortest).
+       - `name_asc`: Alphabetical (A → Z).
+       - `scope`: Hierarchy (Workspace → Global).
+     - **Touch Span Telemetry Capsule**: Rendered monospace capsule pill (`Span: #X ➔ #Y` or `Step #X`) on file cards for instantaneous forensic visibility of a file's active lifetime span across turns.
+  4. *Empirical Verification (Superpower 101 Pillar IV & Acceptance Criteria AC-077..AC-093)*:
+     - Automated test suite: `make test-tool T=session-explorer` passed (100%).
+     - Spec validation: `make validate-specs` passed (0 errors, 0 warnings).
+     - Headless Playwright verification: Navigated live to session `20dadec4-79d4-4c2d-877a-3f62976315ae`, verified all 65 file cards, tested sorting transitions (`type_priority`, `churn_desc`, `name_asc`, `last_touch`, `ext_asc`), verified touch span capsules (`Span: #95 ➔ #4282`), tested Session Matrix sorting (`calls_desc`, `bloat_desc`, `name_asc`), tested Machine Agent Matrix sorting (`bloat_desc`, `name_asc`), captured and archived high-fidelity screenshots.
+
+#### Files Changed
+- `specs/catalog/session-explorer.md` — Updated R-045 and R-046 to implemented (`✅`) and tested (`🧪`); added AC-077..AC-093; updated revision history.
+- `tools/session-explorer/STATUS.md` — Updated SDLC status to `review`; updated progress (46/46 reqs, 93/93 ACs, 100%); updated traceability matrix.
+- `tools/session-explorer/CONTEXT.md` — Updated session status to `review` and traceability summary.
+- `tools/session-explorer/src/web/index.html` — Added `.agent-matrix-sort-box` with select dropdowns `#sessionFilesSortSelect`, `#agentMatrixSortSelect`, `#sessionMatrixSortSelect`.
+- `tools/session-explorer/src/web/src/styles.css` — Added aero-mica sort container, holographic select dropdown styling, chevron icons, and `.touch-span-pill`.
+- `tools/session-explorer/src/web/src/app.js` — Implemented 7-dimension and 5-dimension sorting comparators, event listeners, touch span pills, and greedy bin-packing re-pack in < 12ms.
+- `tools/session-explorer/src/web/dist/` — Rebuilt production bundle via Bun.
+- `tools/session-explorer/bin/session-explorer` — Recompiled standalone Go binary.
+
+---
+
 ### 2026-11-05 — Live Reactive Telemetry Synchronization & Session Trail Refresh (R-044)
 
 **Agent/Author**: Antigravity (Google DeepMind)
@@ -1444,7 +1498,92 @@
    - Fixed `detailAgentContextCount` to compute total active governance and execution units (`active_rules` + `active_skills` + `mcp_tools` + `native_tools`).
    - Verified live on `:9876` via Playwright: `Agent Context` reads `27` with illuminated violet badge; `Files & Artifacts` reads `30` with emerald aurora badge. Saved artifact `session-trail-header-capsules.png`.
 
+---
 
+### Session: 2026-11-06 — Tri-Modal Temporal Engine, Quantum Session Trail Capsule & Card-Level Quick-Copy (R-047 .. R-052)
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `review` (v0.4.0-wip)  
+**Duration**: ~22m  
+**Target Tool**: `tools/session-explorer`
+
+#### What Was Done
+1. **Tri-Modal Date Filtering Engine (`date_filter_by` / `date_mode`) (R-049, AC-104..AC-109)**:
+   - Upgraded `scanner.go` (`GetSessions` & `Search`) to support explicit tri-modal temporal semantics:
+     - `active` (⚡ Last Touched): filters sessions where `last_message_at >= from && last_message_at <= to` (falling back to `created_at` for single-turn sessions).
+     - `created` (🌱 Initiated): filters sessions where `created_at >= from && created_at <= to`.
+     - `overlap` (🔄 Active Span): filters sessions whose active lifespan overlaps the date range (`last_message_at >= from && created_at <= to`).
+   - Extended `api.go:HandleSessions` and `HandleSearch` to parse `date_mode` query parameter with graceful default to `active`.
+   - Built Year 2126 Isomorphic Mica Segmented Control (`#dateFilterModeControl`) into global Date toolbar with glowing cyan/emerald active indicators.
+   - Integrated tri-modal date filter into in-project drilldown engine (`getFilteredAndSortedProjSessions`).
+2. **Session Trail Dual-Temporal Quantum Telemetry Capsule (R-050, AC-110..AC-111)**:
+   - Upgraded `#detailTime` in `#detailView` header top-left to `.detail-temporal-capsule`.
+   - Renders `⚡ Active <relativeTime>` with animated emerald neon pulse dot (`@keyframes neonPulseDot`), `🌱 Initiated: <formattedDate>`, and dynamic `⏳ Multi-Day Span: Xd (<start> ➔ <end>)` pill.
+   - Enriched every element with high-precision ISO-8601 tooltip annotations.
+3. **Card-Level 1-Click UUID Copy & Layout Normalization (R-051, AC-112..AC-115)**:
+   - Added `.card-copy-btn` to each session card header on the main grid with `[📋 <uuid:8>]`, instant click transition to `✓`, and event propagation stop.
+   - Standardized `.session-lifespan-row` with uniform minimum height (`1.6rem`), completely eliminating masonry baseline jitter across columns.
+   - Upgraded `.prompt-snippet` with `line-height: 1.5`, `min-height: 4.8rem`, and balanced padding to eliminate character glyph slicing.
+4. **Step Counter & Filter State Integrity (R-052, AC-116)**:
+   - Guaranteed that switching message filter chips (`💬 Dialogue`, `Prompts`, etc.) and refreshing the Session Trail maintains `Showing X of Y steps` state.
+5. **Automated Verification**:
+   - Added unit test `TestAPI_HandleSessions_TriModalDateFilter` in `src/api_test.go`. All 36 Go unit tests pass in 0.414s.
+   - Bundled web frontend via Bun in 119ms (2128 modules).
+   - Recompiled binary `bin/session-explorer`.
+   - Ran automated headless Playwright MCP verification:
+     - Verified `dateFilterMode`: `Today` with `⚡ Last Touched` surfaces 8 sessions (including current session `20dadec4`); `Today` with `🌱 Initiated` surfaces 6 sessions (correctly excluding multi-day sessions initiated on earlier days).
+     - Verified 1-click UUID copy on card headers: copies to clipboard with `✓` feedback without navigating away.
+     - Verified Session Trail header: displays `[ID] 20dadec4... [📋 Copy]`, `[📁 PolyTuring]`, `[⚡ CLI]`, and `[🟢 ⚡ Active just now | 🌱 Initiated Nov 4, 2026, 02:58:42 PM | ⏳ Multi-Day Span: 2d (2026-11-04 ➔ 2026-11-06)]`.
+     - Saved screenshot artifacts `session-trail-quantum-header.png` and `session-dashboard-tri-modal-matrix.png`.6. **Date Filter UX Simplification & Single-Line Lifespan Pill Refinement**:
+   - Responded to pair programmer feedback regarding the sandwiched date mode control. Removed redundant toolbar buttons, preserving a clean and intuitive `Date: [From] to [To] [Presets]` layout while seamlessly evaluating inclusive lifetime overlap under the hood ($t_{\text{active}} \ge \text{from} \land t_{\text{init}} \le \text{to}$).
+   - Shortened multi-day lifespan pill to `⏳ Xd Span (Nov 4 ➔ Nov 6)` with strict `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;` CSS enforcement, guaranteeing 100% single-line rendering across 5-column grids.
+   - Verified via Playwright headless testing across all 18 rendered multi-day pills.
+
+7. **Release Finalization (v0.4.0)**:
+   - Updated `STATUS.md` phase to `released` (100% requirements and acceptance criteria verified).
+   - Synchronized `CONTEXT.md` and `CHANGELOG.md` for v0.4.0.
+   - Updated Living Documentation Portal in `docs/site/index.html` (Figure 2.8).
+   - Committed changes as `feat(session-explorer): release v0.4.0 - dual-temporal telemetry, quantum trail capsule, 1-click UUID copy, and single-line lifespan pills` (commit `3b1d90d`) and tagged `session-explorer-v0.4.0`.
+
+---
+
+### Session: 2026-11-06 — Timezone Offset Alignment & Evening Session Preservation Investigation
+
+**Agent/Author**: Antigravity (Google DeepMind)  
+**SDLC Phase**: `released` (v0.4.0 patch)  
+**Duration**: ~18m  
+**Target Tool**: `tools/session-explorer`
+
+#### Problem Statement
+User observed that session `7efd4f68-0d1d-44fc-8a74-2e45f171bbcf` on `Default` and brand-new session `1561d7cf-03b1-40f6-87f2-0959b1816ded` on `django-sorcery` (both started within minutes) showed up under `All Time` filter, but completely disappeared when filtering by `Today` or `7 Days`, even though both were active in real time.
+
+#### Forensic Root Cause Isolation
+1. **Timezone Boundary Skew in Backend**:
+   - The user runs in EST (UTC-5). Sessions initiated in the evening (after 7:00 PM EST / 19:00 local) receive UTC timestamps on the *next calendar day* (e.g. `2026-11-07T00:05:16Z` and `2026-11-07T00:13:34Z`).
+   - The Go backend `parseDate("2026-11-06", true)` parsed the end-date strictly as `2026-11-06 23:59:59.999 UTC`.
+   - In `scanner.go`: `s.CreatedAt.After(to)` compared `2026-11-07 00:05:16 UTC` against `2026-11-06 23:59:59 UTC`. Because the session timestamp was after UTC midnight, the backend dropped the session as falling into tomorrow, even though in local time it was Friday evening!
+   - In `7 Days`, the end date was also `2026-11-06`, dropping the session identically.
+2. **Hardcoded UTC Specifiers in Client Project Hub**:
+   - In `app.js:getFilteredAndSortedProjSessions`, `fromTime` and `toTime` appended `'T00:00:00Z'` and `'T23:59:59.999Z'`.
+   - The hardcoded `Z` forced UTC in the browser, evaluating `toTime` as 6:59:59 PM EST. Any session started after 7:00 PM EST failed `cTime <= toTime`.
+3. **In-Project Sort Dropdown Omission**:
+   - In-project `#projectSortSelect` did not include `active` (`⚡ Last Touched`), defaulting to `date_desc` (Initiated).
+4. **Date Grouped View Partitioning**:
+   - `renderDateGroupedView` partitioned exclusively by `s.created_at`, failing to honor `s.last_message_at` when sorted by active.
+
+#### What Was Done
+1. **Backend Timezone Resolution (`src/api.go`)**:
+   - Added `resolveLocation(tzStr string) *time.Location`: parses `tz_offset` minutes from query params, constructing `time.FixedZone("ClientZone", -offsetMin*60)` with seamless fallback to `time.Local`.
+   - Updated `parseDate(s string, isEnd bool, loc *time.Location)`: parses `YYYY-MM-DD` in the client's location, expanding full 24-hour day boundaries (`00:00:00` to `23:59:59.999999999`) in local time.
+2. **Frontend Timezone Transmission (`src/web/src/app.js`)**:
+   - Added `params.append('tz_offset', new Date().getTimezoneOffset())` in `loadSessions()` and `handleModalSearch()`.
+   - Removed `Z` in `getFilteredAndSortedProjSessions`, evaluating start/end timestamps in the browser's local timezone.
+   - Added `active` (`⚡ Last Touched`) as default option in `#projectSortSelect`.
+   - Updated `renderDateGroupedView` to partition by `s.last_message_at || s.created_at` when sorting by active, accurately placing active sessions into `🌟 Active Today`.
+3. **Automated Verification**:
+   - Added unit test `TestAPI_HandleSessions_TimezoneOffsetFilter` in `src/api_test.go` verifying boundary filtering with positive and zero timezone offsets. All 38 tests pass.
+   - Re-bundled web assets with Bun in 102ms and recompiled binary `bin/session-explorer`.
+   - Verified via Playwright: both `7efd4f68` (`Default`) and `1561d7cf` (`django-sorcery`) appear as #1 under `Today`, `7 Days`, and `🌟 Active Today`.
 
 
 

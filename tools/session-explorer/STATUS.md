@@ -1,11 +1,10 @@
 ---
 tool: session-explorer
 status: released
-version: 0.3.6
-language: go
+version: 0.4.0
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---
@@ -41,6 +40,11 @@ spec: ../../specs/catalog/session-explorer.md
 | 2026-11-05 | `released` | `in-progress` | Implementing R-044 (Live Reactive Telemetry Synchronization & Session Trail Refresh) |
 | 2026-11-05 | `in-progress` | `review` | R-044 (Live Reactive Telemetry Synchronization & Session Trail Refresh) verified via Playwright and test suite |
 | 2026-11-05 | `review` | `released` | User approved release v0.3.6 (R-044, AC-071..AC-076 shipped) |
+| 2026-11-06 | `released` | `in-progress` | Implementing R-045 (Universal Session Files & Artifacts Holographic Matrix) and R-046 (Universal Multi-Dimensional Forensic Sorting Engine) |
+| 2026-11-06 | `in-progress` | `review` | R-045 and R-046 fully verified via headless Playwright MCP and automated test suite; ready for human review |
+| 2026-11-06 | `review` | `in-progress` | Implementing R-047 (1-Click Session ID Copy Capsule), R-048 (Dual-Temporal Telemetry & Multi-Day Tracking), R-049 (Tri-Modal Date Filtering Engine), R-050 (Session Trail Dual-Temporal Quantum Capsule), R-051 (Session Card UUID Copy & Layout Harmonization), and R-052 (Step Counter Integrity) |
+| 2026-11-06 | `in-progress` | `review` | R-047..R-052 fully implemented and verified via automated test suite and headless Playwright MCP |
+| 2026-11-06 | `review` | `released` | User approved release v0.4.0 (R-045..R-052 shipped) |
 
 ---
 
@@ -48,8 +52,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 43 | 43 | 100% |
-| Acceptance Criteria (AC-XXX) | 70 | 70 | 100% |
+| Requirements (R-XXX) | 52 | 52 | 100% |
+| Acceptance Criteria (AC-XXX) | 116 | 116 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -102,6 +106,14 @@ spec: ../../specs/catalog/session-explorer.md
 | R-042 | Empirical Skill Invocation Telemetry & Standby Decomposition (3-Tier Evidence, Scope Deduplication, Step Indices, Triggers) | `src/context_scanner.go`, `src/types.go`, `src/web/src/app.js`, `src/web/index.html` | `src/context_test.go`, headless browser | 🧪 |
 | R-043 | Bin-Packing Spatial Density & Panoramic Masonry Matrix (EC2-Style Greedy Placement, Dynamic Column Balancing, Holographic Action Capsules) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
 | R-044 | Live Reactive Telemetry Synchronization & Session Trail Refresh (SSE-driven Dynamic Files & Context Updates, Tactile Counter Pulse, Dedicated Refresh Button) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
+| R-045 | Universal Session Files & Artifacts Holographic Matrix (Year 2500 Panoramic Widescreen, 4 Lenses, 5-Capsule Telemetry, Greedy Bin-Packing, Step Jumps) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
+| R-046 | Universal Multi-Dimensional Forensic Sorting Engine (Holographic Sort Dropdowns, 7-Dimension Files Sorting, 5-Dimension Context Sorting, Touch Spans) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
+| R-047 | 1-Click Interactive Session UUID Copy Capsule (Aero-Mica Trail Header Capsule, Clipboard Copy, Micro-Feedback) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
+| R-048 | Dual-Temporal Telemetry, Active Recency Engine & Multi-Day Lifespan Tracking (⚡ Last Active Pulse, Inception Date, Multi-Day Span Badge, Active Sorting) | `src/scanner.go`, `src/api.go`, `src/web/src/app.js`, `src/web/src/styles.css` | `src/api_test.go`, headless browser | 🧪 |
+| R-049 | Inclusive Lifetime Date Filtering Engine (Clean Date Bar, Lifetime Overlap Surfacing Active Sessions, Zero Clutter) | `src/scanner.go`, `src/api.go`, `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | `src/api_test.go`, headless browser | 🧪 |
+| R-050 | Session Trail Dual-Temporal Quantum Capsule & Live Recency Telemetry (Live Pulse Dot, Initiated Timestamp, Lifespan Badge) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
+| R-051 | Session Card 1-Click UUID Copy & Layout Harmonization (Card Copy Button, Aligned Baseline Metadata, Glyph Padding) | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | 🧪 |
+| R-052 | Step Counter & Filter State Integrity (`Showing X of Y steps` Preserved Across Type Switches and Refresh) | `src/web/src/app.js` | headless browser | 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

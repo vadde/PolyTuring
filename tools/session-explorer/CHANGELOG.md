@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+### Fixed
+- **Timezone Boundary Skew & Local Time Offset Alignment (R-010, R-049)**:
+  - Resolved timezone skew bug where evening sessions created after 00:00:00 UTC (e.g. 7:00 PM EST) fell onto the next UTC calendar day, causing them to be prematurely dropped by naive UTC midnight boundary checks in `Today` and `7 Days` filters.
+  - Implemented dynamic client timezone offset transmission (`tz_offset`) via API query parameters and `resolveLocation(tzStr)` in Go backend (`time.FixedZone` with fallback to `time.Local`), ensuring date ranges evaluate full 24-hour windows in the user's local timezone.
+  - Fixed client-side in-project date filtering in `getFilteredAndSortedProjSessions` by removing hardcoded UTC `Z` specifiers, aligning with local browser day boundaries.
+  - Added `active` (`⚡ Last Touched`) as primary sort option to in-project toolbar dropdown and synchronized Date Grouped view partitioning.
+
+### Added
+- **Inclusive Lifetime Date Filtering Engine (R-049)**:
+
+  - Date filtering naturally evaluates inclusive lifetime overlap (`lastActive >= from && createdAt <= to`), surfacing all sessions active or initiated in the window without cluttering the toolbar.
+- **Session Trail Dual-Temporal Quantum Capsule (R-050)**:
+  - Upgraded Session Trail detail header to `.detail-temporal-capsule` rendering `⚡ Active <relativeTime>` with neon pulse dot, `🌱 Initiated: <formattedDate>`, and dynamic `⏳ Multi-Day Span: Xd (<start> ➔ <end>)` pill.
+- **Card-Level 1-Click UUID Copy & Layout Harmonization (R-047, R-051)**:
+  - Added `.detail-session-capsule` to top-left of Session Trail header with 1-click UUID copy button (`📋 Copy`), visual `✓ Copied!` state, and toast feedback.
+  - Added `.card-copy-btn` (`[📋 <uuid:8>]`) directly on each session card header on the main grid for frictionless 1-click UUID copying.
+  - Compact single-line lifespan pill `⏳ Xd Span (Nov 4 ➔ Nov 6)` with CSS `white-space: nowrap; overflow: hidden; text-overflow: ellipsis;` preventing multi-line wrapping in 5-column layouts.
+  - Standardized `.session-lifespan-row` with uniform minimum height (`1.6rem`), eliminating grid baseline jitter.
+  - Enhanced `.prompt-snippet` with `line-height: 1.5`, `min-height: 4.8rem`, and glyph padding to prevent character cutoff.
+- **Dual-Temporal Telemetry & Multi-Day Lifespan Tracking (R-048)**:
+  - Added dual temporal badges to session cards (`⚡ Active <time>` + `🌱 Inception: <date>`).
+  - Added sorting by `active` (`sort_by=active` / `sort_by=last_active`) as primary default sort across backend and frontend.
+  - Enhanced Date Grouped view to partition by effective recency with in-view lens toggle.
+- **Step Counter & Filter State Integrity (R-052)**:
+  - Preserved `Showing X of Y steps` step subset telemetry when switching message type chips or refreshing Session Trail.
+- **Universal Session Files & Artifacts Holographic Matrix (R-045)**:
+  - Year 2500 panoramic widescreen command bridge (`width: min(1560px, 94vw); max-width: 1560px; max-height: 90vh;`) with liquid glass backdrop blur and glowing icon pulse.
+  - 4 Forensic Lenses: `🗂️ Universal Catalog`, `✨ Artifacts & Deliverables`, `✏️ Codebase Mutations`, `📊 Churn & Blast Radius Telemetry`.
+  - 5-Capsule Holographic Telemetry Ribbon: Deliverables count, Code Mutations, Inspected Files, Blast Radius, and Reconnaissance Ratio ($R_{\text{RW}}$).
+  - Dynamic language and file extension spectrum breakdown bar with color-coded segments and telemetry cards.
+  - EC2-style greedy shortest-column bin-packing spatial placement with zero vertical voids.
+  - 1-click step navigation markers (`#X`) with smooth scroll and animated neon pulse highlight.
+  - 1-click Open in Native File Viewer (`Open ↗`) and Quick Path Copy (`📋 Full` / `📋 Rel`).
+
+- **Universal Multi-Dimensional Forensic Sorting Engine (R-046)**:
+  - Interactive Year 2500 `.agent-matrix-sort-box` with holographic select dropdowns styled in aero-mica liquid glass.
+  - **Files & Artifacts Sorting (7 Dimensions)**: Deliverable Priority (`type_priority`), Churn Intensity (`churn_desc`), Last Touched Recency (`last_touch`), Chronological Flow (`first_touch`), Read Volume (`reads_desc`), Alphabetical (`name_asc`), and File Extension (`ext_asc`).
+  - **In-Session Agent Brain Matrix Sorting (5 Dimensions)**: Execution Frequency (`calls_desc`), Step Recency (`last_step`), Token Bloat (`bloat_desc`), Precedence Cascade (`precedence`), and Alphabetical (`name_asc`).
+  - **Global Machine Agent Matrix Sorting (4 Dimensions)**: Token Bloat (`bloat_desc`), Line Count (`lines_desc`), Alphabetical (`name_asc`), and Scope Precedence (`scope`).
+  - **Touch Span Telemetry Capsule**: Monospace capsule pill (`Span: #X ➔ #Y` or `Step #X`) on file cards for instantaneous forensic visibility of a file's active lifetime span across turns.
+  - Zero-layout-shift bin-pack re-computation executed in < 12ms.
+
 ## [0.3.6] - 2026-11-05
 
 ### Added
