@@ -67,7 +67,7 @@ pub struct DbClient {
     pub graph_generation: Arc<AtomicU64>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DbNode {
     pub id: String,
     pub workspace: Option<String>,
@@ -88,6 +88,10 @@ pub struct DbNode {
     pub community: Option<i32>,
     #[serde(default)]
     pub file_hash: Option<String>,
+    #[serde(default)]
+    pub has_reflection: Option<bool>,
+    #[serde(default)]
+    pub parent_label: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -724,13 +728,15 @@ impl DbClient {
         Ok(paths)
     }
 
-    /// Semantic search using native SurrealDB v2 HNSW KNN operator (R-007, R-009, R-067, R-083)
+    /// Semantic search using native SurrealDB v2 HNSW KNN operator (R-007, R-009, R-067, R-083, R-112)
     pub async fn search_vector(
         &self,
         query_vec: &[f32],
         k: usize,
         workspace: Option<&str>,
         include_docs: bool,
+        exclude_tests: bool,
+        path_prefix: Option<&str>,
     ) -> Result<Vec<SearchResult>, String> {
         let vec_json = serde_json::to_string(query_vec).map_err(|e| e.to_string())?;
         let mut conditions = Vec::new();
@@ -742,6 +748,19 @@ impl DbClient {
         conditions.push("kind NOT IN ['workspace', 'directory']".to_string());
         if !include_docs {
             conditions.push("language != 'markdown'".to_string());
+        }
+
+        // Pre-KNN Test Exclusion Filter (R-112, SPEC-OMNI-006)
+        if exclude_tests {
+            conditions.push("NOT (file_path CONTAINS 'tests/' OR file_path CONTAINS 'test/' OR file_path CONTAINS 'test_' OR file_path CONTAINS '_test.' OR file_path CONTAINS 'spec/' OR file_path CONTAINS 'specs/')".to_string());
+        }
+
+        // Path Prefix Scoping (R-112, SPEC-OMNI-006)
+        if let Some(prefix) = path_prefix {
+            let clean_prefix = prefix.trim();
+            if !clean_prefix.is_empty() {
+                conditions.push(format!("file_path CONTAINS '{}'", surql_escape(clean_prefix)));
+            }
         }
 
         let ef = (k * 4).max(40);
@@ -1320,20 +1339,85 @@ impl DbClient {
     }
 
     /// Symbolic lookup: Find symbol definitions by name (LSP textDocument/definition equivalent)
+    /// Supports qualified names:
+    /// - Class.method (R-113: resolves via CONTAINS edge or enclosing file)
+    /// - path/to/file:symbol (R-113: resolves via file_path filter)
     pub async fn find_symbols(
         &self,
         name: &str,
         workspace: Option<&str>,
         limit: Option<usize>,
     ) -> Result<Vec<DbNode>, String> {
-        let escaped = surql_escape(name);
         let ws_filter = match workspace {
             Some(ws) if !ws.is_empty() => format!("AND workspace = '{}'", surql_escape(ws)),
             _ => String::new(),
         };
         let lim = limit.unwrap_or(25).min(200);
+
+        // Path-qualified syntax: "path/to/file.py:symbol_name" (R-113)
+        if let Some((path_part, sym_part)) = name.split_once(':') {
+            let esc_path = surql_escape(path_part.trim());
+            let esc_sym = surql_escape(sym_part.trim());
+            let q = format!(
+                "SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, has_reflection, \
+                 (label = '{esc_sym}') AS is_exact \
+                 FROM node WHERE (label = '{esc_sym}' OR label CONTAINS '{esc_sym}') \
+                   AND (file_path = '{esc_path}' OR string::ends_with(file_path, '{esc_path}') OR file_path CONTAINS '{esc_path}') {ws_filter} \
+                 ORDER BY is_exact DESC, label ASC LIMIT {lim};"
+            );
+            let resp = self.query_sql(&q).await?;
+            let mut results = Vec::new();
+            if let Some(arr) = resp.as_array().and_then(|a| a.first()).and_then(|r| r.get("result")).and_then(|res| res.as_array()) {
+                for item in arr {
+                    if let Ok(node) = serde_json::from_value::<DbNode>(item.clone()) {
+                        results.push(node);
+                    }
+                }
+            }
+            if !results.is_empty() {
+                return Ok(results);
+            }
+        }
+
+        // Dot-qualified syntax: "Class.method" or "Receiver.call" (R-113)
+        if let Some((parent_part, child_part)) = name.rsplit_once('.') {
+            let esc_parent = surql_escape(parent_part.trim());
+            let esc_child = surql_escape(child_part.trim());
+            if !esc_parent.is_empty() && !esc_child.is_empty() {
+                let q = format!(
+                    "LET $parents = (SELECT VALUE id FROM node WHERE (label = '{esc_parent}' OR string::ends_with(label, '::{esc_parent}') OR string::ends_with(label, '.{esc_parent}')) {ws_filter});\n\
+                     LET $parent_files = (SELECT VALUE file_path FROM node WHERE id IN $parents);\n\
+                     SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, has_reflection, \
+                            '{esc_parent}' AS parent_label, \
+                            (label = '{esc_child}') AS is_exact \
+                     FROM node \
+                     WHERE (label = '{esc_child}' OR label CONTAINS '{esc_child}') \
+                       AND ( \
+                           <-linked_to[WHERE type = 'CONTAINS'].in IN $parents \
+                           OR file_path IN $parent_files \
+                       ) {ws_filter} \
+                     ORDER BY is_exact DESC, label ASC LIMIT {lim};"
+                );
+                let resp = self.query_sql(&q).await?;
+                let arrays = extract_sql_arrays(&resp);
+                let mut results = Vec::new();
+                if let Some(arr) = arrays.last() {
+                    for item in *arr {
+                        if let Ok(node) = serde_json::from_value::<DbNode>(item.clone()) {
+                            results.push(node);
+                        }
+                    }
+                }
+                if !results.is_empty() {
+                    return Ok(results);
+                }
+            }
+        }
+
+        // Standard bare identifier lookup
+        let escaped = surql_escape(name);
         let q = format!(
-            "SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, \
+            "SELECT id, workspace, label, kind, file_path, language, line_start, line_end, text, community, has_reflection, \
              (label = '{}') AS is_exact \
              FROM node WHERE (label = '{}' OR label CONTAINS '{}' OR file_path = '{}' OR file_path CONTAINS '{}') {} \
              ORDER BY is_exact DESC, label ASC LIMIT {};",

@@ -20,8 +20,10 @@ Commands:
   health                     Check service health (Rust API, SurrealDB, TEI)
   workspaces                 List all indexed codebases/workspaces and stats
   worktrees [sync [ws]]      List or sync git worktrees across parent codebases
-  search <query> [ws] [k]    Vector similarity search (optional workspace filter)
-  symbol <name> [ws]         Symbol definition lookup (LSP definition)
+  search <query> [ws] [k] [--exclude-tests|-x] [--path-prefix|-p <p>]
+                             Dense vector similarity search (supports test exclusion and subtree filtering)
+  symbol <name|Class.method|path:symbol> [ws]
+                             Symbol definition lookup (supports qualified names like Query.order_by or path:symbol)
   references <symbol> [ws]   Find all callers/references (LSP references)
   relate <src> <tgt> [t] [ws] Augment graph with dynamic/inferred relationship
   condense <sym> [ws] [hops] Multi-hop AST subgraph slice (<1500 tokens for agents)
@@ -97,21 +99,35 @@ except Exception as e:
     ;;
 
   search)
-    QUERY="${1:-}"
-    WS="$(norm_ws "${2:-}")"
-    K="${3:-10}"
-    if [ -z "${QUERY}" ]; then echo "❌ Missing query argument"; exit 1; fi
     python3 -c "
-import urllib.request, urllib.parse, json, sys
-params = {'q': sys.argv[1], 'k': sys.argv[3]}
-if sys.argv[2]:
-    params['workspace'] = sys.argv[2]
+import argparse, json, sys, urllib.parse, urllib.request
+
+parser = argparse.ArgumentParser(prog='omni search', description='Vector similarity search')
+parser.add_argument('query', help='Search query')
+parser.add_argument('workspace', nargs='?', default=None, help='Workspace filter')
+parser.add_argument('k', nargs='?', default=10, type=int, help='Top k results')
+parser.add_argument('--exclude-tests', '-x', action='store_true', help='Exclude test files')
+parser.add_argument('--path-prefix', '-p', default=None, help='Filter by file path prefix')
+
+args = parser.parse_args([a for a in sys.argv[1:] if a != ''])
+params = {'q': args.query, 'k': str(args.k)}
+if args.workspace:
+    params['workspace'] = args.workspace.rstrip('/').split('/')[-1]
+if args.exclude_tests:
+    params['exclude_tests'] = 'true'
+if args.path_prefix:
+    params['path_prefix'] = args.path_prefix
+
 url = '${ENDPOINT}/api/search?' + urllib.parse.urlencode(params)
 req = urllib.request.Request(url)
-with urllib.request.urlopen(req) as resp:
-    data = json.loads(resp.read().decode())
-    print(json.dumps(data, indent=2))
-" "${QUERY}" "${WS}" "${K}"
+try:
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read().decode())
+        print(json.dumps(data, indent=2))
+except Exception as e:
+    print(f'❌ Search failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" "$@"
     ;;
 
   symbol)

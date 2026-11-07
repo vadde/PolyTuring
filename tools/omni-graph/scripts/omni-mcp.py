@@ -44,13 +44,21 @@ def get_default_workspace() -> str:
 TOOLS_SPEC = [
     {
         "name": "omni_definition",
-        "description": "Lookup precise AST definition, signatures, and file line ranges for a code symbol. Essential before editing code.",
+        "description": "Lookup precise AST definition, signatures, and file line ranges for a code symbol. Returns in-band code bodies for single targets under 120 lines to eliminate secondary read_file calls.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "symbol": {
                     "type": "string",
-                    "description": "The exact identifier name of the function, struct, class, method, or interface."
+                    "description": "The exact identifier name of the function, struct, class, method, or interface (supports Class.method and path:symbol)."
+                },
+                "include_body": {
+                    "type": "boolean",
+                    "description": "Whether to return the complete symbol body if under 120 lines (default true). Avoids secondary read_file calls."
+                },
+                "force_full_bodies": {
+                    "type": "boolean",
+                    "description": "Force full bodies even when query matches > 3 symbols (default false)."
                 },
                 "workspace": {
                     "type": "string",
@@ -121,6 +129,14 @@ TOOLS_SPEC = [
                 "include_docs": {
                     "type": "boolean",
                     "description": "Whether to include markdown documentation nodes (default false: code-only)."
+                },
+                "exclude_tests": {
+                    "type": "boolean",
+                    "description": "Whether to exclude test directories and test files (default false)."
+                },
+                "path_prefix": {
+                    "type": "string",
+                    "description": "Filter results by directory path prefix (e.g. 'src/' or 'django_sorcery/')."
                 }
             },
             "required": ["query"]
@@ -201,6 +217,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
     try:
         if name == "omni_definition":
             symbol = args["symbol"]
+            include_body = args.get("include_body", True)
+            force_full_bodies = args.get("force_full_bodies", False)
             params = urllib.parse.urlencode({"name": symbol, "workspace": workspace, "wait_for_sync": "true"})
             res = make_http_request(f"{API_URL}/api/symbol?{params}")
             if res.get("locked"):
@@ -210,11 +228,34 @@ def handle_tool_call(name: str, args: dict) -> dict:
                 return {"content": [{"type": "text", "text": f"Symbol '{symbol}' not found in workspace '{workspace}'."}]}
             
             lines = [f"Found {len(matches)} match(es) for '{symbol}' in workspace '{workspace}':\n"]
+            match_count = len(matches)
             for m in matches:
-                lines.append(f"• [{m.get('kind', 'symbol')}] `{m.get('label')}` in `{m.get('file_path')}:{m.get('line_start')}-{m.get('line_end')}` ({m.get('language')})")
-                text_preview = m.get('text', '').strip()
-                if text_preview:
-                    lines.append(f"  ```{m.get('language', '')}\n  {text_preview[:400]}\n  ```")
+                kind = m.get('kind', 'symbol')
+                label = m.get('label')
+                parent_prefix = f"{m.get('parent_label')}." if m.get('parent_label') else ""
+                disp_label = f"{parent_prefix}{label}" if parent_prefix and not label.startswith(parent_prefix) else label
+                refl_tag = " [⚠️ reflection]" if m.get("has_reflection") else ""
+                lines.append(f"• [{kind}] `{disp_label}` in `{m.get('file_path')}:{m.get('line_start')}-{m.get('line_end')}` ({m.get('language')}){refl_tag}")
+                text = m.get('text', '').strip()
+                if text:
+                    line_start = m.get('line_start', 0)
+                    line_end = m.get('line_end', 0)
+                    line_count = (line_end - line_start + 1) if line_end >= line_start else len(text.splitlines())
+                    # Adaptive budgeting (R-110):
+                    # If single match: full body up to 120 lines / 3500 chars
+                    # If 2-3 matches: full body up to 60 lines each
+                    # If >3 matches and not force_full_bodies: clamp preview with guidance to prevent prompt bloat
+                    can_embed_full = include_body and (
+                        force_full_bodies
+                        or (match_count == 1 and line_count <= 120 and len(text) <= 3500)
+                        or (match_count <= 3 and line_count <= 60 and len(text) <= 2000)
+                    )
+                    if can_embed_full:
+                        lines.append(f"  ```{m.get('language', '')}\n{text}\n  ```")
+                    elif include_body and line_count > 120 and match_count == 1:
+                        lines.append(f"  ```{m.get('language', '')}\n{text[:600]}\n  ... [truncated: {line_count} lines. Use read_file({m.get('file_path')}, StartLine={line_start}, EndLine={line_end}) for full code]\n  ```")
+                    else:
+                        lines.append(f"  ```{m.get('language', '')}\n{text[:300]} ...\n  ```")
             return {"content": [{"type": "text", "text": "\n".join(lines)}]}
 
         elif name == "omni_references":
@@ -294,7 +335,18 @@ def handle_tool_call(name: str, args: dict) -> dict:
             query = args["query"]
             k = args.get("k", 10)
             include_docs = "true" if args.get("include_docs", False) else "false"
-            params = urllib.parse.urlencode({"q": query, "workspace": workspace, "k": k, "include_docs": include_docs, "wait_for_sync": "true"})
+            search_query_dict = {
+                "q": query,
+                "workspace": workspace,
+                "k": k,
+                "include_docs": include_docs,
+                "wait_for_sync": "true",
+            }
+            if args.get("exclude_tests"):
+                search_query_dict["exclude_tests"] = "true"
+            if args.get("path_prefix"):
+                search_query_dict["path_prefix"] = args["path_prefix"]
+            params = urllib.parse.urlencode(search_query_dict)
             res = make_http_request(f"{API_URL}/api/search?{params}")
             if isinstance(res, dict) and res.get("locked"):
                 return {"content": [{"type": "text", "text": f"⏳ Workspace '{workspace}' is synchronizing graph topology. {res.get('message', '')}"}]}

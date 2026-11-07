@@ -59,6 +59,10 @@ pub struct SearchParams {
     pub workspace: Option<String>,
     pub include_docs: Option<bool>,
     #[serde(default)]
+    pub exclude_tests: Option<bool>,
+    #[serde(default)]
+    pub path_prefix: Option<String>,
+    #[serde(default)]
     pub wait_for_sync: Option<bool>,
     #[serde(default)]
     pub timeout_ms: Option<u64>,
@@ -702,9 +706,11 @@ async fn search_handler(
         }
     };
 
-    // 2. Perform HNSW cosine similarity search
+    // 2. Perform HNSW cosine similarity search (with pre-KNN filters, R-112)
     let include_docs = params.include_docs.unwrap_or(false);
-    let res = state.db.search_vector(&query_vec, k, ws.as_deref(), include_docs).await;
+    let exclude_tests = params.exclude_tests.unwrap_or(false);
+    let path_prefix = params.path_prefix.as_deref();
+    let res = state.db.search_vector(&query_vec, k, ws.as_deref(), include_docs, exclude_tests, path_prefix).await;
     let duration_ms = start.elapsed().as_millis() as i64;
 
     // Record telemetry asynchronously

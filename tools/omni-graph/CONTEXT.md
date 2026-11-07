@@ -16,18 +16,28 @@ blockers: []
 
 ## Current State
 
-- **SDLC Phase**: `in-progress`
-- **Version**: 0.7.0-dev
+- **SDLC Phase**: `testing`
+- **Version**: 0.8.0-dev
 - **Language**: Rust (backend orchestrator) + React/TypeScript (frontend UI)
 - **Category**: GenAI
 - **Architecture**: Multi-container Docker microservices (4 services on `omni-net`)
-- **Active Specification**: [`specs/catalog/omni-graph-live-watcher-fidelity-parity.md`](../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md)
+- **Active Specification**: [`specs/catalog/omni-graph-agent-dx-improvements.md`](../../specs/catalog/omni-graph-agent-dx-improvements.md)
+- **Product Requirements Document**: [`specs/catalog/omni-graph-agent-dx-prd.md`](../../specs/catalog/omni-graph-agent-dx-prd.md)
 - **Architecture Decision Record**: [`docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md`](../../docs/architecture/adr-002-live-watcher-fidelity-concurrency-overhaul.md)
 
 ### Progress
 
 | Metric | Done | Total | Status |
 |--------|------|-------|--------|
+| In-Band AST Code Slices & Adaptive Budgeting (R-110) | Complete | — | 🟢 Full body up to 120 lines in markdown code fences; eliminates secondary read_file calls |
+| Semantic Kind-Weighted Centroid Election (R-111) | Complete | — | 🟢 Purged import titles (`from ...`, `import ...`); prioritized Classes (100) > Functions (75) > Methods (50) |
+| Pre-KNN Scoped Filtering in Vector Search (R-112) | Complete | — | 🟢 Native SurrealQL `NOT (file_path CONTAINS 'test')` and `string::starts_with` in HNSW query |
+| Qualified Symbol & Containment Traversal (R-113) | Complete | — | 🟢 Direct resolution of `Class.method` (Query.order_by) and `path:symbol` via CONTAINS edges |
+| Python Class Inheritance & Metaclass DAG (R-114) | Complete | — | 🟢 AST tree-sitter extraction of `keyword_argument` (`metaclass=...`) emitting `METACLASS_OF` edges |
+| Python Import Alias Resolution in Symbol Table (R-115) | Complete | — | 🟢 `extract_imported_symbols` extracts both original name and `as <alias>`, unblocking aliased base resolution |
+| Dynamic Reflection Heuristic Flagging (R-116) | Complete | — | 🟢 Zero-overhead detection of reflection primitives (`setattr`, `getattr`) rendering `[⚠️ reflection]` badge |
+| Multi-Workspace MCP Parity & Tool Schema Sync (R-117) | Complete | — | 🟢 Stdio JSON-RPC MCP server (`omni-mcp.py`) and schema files synchronized across workspace & global skills |
+| Test Coverage | 125/125 Unit Tests | 125 | 🟢 100% Verified (0.05s, 0 clippy warnings) |
 | Reactive Inverted Dependency Graph (R-093) | Complete | — | 🟢 ReverseDependencyIndex (`symbol_callers`) tracking foreign callers dependent on exported symbols |
 | Unresolved Edge Retention Pool (R-103) | Complete | — | 🟢 RAM `UnresolvedReferencePool` retains dangling forward references; auto-drains when targets appear |
 | Language-Aware SAIR Scoping (R-106) | Complete | — | 🟢 SymbolDef language field & extension detection; eliminates polyglot cross-language candidate leakage |

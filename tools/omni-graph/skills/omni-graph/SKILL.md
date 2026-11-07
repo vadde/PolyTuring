@@ -113,10 +113,12 @@ The stdio MCP server runs hermetically via `tools/omni-graph/scripts/omni-mcp.py
   "tools": [
     {
       "name": "omni_definition",
-      "description": "Lookup precise AST definition, signatures, and file line ranges for a code symbol.",
+      "description": "Lookup precise AST definition, signatures, and file line ranges for a code symbol. Includes in-band implementation body.",
       "parameters": {
-        "symbol": "string (required) — Exact identifier name (function, struct, class, interface)",
-        "workspace": "string (optional) — Workspace name (defaults to auto-detected Git root)"
+        "symbol": "string (required) — Identifier name, qualified symbol (e.g., 'Class.method'), or file-scoped path ('path/file.py:func')",
+        "workspace": "string (optional) — Workspace name (defaults to auto-detected Git root)",
+        "include_body": "boolean (optional, default true) — Include full code body in-band (dynamically adapts budget if >3 matches)",
+        "force_full_bodies": "boolean (optional, default false) — Force full code body inclusion even for multiple ambiguous matches"
       }
     },
     {
@@ -143,7 +145,9 @@ The stdio MCP server runs hermetically via `tools/omni-graph/scripts/omni-mcp.py
         "query": "string (required) — Natural language or technical concept",
         "k": "integer (optional, default 10) — Number of top results",
         "workspace": "string (optional) — Target workspace name",
-        "include_docs": "boolean (optional, default false) — Include markdown documentation nodes"
+        "include_docs": "boolean (optional, default false) — Include markdown documentation nodes",
+        "exclude_tests": "boolean (optional, default false) — Pre-KNN filter excluding test files, test directories, and benchmark files",
+        "path_prefix": "string (optional) — Filter vector search results strictly within subtrees matching prefix"
       }
     },
     {
@@ -178,19 +182,19 @@ The command-line wrapper lives at `./scripts/omni` (symlinked to `tools/omni-gra
 ./scripts/omni worktrees [sync]          # Scan & synchronize ephemeral Git worktrees
 
 # AST Code Intelligence
-./scripts/omni symbol <name> [ws]        # Locate symbol definition, line bounds, and code snippet
-./scripts/omni references <name> [ws]    # Locate all callers, importing files, and test suites
-./scripts/omni condense <name> [ws] [h]  # Extract <1500-token PPR-condensed call graph slice (hops: 1 or 2)
-./scripts/omni search <query> [ws] [k]   # Dense vector semantic code search (top k)
-./scripts/omni galaxies [ws]             # ASCII table of modular architectural subsystems & coupling metrics
-./scripts/omni query <prompt> [ws] [k]   # Hybrid Graph-RAG architectural brief
-./scripts/omni relate <src> <tgt> [t]    # Inject dynamic/inferred runtime relationship edge (CALLS, ROUTES_TO)
+./scripts/omni symbol <name|Class.method|path:symbol> [ws]  # Locate symbol definition, line bounds, and code snippet
+./scripts/omni references <name> [ws]                      # Locate all callers, importing files, and test suites
+./scripts/omni condense <name> [ws] [h]                    # Extract <1500-token PPR-condensed call graph slice (hops: 1 or 2)
+./scripts/omni search <query> [ws] [k] [--exclude-tests|-x] [--path-prefix|-p <p>] # Dense vector semantic code search
+./scripts/omni galaxies [ws]                               # ASCII table of modular architectural subsystems & coupling metrics
+./scripts/omni query <prompt> [ws] [k]                     # Hybrid Graph-RAG architectural brief
+./scripts/omni relate <src> <tgt> [t]                      # Inject dynamic/inferred runtime relationship edge (CALLS, ROUTES_TO)
 
 # Ingestion & Live Watch
-./scripts/omni ingest <path> [ws]        # Initial one-time indexing of an untracked repository
-./scripts/omni watch status              # Inspect real-time file watcher sync metrics & event counters
-./scripts/omni watch start [path]        # Start live file watcher daemon for repository
-./scripts/omni watch stop                # Stop live file watcher daemon
+./scripts/omni ingest <path> [ws]                          # Initial one-time indexing of an untracked repository
+./scripts/omni watch status                                # Inspect real-time file watcher sync metrics & event counters
+./scripts/omni watch start [path]                          # Start live file watcher daemon for repository
+./scripts/omni watch stop                                  # Stop live file watcher daemon
 ```
 
 ### 3. Tier 3: Direct REST API Endpoints Reference
@@ -199,10 +203,10 @@ All endpoints serve JSON directly from the Rust core on `http://localhost:8080`:
 
 - `GET  /api/health` — System status (`{"status":"ok","surrealdb":true,"embeddings":true}`)
 - `GET  /api/workspaces` — Array of indexed workspaces, node counts, languages, and live watch states
-- `GET  /api/symbol?name=<sym>&workspace=<ws>` — Precise symbol definition records
+- `GET  /api/symbol?name=<sym>&workspace=<ws>` — Precise symbol definition records (supports `Class.method` and `path:symbol`)
 - `GET  /api/references?symbol=<sym>&workspace=<ws>` — Callers, importers, and edge categories
 - `GET  /api/condense?symbol=<sym>&workspace=<ws>&hops=2` — PPR-condensed Markdown call slice
-- `GET  /api/search?q=<query>&workspace=<ws>&k=10&include_docs=false` — Vector similarity search
+- `GET  /api/search?q=<query>&workspace=<ws>&k=10&include_docs=false&exclude_tests=false&path_prefix=src/` — Vector similarity search
 - `GET  /api/galaxies?workspace=<ws>&limit=15` — Louvain/Leiden modular clusters and instability metrics
 - `POST /api/query` — Hybrid Graph-RAG synthesis (`{"prompt":"...", "workspace":"...", "include_docs":false}`)
 - `POST /api/relationships` — Edge augmentation (`{"source_symbol":"...", "target_symbol":"...", "type":"..."}`)

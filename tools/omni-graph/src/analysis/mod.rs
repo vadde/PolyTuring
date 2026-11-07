@@ -588,19 +588,73 @@ impl CommunityDetector {
             let mut languages = HashSet::new();
             let mut dir_counts: HashMap<String, usize> = HashMap::new();
 
+            // Semantic Kind-Weighted Centroid Election & Label Sanitization (R-111, SPEC-OMNI-006)
+            // Filter out import nodes, files, directories, manifests, and multi-line statements.
+            // Weight candidate symbols: class/struct/interface (100) > function/fn (75) > method (50) > const/enum (20).
+            let is_invalid_label = |label: &str| -> bool {
+                let trimmed = label.trim();
+                trimmed.is_empty()
+                    || trimmed.contains('\n')
+                    || trimmed.starts_with("from ")
+                    || trimmed.starts_with("import ")
+                    || trimmed.starts_with('.')
+                    || trimmed.starts_with("use ")
+            };
+
+            let get_kind_weight = |kind: &str| -> usize {
+                match kind.to_lowercase().as_str() {
+                    "class" | "struct" | "interface" | "trait" | "type" | "classdef" => 100,
+                    "function" | "fn" => 75,
+                    "method" | "constructor" => 50,
+                    "constant" | "enum" | "macro" | "property" => 20,
+                    _ => 0,
+                }
+            };
+
+            let mut scored_symbols: Vec<(&DbNode, usize)> = Vec::new();
+
             for m in &members {
                 files_set.insert(m.file_path.clone());
                 if !m.language.is_empty() {
                     languages.insert(m.language.clone());
-                }
-                if top_symbols.len() < 8 {
-                    top_symbols.push(m.label.clone());
                 }
 
                 if let Some(parent) = std::path::Path::new(&m.file_path).parent() {
                     let p = parent.to_string_lossy().to_string();
                     if !p.is_empty() && p != "." {
                         *dir_counts.entry(p).or_insert(0) += 1;
+                    }
+                }
+
+                if !is_invalid_label(&m.label) {
+                    let weight = get_kind_weight(&m.kind);
+                    if weight > 0 {
+                        scored_symbols.push((m, weight));
+                    }
+                }
+            }
+
+            // Sort by kind weight descending, then label alphabetical for determinism
+            scored_symbols.sort_by(|(a_node, a_weight), (b_node, b_weight)| {
+                b_weight.cmp(a_weight).then_with(|| a_node.label.cmp(&b_node.label))
+            });
+
+            for (m, _) in &scored_symbols {
+                if top_symbols.len() < 8 && !top_symbols.contains(&m.label) {
+                    top_symbols.push(m.label.clone());
+                }
+            }
+
+            // If no weighted code symbols qualified, populate fallback top_symbols from sanitized non-import nodes
+            if top_symbols.is_empty() {
+                for m in &members {
+                    if !is_invalid_label(&m.label)
+                        && m.kind != "import"
+                        && m.kind != "import_from"
+                        && top_symbols.len() < 8
+                        && !top_symbols.contains(&m.label)
+                    {
+                        top_symbols.push(m.label.clone());
                     }
                 }
             }
@@ -615,7 +669,11 @@ impl CommunityDetector {
 
             let primary_symbol = top_symbols.first().map(|s| s.as_str()).unwrap_or("");
             let name = if dominant.is_empty() || dominant == "." {
-                format!("Galaxy #{}", cid)
+                if !primary_symbol.is_empty() {
+                    format!("Galaxy #{}: {}", cid, primary_symbol)
+                } else {
+                    format!("Galaxy #{}", cid)
+                }
             } else if !primary_symbol.is_empty() && primary_symbol != dominant {
                 format!("{} ({})", dominant, primary_symbol)
             } else {
@@ -811,7 +869,7 @@ impl GraphRagEngine {
     ) -> Result<GraphRagResponse, String> {
         // 1. Microscopic Vector Search with Content-Tier Partitioning (R-067)
         let query_vec = embedder.embed_single(prompt).await?;
-        let vector_hits = db.search_vector(&query_vec, top_k, workspace, include_docs).await?;
+        let vector_hits = db.search_vector(&query_vec, top_k, workspace, include_docs, false, None).await?;
 
         // 2. Collect Seed Symbols and IDs
         let mut seed_symbols = Vec::new();
