@@ -43,6 +43,8 @@ pub struct ParseResult {
 pub struct CodeParser;
 
 impl CodeParser {
+    pub const MAX_AST_NODE_TEXT_CHARS: usize = 4000;
+
     fn safe_truncate(s: &str, max_chars: usize) -> &str {
         match s.char_indices().nth(max_chars) {
             Some((idx, _)) => &s[..idx],
@@ -274,13 +276,25 @@ impl CodeParser {
             // "from foo import bar, baz"
             // "from foo.bar import baz as b"
             // "import os, sys"
+            // "from django.forms.models import BaseModelForm as DjangoBaseModelForm" (R-115)
             if let Some(after_import) = trimmed.rsplit("import ").next() {
                 for part in after_import.split(',') {
                     let part = part.trim();
-                    let raw_name = part.split_whitespace().next().unwrap_or(part);
-                    let clean = raw_name.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
-                    if !clean.is_empty() && !symbols.contains(&clean.to_string()) {
-                        symbols.push(clean.to_string());
+                    if let Some((orig, alias)) = part.split_once(" as ") {
+                        let clean_orig = orig.trim().trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        let clean_alias = alias.trim().trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        if !clean_orig.is_empty() && !symbols.contains(&clean_orig.to_string()) {
+                            symbols.push(clean_orig.to_string());
+                        }
+                        if !clean_alias.is_empty() && !symbols.contains(&clean_alias.to_string()) {
+                            symbols.push(clean_alias.to_string());
+                        }
+                    } else {
+                        let raw_name = part.split_whitespace().next().unwrap_or(part);
+                        let clean = raw_name.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        if !clean.is_empty() && !symbols.contains(&clean.to_string()) {
+                            symbols.push(clean.to_string());
+                        }
                     }
                 }
             }
@@ -455,7 +469,7 @@ impl CodeParser {
 
             if let Some(name) = c_fn_name.or_else(|| name_opt.map(|n| &content[n.byte_range()])) {
                 let snippet = &content[node.byte_range()];
-                let text = Self::safe_truncate(snippet, 1000);
+                let text = Self::safe_truncate(snippet, Self::MAX_AST_NODE_TEXT_CHARS);
 
                 let node_kind = if kind == "method_declaration" || kind == "method_definition" || kind == "method_spec" || kind == "method_elem" {
                     "method"
@@ -541,7 +555,7 @@ impl CodeParser {
                         if val_kind == "arrow_function" || val_kind == "function_expression" {
                             let name = &content[name_node.byte_range()];
                             let snippet = &content[child.byte_range()];
-                            let text = Self::safe_truncate(snippet, 1000);
+                            let text = Self::safe_truncate(snippet, Self::MAX_AST_NODE_TEXT_CHARS);
                             let v_start = child.start_position();
                             let v_end = child.end_position();
 
@@ -627,7 +641,7 @@ impl CodeParser {
             if let Some(name_node) = node.child_by_field_name("name") {
                 let name = &content[name_node.byte_range()];
                 let snippet = &content[node.byte_range()];
-                let text = Self::safe_truncate(snippet, 1000);
+                let text = Self::safe_truncate(snippet, Self::MAX_AST_NODE_TEXT_CHARS);
 
                 let struct_kind = match kind {
                     "type_spec" => Self::infer_go_type_kind(node),
@@ -654,7 +668,7 @@ impl CodeParser {
                     text: text.to_string(),
                 });
 
-                // Python: extract class inheritance (R-048)
+                // Python: extract class inheritance & metaclasses (R-048, R-114)
                 if kind == "class_definition" && language == "python" {
                     if let Some(superclasses) = node.child_by_field_name("superclasses") {
                         let mut s_cursor = superclasses.walk();
@@ -672,6 +686,25 @@ impl CodeParser {
                                         edge_type: "EXTENDS".to_string(),
                                         category: "EXTRACTED".to_string(),
                                     });
+                                }
+                            } else if c_kind == "keyword_argument" {
+                                // Extract metaclass=Foo (R-114)
+                                if let (Some(name_node), Some(val_node)) = (child.child_by_field_name("name"), child.child_by_field_name("value")) {
+                                    let arg_name = &content[name_node.byte_range()];
+                                    if arg_name == "metaclass" {
+                                        let meta_val = &content[val_node.byte_range()];
+                                        let clean_meta = meta_val.rsplit('.').next().unwrap_or(meta_val).trim();
+                                        if !clean_meta.is_empty() {
+                                            edges.push(ExtractedEdge {
+                                                workspace: workspace.to_string(),
+                                                source_id: id.clone(),
+                                                target_label: clean_meta.to_string(),
+                                                target_id: None,
+                                                edge_type: "METACLASS_OF".to_string(),
+                                                category: "EXTRACTED".to_string(),
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -840,7 +873,7 @@ impl CodeParser {
             if let Some(name_node) = node.child_by_field_name("name") {
                 let name = &content[name_node.byte_range()];
                 let snippet = &content[node.byte_range()];
-                let text = Self::safe_truncate(snippet, 1000);
+                let text = Self::safe_truncate(snippet, Self::MAX_AST_NODE_TEXT_CHARS);
 
                 let id = format!("{}:{}:{}:{}", workspace, file_path, name, start_pos.row + 1);
                 nodes.push(ExtractedNode {

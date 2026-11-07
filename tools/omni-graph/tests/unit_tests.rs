@@ -506,17 +506,23 @@ fn track() {
     }
 
     #[test]
-    fn text_truncation_at_1000_chars() {
-        // Generate a function with a very long body
-        let body = "let x = 1;\n".repeat(200); // ~2200 chars
-        let content = format!("fn huge_fn() {{\n{}}}", body);
-        let pr = CodeParser::parse_file("ws", "big.rs", &content).unwrap();
-        assert!(!pr.nodes.is_empty());
-        // Text should be truncated to ~1000 chars
+    fn text_truncation_at_4000_chars() {
+        // Generate a function with a medium body (~2200 chars): should NOT be truncated prematurely (R-110)
+        let body_med = "let x = 1;\n".repeat(200); // ~2200 chars
+        let content_med = format!("fn med_fn() {{\n{}}}", body_med);
+        let pr_med = CodeParser::parse_file("ws", "med.rs", &content_med).unwrap();
+        assert!(!pr_med.nodes.is_empty());
+        assert!(pr_med.nodes[0].text.len() >= 2100, "2200-char body should be preserved intact, got {}", pr_med.nodes[0].text.len());
+
+        // Generate a function with a huge body (~6600 chars): should be truncated at 4000 chars (R-110)
+        let body_huge = "let x = 1;\n".repeat(600); // ~6600 chars
+        let content_huge = format!("fn huge_fn() {{\n{}}}", body_huge);
+        let pr_huge = CodeParser::parse_file("ws", "big.rs", &content_huge).unwrap();
+        assert!(!pr_huge.nodes.is_empty());
         assert!(
-            pr.nodes[0].text.len() <= 1100,
-            "Text should be truncated around 1000 chars, got {}",
-            pr.nodes[0].text.len()
+            pr_huge.nodes[0].text.len() <= 4100,
+            "Text should be truncated around 4000 chars, got {}",
+            pr_huge.nodes[0].text.len()
         );
     }
 
@@ -739,6 +745,8 @@ mod condenser_tests {
             text: format!("fn {}() {{}}", label),
             community: None,
             file_hash: None,
+            has_reflection: None,
+            parent_label: None,
         }
     }
 
@@ -872,6 +880,8 @@ mod condenser_tests {
             text: "pub fn core_root() {\n    // Large root implementation\n}".to_string(),
             community: None,
             file_hash: None,
+            has_reflection: None,
+            parent_label: None,
         });
 
         for i in 1..=20 {
@@ -889,6 +899,8 @@ mod condenser_tests {
                 text: format!("pub fn neighbor_{}() {{\n{}\n}}", i, "    let x = 1;\n".repeat(30)),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             });
             links.push(make_link("root", &id, "CALLS"));
         }
@@ -960,6 +972,8 @@ mod community_tests {
             text: format!("fn {}() {{}}", id),
             community: None,
             file_hash: None,
+            has_reflection: None,
+            parent_label: None,
         }
     }
 
@@ -1250,6 +1264,8 @@ mod cluster_filter_tests {
             text: format!("fn {}() {{}}", label),
             community: None,
             file_hash: None,
+            has_reflection: None,
+            parent_label: None,
         }
     }
 
@@ -2379,6 +2395,8 @@ mod hardening_v050_tests {
             text: format!("fn {}() {{}}", label),
             community: None,
             file_hash: None,
+            has_reflection: None,
+            parent_label: None,
         }
     }
 
@@ -2759,6 +2777,8 @@ def create_account():
                 text: "fn test() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             });
             // Assign 15 distinct initial cluster IDs
             assignments.insert(nid, i % 15);
@@ -2817,6 +2837,8 @@ def create_account():
                 text: "pub trait Interface {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             });
             assignments.insert(id, 0);
         }
@@ -2835,6 +2857,8 @@ def create_account():
                 text: "fn worker() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             });
             assignments.insert(id, 0);
         }
@@ -2854,6 +2878,8 @@ def create_account():
                 text: "fn ext() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             });
             assignments.insert(id, 1);
         }
@@ -2936,6 +2962,8 @@ def create_account():
                 text: "fn login() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             DbNode {
                 id: "auth_2".to_string(),
@@ -2949,6 +2977,8 @@ def create_account():
                 text: "fn verify() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             DbNode {
                 id: "billing_1".to_string(),
@@ -2962,6 +2992,8 @@ def create_account():
                 text: "fn charge() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             DbNode {
                 id: "billing_2".to_string(),
@@ -2975,6 +3007,8 @@ def create_account():
                 text: "fn invoice() {}".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
         ];
 
@@ -3058,6 +3092,8 @@ def create_account():
                 text: "".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             DbNode {
                 id: "core_2".to_string(),
@@ -3071,6 +3107,8 @@ def create_account():
                 text: "".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             DbNode {
                 id: "core_3".to_string(),
@@ -3084,6 +3122,8 @@ def create_account():
                 text: "".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
             // Isolated orphan (size 1) in completely detached path
             DbNode {
@@ -3098,6 +3138,8 @@ def create_account():
                 text: "".to_string(),
                 community: None,
                 file_hash: None,
+            has_reflection: None,
+            parent_label: None,
             },
         ];
 
@@ -4290,6 +4332,115 @@ Model {
 
         // 56 receivers > 50 fanout threshold -> classified as DATAFLOW_BROADCAST!
         assert_eq!(broadcast_edges.len(), 56, "Should attenuate high-degree bus lines to DATAFLOW_BROADCAST");
+    }
+
+    #[test]
+    fn test_r111_centroid_election_excludes_imports_and_newlines() {
+        use omni_graph::analysis::CommunityDetector;
+        use omni_graph::db::DbNode;
+        use std::collections::HashMap;
+
+        let nodes = vec![
+            DbNode {
+                id: "node:import_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "from ...fields import ModelChoiceField, ModelMultipleChoiceField".to_string(),
+                kind: "import".to_string(),
+                file_path: "django_sorcery/fields.py".to_string(),
+                language: "python".to_string(),
+                line_start: 1,
+                line_end: 2,
+                text: "from ...fields import ModelChoiceField".to_string(),
+                community: Some(10),
+                file_hash: None,
+                has_reflection: None,
+                parent_label: None,
+            },
+            DbNode {
+                id: "node:import_2".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "import os\nimport sys".to_string(),
+                kind: "import".to_string(),
+                file_path: "django_sorcery/fields.py".to_string(),
+                language: "python".to_string(),
+                line_start: 3,
+                line_end: 4,
+                text: "import os".to_string(),
+                community: Some(10),
+                file_hash: None,
+                has_reflection: None,
+                parent_label: None,
+            },
+            DbNode {
+                id: "node:class_1".to_string(),
+                workspace: Some("test-ws".to_string()),
+                label: "ModelChoiceField".to_string(),
+                kind: "class".to_string(),
+                file_path: "django_sorcery/fields.py".to_string(),
+                language: "python".to_string(),
+                line_start: 10,
+                line_end: 50,
+                text: "class ModelChoiceField: pass".to_string(),
+                community: Some(10),
+                file_hash: None,
+                has_reflection: None,
+                parent_label: None,
+            },
+        ];
+
+        let mut assignments = HashMap::new();
+        assignments.insert("node:import_1".to_string(), 10);
+        assignments.insert("node:import_2".to_string(), 10);
+        assignments.insert("node:class_1".to_string(), 10);
+
+        let (summaries, galaxies) = CommunityDetector::compute_galaxy_metrics("test-ws", &nodes, &[], &assignments);
+        assert_eq!(galaxies.len(), 1);
+        let galaxy = &galaxies[0];
+
+        // R-111: Galaxy name MUST elect the class "ModelChoiceField", NEVER the import statement!
+        assert!(galaxy.name.contains("ModelChoiceField"), "Galaxy name '{}' should contain class name ModelChoiceField", galaxy.name);
+        assert!(!galaxy.name.contains("from "), "Galaxy name '{}' must never contain import statements", galaxy.name);
+        assert!(!galaxy.name.contains("import "), "Galaxy name '{}' must never contain import statements", galaxy.name);
+
+        let summary = &summaries[0];
+        assert_eq!(summary.top_symbols[0], "ModelChoiceField");
+    }
+
+    #[test]
+    fn test_r114_python_metaclass_and_extends_extraction() {
+        use omni_graph::parser::CodeParser;
+
+        let python_code = r#"
+class SQLAlchemy(RelationsMixin, metaclass=_sqla_meta):
+    session_class = SignallingSession
+"#;
+        let pr = CodeParser::parse_file("test-ws", "django_sorcery/db/sqlalchemy.py", python_code)
+            .expect("Should parse python code");
+
+        // Verify EXTENDS edge for RelationsMixin
+        assert!(
+            pr.edges.iter().any(|e| e.edge_type == "EXTENDS" && e.target_label == "RelationsMixin"),
+            "Should extract EXTENDS edge to RelationsMixin"
+        );
+
+        // Verify METACLASS_OF edge for _sqla_meta (R-114)
+        assert!(
+            pr.edges.iter().any(|e| e.edge_type == "METACLASS_OF" && e.target_label == "_sqla_meta"),
+            "Should extract METACLASS_OF edge to _sqla_meta"
+        );
+    }
+
+    #[test]
+    fn test_r115_python_import_alias_resolution() {
+        use omni_graph::parser::CodeParser;
+
+        let snippet = "from django.forms.models import BaseModelForm as DjangoBaseModelForm, ModelFormOptions";
+        let symbols = CodeParser::extract_imported_symbols("python", snippet);
+
+        // R-115: Should extract both the original name AND the alias!
+        assert!(symbols.contains(&"BaseModelForm".to_string()), "Should contain original BaseModelForm");
+        assert!(symbols.contains(&"DjangoBaseModelForm".to_string()), "Should contain alias DjangoBaseModelForm");
+        assert!(symbols.contains(&"ModelFormOptions".to_string()), "Should contain ModelFormOptions");
     }
 }
 

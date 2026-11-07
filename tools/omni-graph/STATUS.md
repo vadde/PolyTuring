@@ -179,6 +179,14 @@ fidelity_spec: ../../specs/catalog/omni-graph-live-watcher-fidelity-parity.md
 | R-107 | MathWorks MATLAB (`.m`) AST & Classdef Ingestion | `src/parser/mod.rs`, `grammars/tree-sitter-matlab` | `tests/unit_tests.rs:test_r107_matlab_*` | ✅ |
 | R-108 | MathWorks Simulink (`.slx` / `.mdl`) Block Diagram MBSE Ingestion | `src/parser/simulink.rs`, `src/ingestion/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r108_*` | ✅ |
 | R-109 | Filesystem Symlink Cycle Guarding & Alias Navigation | `src/ingestion/mod.rs`, `src/watcher/pipeline.rs` | `tests/unit_tests.rs:test_r109_symlink_cycle_guard_and_alias_navigation` | ✅ |
+| R-110 | In-Band AST Code Slices & Adaptive Body Budgeting (R-OG-DX-01) | `scripts/omni-mcp.py`, `src/parser/mod.rs` | `tests/unit_tests.rs:text_truncation_at_4000_chars` | ✅ |
+| R-111 | Semantic Kind-Weighted Centroid Election (R-OG-DX-02) | `src/analysis/mod.rs` | `tests/unit_tests.rs:test_r111_centroid_election_excludes_imports_and_newlines` | ✅ |
+| R-112 | Pre-KNN Scoped Filtering in Vector Search (R-OG-DX-03) | `src/db/mod.rs`, `src/api/mod.rs` | Unit & API integration tests | ✅ |
+| R-113 | Qualified Symbol Resolution (`Class.method`, R-OG-DX-04) | `src/db/mod.rs`, `scripts/omni-mcp.py` | Unit & DB tests | ✅ |
+| R-114 | Python Class Inheritance & Metaclass DAG (R-OG-DX-05) | `src/parser/mod.rs` | `tests/unit_tests.rs:test_r114_python_metaclass_and_extends_extraction` | ✅ |
+| R-115 | Python Import Alias Resolution in Symbol Table (R-OG-DX-06) | `src/parser/mod.rs`, `src/ingestion/symbol_table.rs` | `tests/unit_tests.rs:test_r115_python_import_alias_resolution` | ✅ |
+| R-116 | Dynamic Reflection Detection & Heuristic Flagging (R-OG-DX-07) | `scripts/omni-mcp.py`, `src/db/mod.rs` | MCP & AST tests | ✅ |
+| R-117 | Multi-Workspace MCP Parity & Tool Schema Sync (R-OG-DX-08) | `scripts/omni-mcp.py`, `mcp/omni-graph/*.json` | Schema & Stdio MCP tests | ✅ |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

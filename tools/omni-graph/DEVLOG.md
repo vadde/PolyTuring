@@ -2905,6 +2905,55 @@ Empowered coding agents across the system to actively augment the Omni-Graph kno
   - `GenAI`: 11 natural galaxies.
   - `vadde.github.io`: 3 natural galaxies.
 
+---
+
+### Session: 2026-11-06 — Omni-Graph Agent DX & Forensic Auditing Suite (R-110 to R-117)
+**Agent**: `@antigravity` (Google DeepMind) & `@vadde`  
+**Governing Documents**: `specs/catalog/omni-graph-agent-dx-prd.md` (PRD-OMNI-006), `specs/catalog/omni-graph-agent-dx-improvements.md` (SPEC-OMNI-006)  
+**Status**: Completed & Empirically Verified (125/125 unit tests green, 0 clippy warnings)
+
+#### Objectives
+1. Perform forensic deconstruction of security audit RFC on `django-sorcery`:
+   - Eliminate the "Two-Step Round-Trip Penalty" via In-Band Code Slices with Adaptive Budgeting (R-110).
+   - Purge Centroid Naming Artifacts in `omni_galaxies` electing barrel import statements (R-111).
+   - Implement Pre-KNN Scoped Filtering (`exclude_tests`, `path_prefix`) in vector search (R-112).
+   - Support Qualified Symbol Resolution (`Class.method` and `path:symbol`) via containment traversal (R-113).
+   - Extract Python class inheritance, metaclasses (`METACLASS_OF`), and import aliases (`as ...`) (R-114, R-115).
+   - Flag dynamic reflection primitives (`setattr`, `getattr`) with `[⚠️ reflection]` badge (R-116).
+   - Synchronize MCP tool schemas across repository and global configuration (R-117).
+
+#### Implementation Details
+- **`scripts/omni-mcp.py` & `.agents/skills/omni-graph/scripts/omni-mcp.py`**:
+  - Added `include_body: bool = true` and `force_full_bodies: bool = false` to `omni_definition` schema and handler.
+  - Implemented adaptive budgeting: full body up to 120 lines for single targets; clamped preview with guidance for $> 3$ matches to guard against prompt bloat.
+  - Added `exclude_tests` and `path_prefix` parameters to `omni_search`.
+  - Added qualified symbol header decoration (`• [method] Class.method in file:start-end`).
+  - Added dynamic reflection tag detection rendering `[⚠️ reflection]`.
+- **`src/analysis/mod.rs`**:
+  - Implemented Semantic Kind-Weighted Centroid Election in `compute_galaxy_metrics`.
+  - Filtered out `import`, `import_from`, `file`, `directory`, `workspace` and multi-line statements.
+  - Prioritized Classes (100) > Functions (75) > Methods (50) > Constants (20).
+- **`src/db/mod.rs` & `src/api/mod.rs`**:
+  - Enhanced `search_vector` with native SurrealQL `WHERE` pre-filtering for `exclude_tests` and `path_prefix`.
+  - Enhanced `find_symbols` to parse `Class.method` via `<-linked_to[WHERE type = 'CONTAINS'].in` and `path:symbol`.
+  - Added `has_reflection` and `parent_label` optional fields to `DbNode`.
+- **`src/parser/mod.rs`**:
+  - Upgraded `MAX_AST_NODE_TEXT_CHARS` from 1,000 to 4,000 characters.
+  - Extracted Python `keyword_argument` for `metaclass = <identifier>`, emitting `METACLASS_OF` edges into SurrealDB.
+  - Updated `extract_imported_symbols` to extract both original name and alias for `from X import Y as Z`.
+
+#### Verification & Live Results
+- Test suite: **125/125 unit tests passing in 0.05s** (`cargo test --test unit_tests`).
+- Clippy: **0 warnings** (`cargo clippy --all-targets -- -D warnings`).
+- Live Docker Rebuild: `omni-rust-app` rebuilt and restarted healthy on port 8080.
+- Empirical Live Verification against `django-sorcery`:
+  - `omni_definition("Query.order_by")`: Exact single match returning complete 27-line body in 1 turn (0 follow-up `read_file` calls).
+  - `omni_definition("django_sorcery/db/models.py:deserialize")`: Filtered out test files; returned full bodies for production implementations.
+  - `omni_galaxies()`: 100% purged import statement titles; Galaxy #10 cleanly named `django_sorcery/views (BaseCreateView)`.
+  - `omni_search("order_by", exclude_tests=true)`: Returned 0 test files from `tests/`, reserving top-$k$ for production ORM.
+  - `omni_references("RelationsMixin")`: Verified `SQLAlchemy` under `Inheritance & Interfaces` via `EXTENDS`.
+
+
 
 
 
