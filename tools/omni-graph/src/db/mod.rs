@@ -752,14 +752,14 @@ impl DbClient {
 
         // Pre-KNN Test Exclusion Filter (R-112, SPEC-OMNI-006)
         if exclude_tests {
-            conditions.push("NOT (file_path CONTAINS '/test/' OR file_path CONTAINS '/tests/' OR file_path CONTAINS 'test_' OR file_path CONTAINS '_test.' OR file_path CONTAINS '/spec/')".to_string());
+            conditions.push("NOT (file_path CONTAINS 'tests/' OR file_path CONTAINS 'test/' OR file_path CONTAINS 'test_' OR file_path CONTAINS '_test.' OR file_path CONTAINS 'spec/' OR file_path CONTAINS 'specs/')".to_string());
         }
 
         // Path Prefix Scoping (R-112, SPEC-OMNI-006)
         if let Some(prefix) = path_prefix {
             let clean_prefix = prefix.trim();
             if !clean_prefix.is_empty() {
-                conditions.push(format!("string::starts_with(file_path, '{}')", surql_escape(clean_prefix)));
+                conditions.push(format!("file_path CONTAINS '{}'", surql_escape(clean_prefix)));
             }
         }
 
