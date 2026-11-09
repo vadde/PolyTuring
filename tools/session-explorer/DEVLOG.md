@@ -6,6 +6,122 @@
 
 ---
 
+### 2026-11-09 — Release v0.5.2: Holographic Review Diff, Spatial Sync, Zero-Drift & Living Docs Integration
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `released` (Version 0.5.2)
+**Duration**: ~30m
+
+#### What Was Done
+- **User Verbal Approval Received**:
+  - User explicitly approved shipment of release v0.5.2 with all post-remote activities, merges, and verification checks.
+- **Living Documentation Portal Normalization**:
+  - Restructured Chapter 02 in `docs/site/index.html` to pair Architectural Blueprints (Mermaid) with Live Interface Showcases (high-res screenshots) across all major subsystems.
+  - Resolved Figure 2.8 defects: migrated from non-standard `.canvas-workbench` to canonical `.canvas-container`, adding zoom controls, zoom badge, and full-screen pan/zoom Theater Mode.
+  - Added Figure 2.8: Architectural Blueprint for Session Files Ingestion, 4 Lenses Classification, and 7-Dimensional Sorting Pipeline.
+  - Added Figure 2.10: Architectural Blueprint for Holographic Git Diff & Spatial Synchronization Pipeline.
+  - Added Figure 2.11: Live Interface Showcase for Review Diff & Spatial Sync Cockpit.
+  - Deterministically passed all 14 documentation portal audit gates (`make docs-test`).
+- **SDLC Lifecycle Progression**:
+  - Advanced `STATUS.md` and `CONTEXT.md` to `released` phase.
+  - Updated `README.md` status badge to `released` with 72 verified requirements and 185 acceptance criteria.
+  - Rebuilt production static assets and standalone binary.
+
+---
+
+### 2026-11-09 — Sub-Pixel Zero-Drift Alignment Engine, Multi-Hunk Radar & Buffer Telemetry (R-067..R-072)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Version 0.5.2)
+**Duration**: ~45m
+
+#### What Was Done
+- **User Problem & Forensic Root Cause Resolution**:
+  - *Spacing Discrepancy & Cumulative Drift*: Code lines in `<pre>` were wrapped in `<span class="code-line">` and joined with `\n`. Because `<pre>` preserves newlines, block spans followed by `\n` produced an extra blank line between code lines (43.6px per code line vs 22px per gutter number). Additionally, Highlight.js default stylesheet introduced 13.44px container padding. Consequently, code lines drifted dozens of lines away from their true gutter numbers.
+  - *400-Line Boundary Demystification*: User observed ~400 lines on `tools/omni-graph/src/ingestion/symbol_table.rs`. Investigation proved the file on disk literally has 399 physical lines; there is no 400-line ceiling in the viewer or server (server ceiling is 10MB).
+  - *13-Hunk Cognitive Overload*: In `symbol_table.rs` (commit `a8fff59`), 13 hunks required repetitive `<` `>` clicking to inspect.
+- **Architectural Enhancements Implemented**:
+  1. *Sub-Pixel Zero-Drift Alignment Engine (R-067)*:
+     - Joined code line spans with empty string `''` (`.join('')`), completely eliminating ghost empty lines.
+     - Normalized `code.hljs`: `padding: 0 !important; margin: 0 !important; background: transparent !important;`.
+     - Standardized `.code-line` and `.code-line-numbers span`: `height: 22px; line-height: 22px; min-height: 22px; box-sizing: border-box;`.
+     - Empirically verified across lines 1, 50, 100, 200, 399: $|y_{code} - y_{gutter}| = 0.00\text{px}$ (Zero Drift).
+     - Added dynamic wrap reconciliation (`syncWrappedLineHeights()`) that dynamically updates gutter span heights when line-wrapping is toggled on.
+  2. *Forensic File Buffer Telemetry Capsule (R-068)*:
+     - Added `#fileViewerBufferBadge` in header: `● 100% On-Disk`.
+     - Tooltip transparently communicates physical line count, byte size, and confirms no truncation occurred (10MB preview ceiling).
+     - Expanded `write_file` agent step previews from 300 to 2,500 lines.
+  3. *Multi-Hunk Navigation Radar & Quick-Jump Dropdown (R-069)*:
+     - Mounted `#hunkRadarSelect` in review subbar: lists all 13 hunks with 1-indexed numbers, AST function names (`impl SymbolTable`, etc.), and line offsets.
+     - 1-click jump to any hunk anywhere in the file with bidirectional synchronization with `<` `>` and `⌥[` / `⌥]`.
+  4. *Holographic Minimap Tooltips & Gutter Hover Sync (R-070)*:
+     - Hovering over minimap ticks displays `#minimapFloatingTooltip` with hunk number, line number, diff sign, and AST symbol.
+     - Gutter hover highlights corresponding code lines via `.line-hover-sync`.
+  5. *Active Hunk Spotlight Framing Rail (R-071)*:
+     - Left file viewer frames lines belonging to the active hunk with an illuminated accent rail (`.hunk-active-spotlight`).
+- **Empirical Verification (Superpower 101 Pillar IV)**:
+  - 42/42 Go unit tests passed (`go test -v ./src/...`).
+  - Web bundle built in 166ms via Bun (`bun run build`).
+  - Headless Playwright verified `symbol_table.rs` across all 13 hunks, 0.00px drift, buffer badge display, and radar dropdown navigation.
+
+#### Files Changed
+- `tools/session-explorer/src/web/src/app.js` — Changed `.join('\n')` to `.join('')`, added buffer badge telemetry, added `syncWrappedLineHeights()`, populated `#hunkRadarSelect`, added active hunk spotlight, added hover sync and minimap tooltip.
+- `tools/session-explorer/src/web/src/styles.css` — Locked `.code-line` and `.code-line-numbers span` geometry, added `.file-buffer-pill`, `.hunk-radar-select`, `.minimap-floating-tooltip`, `.hunk-active-spotlight`.
+- `tools/session-explorer/src/web/index.html` — Added `#fileViewerBufferBadge`, `#hunkRadarSelect`, `#minimapFloatingTooltip`, bumped asset query version to `?v=0.5.2`.
+- `tools/session-explorer/STATUS.md` — Updated to v0.5.2 (72/72 requirements, 185/185 ACs).
+- `tools/session-explorer/CONTEXT.md` — Updated state, metrics, and verification tallies.
+
+---
+
+### 2026-11-09 — GitHub Review Diff Spatial Sync, Dual Line Gutter, & In-File Bidirectional Anchoring (R-053..R-066)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Version 0.5.1)
+**Duration**: ~1h 45m
+
+#### What Was Done
+- **Radical Candor & Pair Programming Retrospection**:
+  - Addressed user feedback directly: the review diff pane lacked line numbers in the `⚡ Agent Steps` vector, and clicking a hunk header or AST function did not navigate to that function on the left file viewer.
+  - Root cause analysis: In `extractAgentStepDiffsForFile`, raw `args.Target` and `args.Replacement` were split into lines without calculating their true line positions inside the currently loaded file (`state.fileViewerData.content`). Hunk headers had no target line markers, and only `.diff-line` click listeners were bound, skipping hunk headers entirely.
+- **Architectural Enhancements Implemented**:
+  1. *Sub-line & String Location Engine (`locateStepDiffInFile`)*:
+     - Implemented dynamic string search with forward/backward scanning: locates `targetStr`, fallback `replaceStr`, and fuzzy probe matching to calculate the exact `startLine` in the loaded file.
+     - Scans upwards up to 60 lines to identify enclosing function, method, struct, or class AST symbol (`func`, `def`, `class`, `type ... struct`, `interface`) to generate context-aware hunk headers.
+  2. *Dual Line Gutters with Calculated Offsets (R-061)*:
+     - Deleted lines receive `old_line_num = startLine + idx` with blank new gutter.
+     - Added lines receive `new_line_num = startLine + idx` with blank old gutter.
+     - Context lines receive symmetric line numbers.
+     - Both Unified and Split view displays full line numbers matching GitHub PR review conventions.
+  3. *Bidirectional Click-to-Jump & Dual Radiant Beam Pulse (R-059)*:
+     - Every syntax-highlighted code line is wrapped in `<span class="code-line" id="code-line-${lineNum}">`.
+     - Clicking any line in the diff pane, hunk header, or AST Scope Capsule calls `jumpToFileViewerLine(lineNum)`.
+     - Smoothly centers the left file viewer on that exact line.
+     - Gutter pulses with `.jump-pulse` (scale 1.35x + neon glow), and code line pulses with `.jump-pulse-line` (radiant indigo beam).
+  4. *In-File Gutter Diff Stripes & Holographic Minimap Rail (R-062, R-063)*:
+     - In-file line numbers receive colored indicator stripes: green (`.gutter-diff-add`), amber (`.gutter-diff-mod`), and red (`.gutter-diff-del`).
+     - Right edge of file viewer renders interactive 6px minimap heatmap rail with absolute percentage ticks. Clicking ticks jumps both file and review hunk in unison.
+  5. *Synchronized Hunk Stepper Navigation & 1-Click Patch Copy (R-064, R-066)*:
+     - Previous/Next buttons (`<` `>`) step through hunks and update both panes simultaneously.
+     - 1-click patch copy button extracts git-compatible unified patch block.
+  6. *Asset Cache-Busting (`?v=0.5.1`)*:
+     - Added query parameters to `styles.css` and `app.bundle.js` in `index.html` to prevent browser caching.
+- **Empirical Verification (Superpower 101 Pillar IV)**:
+  - Unit Tests: 42/42 Go tests passed (`go test -v ./src/...`).
+  - Bundle: Built in 148ms via Bun (`bun run build`).
+  - Live Playwright Verification: Tested on running daemon (port 9876), verified line 275 and 278 dual-gutter display in Agent Steps, tested hunk header click navigation, verified `.jump-pulse-line` on code pre, and captured visual screenshots.
+
+#### Files Changed
+- `tools/session-explorer/src/web/src/app.js` — Added `locateStepDiffInFile`, updated `extractAgentStepDiffsForFile`, added hunk header click sync, updated `jumpToFileViewerLine` to trigger `.jump-pulse-line`.
+- `tools/session-explorer/src/web/src/styles.css` — Added `@keyframes jumpPulseAnim`, `.jump-pulse`, `.jump-pulse-line`, `.code-line`, in-file diff gutter stripes, minimap rail, AST pills.
+- `tools/session-explorer/src/web/index.html` — Added minimap rail `#fileDiffMinimapRail`, hunk stepper controls `#reviewHunkStepper`, and cache-busting `?v=0.5.1`.
+- `tools/session-explorer/src/web/dist/` — Rebuilt production bundle via Bun.
+- `tools/session-explorer/bin/session-explorer` — Recompiled standalone Go binary.
+- `tools/session-explorer/STATUS.md` — Updated SDLC status (66/66 reqs, 165/165 ACs, 100%).
+- `tools/session-explorer/CONTEXT.md` — Updated session state and continuity notes.
+- `tools/session-explorer/CHANGELOG.md` — Added v0.5.1 entry.
+
+---
+
 ### 2026-11-06 — Universal Session Files & Artifacts Holographic Matrix (R-045) & Multi-Dimensional Forensic Sorting Engine (R-046)
 
 **Agent/Author**: Antigravity (Google DeepMind)
@@ -1588,3 +1704,125 @@ User observed that session `7efd4f68-0d1d-44fc-8a74-2e45f171bbcf` on `Default` a
 
 
 
+
+
+### 2026-11-09 — Spec & Architecture: Holographic GitHub & Agent Step Review Pane (R-053..R-060, AC-117..AC-142)
+
+**Agent/Author**: Antigravity  
+**Goal**: Design and formalize Product Requirements Document (PRD) and SDD Specification for the **Holographic GitHub & Agent Step Review Pane** inside Session Explorer.
+
+#### Requirements Addressed
+- **R-053**: Native Git Trackability Discovery & Ambient Identity Engine (`findGitRoot`, zero-config credentials, machine-level `gh` CLI discovery)
+- **R-054**: Multi-Vector Git File Diff & History REST API (`/api/git/file/status`, `/api/git/file/diff`, `/api/git/file/commits`)
+- **R-055**: Agent Step Chrono-Diff & Hunk Extraction Engine (`edit_file` Target vs Replacement, `write_file`, agent thinking)
+- **R-056**: Year 2500 Cosmic Holographic Review Pane UI (`#fileViewerReviewPane`, 4-theme styling, quantum telemetry ribbon)
+- **R-057**: Interactive Draggable Splitter & Responsive Geometry (`.file-viewer-resizer`, snap points, `localStorage` width persistence, `⌘\`)
+- **R-058**: Dual-Mode Diff Engine (Split & Unified) with Sub-Line Token Highlighting
+- **R-059**: Bidirectional Viewport Synchronization & Anchor Gutter Navigation
+- **R-060**: Ambient Remote GitHub PR & Checks Integration (`gh pr view`)
+
+#### Forensic Codebase & Machine Audit
+1. **Omni-Graph Retrieval**:
+   - Analyzed `openFileViewer` (L3566), `renderFileViewerContent` (L3642), and `extractSessionFilesForensics` (L4009) in `src/web/src/app.js`.
+   - Identified that `extractSessionFilesForensics` already maps session tool calls (`write_file`, `edit_file`) and markdown references per step.
+   - Identified `findGitRoot(path)` in `src/scanner.go:1589` traversing parents to locate `.git` repository boundaries.
+2. **Local Machine & Subprocess Verification**:
+   - Checked local environment: Git v2.56.0, `gh` CLI v2.103.3 at `/opt/homebrew/bin/gh`.
+   - Verified active GitHub authentication via keyring / token (`vadde`, token scopes: `gist`, `read:org`, `repo`, `workflow`).
+   - Confirmed zero extra credentials required; backend subprocess execution can directly inherit ambient execution tokens and keyring access.
+
+#### Deliverables Produced
+- Created `specs/catalog/session-explorer-github-review-pane-prd.md` (Comprehensive PRD).
+- Created `specs/catalog/session-explorer-github-review-pane.md` (SDD Specification with REST contracts, Go structs, and AC-117..AC-142).
+- Updated `specs/catalog/session-explorer.md` (Master catalog specification updated with R-053..R-060 and AC-117..AC-142).
+- Updated `tools/session-explorer/STATUS.md` (Transitioned to `spec-review` for R-053..R-060).
+- Created an interactive architecture & design artifact for user review and tie-breaker decisions.
+
+---
+
+### 2026-11-09 — Implementation & Verification: Holographic Review Pane v0.5.0 (R-053..R-060, AC-117..AC-142)
+
+**Agent/Author**: Antigravity  
+**Goal**: Complete end-to-end implementation and Playwright browser verification for the Holographic Git & GitHub Review Pane.
+
+#### What Was Built
+1. **Backend Git Engine & REST Handlers (`src/git_service.go`, `src/types.go`, `src/api.go`, `src/server.go`)**:
+   - `GitService`: Path sanitization (`CleanPath`), repo root discovery (`findGitRoot`), branch discovery, dirty checking (`git status --porcelain`), commit history parsing (`git log --follow`), and unified diff parsing (`ParseUnifiedDiff`).
+   - Untracked file fallback: dynamically diffs newly created/untracked files against `/dev/null` (`git diff --no-index`) so all newly added files render full additions.
+   - Ambient GitHub CLI (`gh`) integration: executes `gh pr view` with timeout protection and JSON output parsing to surface open PRs and CI checks with zero credential configuration.
+   - Endpoints registered:
+     - `GET /api/git/file/status?path={path}&session_id={id}`
+     - `GET /api/git/file/diff?path={path}&mode={unstaged|staged|commit}&commit_sha={sha}`
+     - `GET /api/git/file/commits?path={path}&limit={limit}`
+     - `GET /api/sessions/{id}/file/steps?path={path}`
+2. **Frontend Holographic Review Pane (`src/web/index.html`, `src/web/src/styles.css`, `src/web/src/app.js`)**:
+   - Dynamic Split Layout: `#fileViewerModal` wrapped into `.file-viewer-split-container`, `.file-viewer-body`, `.file-viewer-resizer`, and `#fileViewerReviewPane`.
+   - Physics-based Splitter: Interactive draggable divider with 25%-80% bounds clamp, double-click snap points (50% -> 70% -> 35%), and persistent width in `localStorage` (`se_review_split`).
+   - Vector Tabs:
+     - `⚡ Agent Steps`: Chrono-Step scrubber displaying per-step file mutations extracted from transcript `edit_file` / `write_file` calls paired with the LLM's raw reasoning thoughts.
+     - `📝 Working Copy`: Unstaged working tree diffs (`git diff`).
+     - `📦 Staged`: Staged index diffs (`git diff --cached`).
+     - `📜 Commits`: Commit history picker (`git log`) and per-commit diff inspection (`git show`).
+   - Dual-Mode Diff Engine:
+     - Unified Inline View: Colored line additions (`+`, green) and deletions (`-`, rose).
+     - Side-by-Side Split View: Synchronized left (old) and right (new) columns with empty filler cells for uneven diff blocks.
+     - Sub-line Token Diffing: Word/token highlighting (`.diff-token-add`, `.diff-token-del`) using common prefix/suffix boundaries.
+     - Click-to-Jump Navigation: Clicking any diff line automatically scrolls the left file viewer directly to that line.
+   - Year 2500 Cosmic Parity: 4-theme styling (`cosmic-glass`, `fluent-mica`, `holo-cyberpunk`, `matrix-obsidian`) with ambient glowing ribbons, frosted backdrop filters, and keyboard shortcut `⌘\`.
+3. **Automated & Browser Verification**:
+   - Go Unit Tests: 7 tests added in `src/git_test.go`. All 38 tool tests pass (`make test-tool T=session-explorer`).
+   - Bun Compilation: Bundled 2,128 modules in 128ms with zero errors.
+   - Playwright End-to-End Verification:
+     - Navigated to `http://127.0.0.1:9876/#/session/61b8ba3b-a66a-4c3c-b950-68ae008432ba`.
+     - Verified `#fileViewerModal` and `#fileViewerReviewPane` mount seamlessly.
+     - Verified working tree diff on modified `types.go` (88 additions).
+     - Verified commit history dropdown with 10 commits and inspected commit `509af9d` (2 hunks, 113 lines).
+     - Verified side-by-side split diff mode rendering `.diff-split-container` with 196 split lines.
+     - Verified `⚡ Agent Steps` vector: loaded 5 steps for `git_service.go`, scrubbed between Step 536 and Step 322, and confirmed thought card display.
+     - Verified resizer double-click cycling snap widths (55% -> 70% -> 35%).
+     - Verified theme switching across all 4 cosmic liquid-glass themes.
+     - Captured visual artifacts: `artifacts/review-pane-working-copy.png`, `artifacts/review-pane-commit-diff.png`, `artifacts/review-pane-split-diff.png`, `artifacts/review-pane-agent-step-chrono-diff.png`.
+
+---
+
+### 2026-11-09 — Implementation & Verification: Diff Spatial Sync & Change Intelligence v0.5.1 (R-061..R-066, AC-143..AC-165)
+
+**Agent/Author**: Antigravity  
+**Goal**: Implement and verify GitHub-standard dual line number gutters, in-file code viewer diff decorations, ambient holographic minimap rail, synchronized hunk stepper, AST semantic scope capsules, and 1-click IDE deep-linking.
+
+#### What Was Built & Verified
+1. **GitHub-Standard Dual Line Number Gutter (R-061, AC-143..AC-147)**:
+   - Unified diff lines render two dedicated gutter columns: `<span class="diff-gutter-num diff-gutter-old">` and `<span class="diff-gutter-num diff-gutter-new">`.
+   - On additions, old gutter is blank; on deletions, new gutter is blank; on context lines, both gutters render line numbers.
+   - Fixed 40px width with `font-variant-numeric: tabular-nums` guaranteeing zero horizontal character jitter.
+2. **In-File Code Gutter Diff Decorations (R-062, AC-148..AC-153)**:
+   - `updateInFileDiffDecorations(hunks)` dynamically annotates `.code-line-numbers span`:
+     - Added lines: `.gutter-diff-add` with `border-left: 3px solid #10b981`, green background tint, and emerald numerals.
+     - Modified lines: `.gutter-diff-mod` with `border-left: 3px solid #38bdf8`.
+     - Deletion points: `.gutter-diff-del` with rose marker `▾`.
+   - Clicking any decorated line number in the code viewer gutter instantly scrolls the review pane directly to that hunk with animated `jump-pulse`.
+3. **Holographic Diff Minimap Rail / Heatmap (R-063, AC-154..AC-156)**:
+   - Mounted `.file-diff-minimap-rail` (4px-10px hover rail) on the right edge of `#fileViewerCodeContainer`.
+   - Renders glowing color-coded ticks (`.minimap-tick-add`, `.minimap-tick-mod`, `.minimap-tick-del`) calculated via percentage coordinates across total line count.
+   - Clicking any tick or rail position smoothly scrolls both the code viewer and review pane.
+4. **Synchronized Hunk Stepper Navigation (R-064, AC-157..AC-160)**:
+   - Implemented `#reviewHunkStepper` with `▲` (`#hunkPrevBtn`), `#hunkStepLabel` (`Hunk X/Y`), and `▼` (`#hunkNextBtn`).
+   - Keyboard shortcuts: `⌥[` / `⌥]` and `F7` / `F8`.
+   - Stepping simultaneously centers the target hunk in the review pane and centers the corresponding line in the left file viewer, flashing the cosmic `jump-pulse` aura on both.
+5. **AST Semantic Scope Breadcrumbs (R-065, AC-161..AC-162)**:
+   - `parseHunkAstSymbol(header)` extracts enclosing function/struct context from hunk header trailing text (`@@ -old,len +new,len @@ [scope]`).
+   - Renders a holographic capsule (`.diff-hunk-ast-pill`) with semantic glyphs (`📦 struct SessionAgentContext`, `⚡ func Name`).
+6. **Surgical Hunk Patch Copy & Desktop IDE Deep-Linking (R-066, AC-163..AC-165)**:
+   - Added individual `.hunk-copy-btn` (`📋 Hunk`) on each hunk header card, copying only that hunk as a valid unified diff.
+   - Added `#fileViewerIdeDeepLinkBtn` (`↗ IDE`) generating `cursor://file/<path>:<line>` deep-links.
+
+#### Automated & Headless Verification
+- **Unit Test Suite**: All 38 backend tests pass (`make test-tool T=session-explorer`).
+- **Bun Bundle**: 2,128 modules bundled in 122ms.
+- **Playwright Suite**:
+  - Verified dual gutters (`diff-gutter-old` vs `diff-gutter-new`) with tabular numeric alignment.
+  - Verified 88 lines in `types.go` received `.gutter-diff-add` with `3px solid rgb(16, 185, 129)` border.
+  - Verified minimap rail rendering 88 glowing ticks.
+  - Verified clicking line 487 in the left code gutter scrolled to Hunk 1 and triggered `jump-pulse`.
+  - Verified Hunk Stepper navigation from Hunk 1/2 to Hunk 2/2 on commit `509af9d`.
+  - Captured screenshots: `artifacts/dual-gutter-and-in-file-diff-decorations.png` and `artifacts/hunk-stepper-navigation-sync.png`.

@@ -14,6 +14,7 @@ Thumbs.db
 Desktop.ini
 _site/
 .playwright-mcp/
+artifacts/
 
 # ─── IDE / Editors ──────────────────────────────────────────────────────────
 .idea/

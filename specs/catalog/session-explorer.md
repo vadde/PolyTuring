@@ -111,6 +111,26 @@ The tool delivers a **glassmorphic, liquid-glass, acrylic-inspired** UI that fee
 | R-050 | Session Trail Dual-Temporal Quantum Capsule & Live Recency Telemetry: Top-left Session Trail header modernizes `#detailTime` into a liquid-glass dual-temporal capsule rendering `⚡ Active <relativeTime>` with live neon pulse dot, `🌱 Initiated: <formattedDate>`, and multi-day span pill | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css, src/web/index.html |
 | R-051 | Session Card 1-Click UUID Copy & Layout Harmonization: Main dashboard session tiles render a subtle 1-click UUID copy button on card header; standardized metadata rows eliminate masonry baseline jitter; line-height padding fixes prompt snippet glyph slicing | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
 | R-052 | Step Counter & Filter State Integrity: Toggling message filter chips (`💬 Dialogue`, `Prompts`, etc.) and clicking `Refresh` preserves filter context and accurately displays `Showing X of Y steps` without losing step subset telemetry | Must | ✅ | 🧪 | src/web/src/app.js |
+| R-053 | Native Git Trackability Discovery & Ambient Identity Engine: Detect repository boundaries using `findGitRoot`, extract branch, dirty status, remote origin, and ambient `gh` CLI status with zero credential configuration | Must | ✅ | 🧪 | src/git_service.go, src/api.go |
+| R-054 | Multi-Vector Git File Diff & History REST API: Implement `/api/git/file/status`, `/api/git/file/diff`, and `/api/git/file/commits` supporting Working Copy (unstaged), Staged Index, Commit Diffs, and file commit history with bounded timeouts (3s) and size ceilings (2MB) | Must | ✅ | 🧪 | src/api.go, src/types.go, src/git_service.go |
+| R-055 | Agent Step Chrono-Diff & Hunk Extraction Engine: Extract and synthesize step-by-step file modifications (`edit_file` Target vs Replacement, `write_file` creations/overwrites) from session transcripts with agent thinking correlation | Must | ✅ | 🧪 | src/api.go, src/web/src/app.js |
+| R-056 | Year 2500 Cosmic Holographic Review Pane UI: Render `#fileViewerReviewPane` on far right of `#fileViewerModal` featuring quantum telemetry ribbon (branch, churn counts, PR pill), isomorphic 4-theme styling, and vector mode selector | Must | ✅ | 🧪 | src/web/index.html, src/web/src/styles.css |
+| R-057 | Interactive Draggable Splitter & Responsive Geometry: Draggable splitter (`.file-viewer-resizer`) with visual grip, mouse/touch drag, double-click snap points (50/50, 65/35, 35/65), local storage width persistence, and `⌘\` toggle shortcut | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-058 | Dual-Mode Diff Engine (Split & Unified) with Token Highlighting: Render side-by-side or unified diff views with syntax highlighting, intra-line word/token change spans, collapsible hunks, and line number gutters | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-059 | Bidirectional Viewport Synchronization & Anchor Navigation: Clicking diff hunk or line highlights and smoothly scrolls the code viewer to that exact line; navigating code anchors cross-highlights in review pane | Should | ✅ | 🧪 | src/web/src/app.js |
+| R-060 | Ambient Remote GitHub PR & Checks Integration: Query `gh pr view` to surface active PR number, title, state, review decisions, and CI checks with 1-click external navigation to GitHub | Should | ✅ | 🧪 | src/git_service.go, src/api.go, src/web/src/app.js |
+| R-061 | GitHub-Standard Dual Line Number Gutter: Render dual-column line numbers (`diff-gutter-old` vs `diff-gutter-new`) in unified view with tabular numeral alignment and blank states for additions/deletions | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-062 | In-File Code Gutter Diff Decorations: Dynamically decorate left file viewer line gutter with high-contrast colored bars (`.gutter-diff-add`, `.gutter-diff-mod`, `.gutter-diff-del`) reflecting active diff hunks | Must | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-063 | Holographic Diff Minimap Rail: Mount vertical 4px heatmap rail alongside file viewer scrollbar visualizing spatial distribution of additions, modifications, and deletions across the entire scrollable file | Should | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-064 | Synchronized Hunk Stepper Navigation: Provide `⏮ Prev Hunk (⌥[)` and `⏭ Next Hunk (⌥])` controls that simultaneously scroll and highlight corresponding blocks in both the review pane and the source file viewer | Must | ✅ | 🧪 | src/web/src/app.js, src/web/index.html |
+| R-065 | AST Semantic Symbol Breadcrumbs: Parse trailing hunk header contexts to display enclosing function, struct, or class capsules (`📦 struct Name`, `⚡ func Name`) on each hunk header | Should | ✅ | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-066 | Surgical Hunk Patch Copy & Desktop IDE Deep-Linking: Provide 1-click `📋 Hunk` patch copy button on each hunk header and `↗ IDE` deep links (`vscode://`, `cursor://`) to open exact lines in local editors | Should | ✅ | 🧪 | src/web/src/app.js, src/web/index.html |
+| R-067 | Sub-Pixel Code & Gutter Synchronous Alignment Engine: Eliminate newline joiners between block code lines, normalize Highlight.js padding to zero, lock code and gutter line heights to 22px, and guarantee 0.00px vertical drift across all file lines | Must | 🔨 | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-068 | Forensic File Buffer Telemetry Capsule: Ambient header capsule displaying exact file line count, file size, and explicit buffer integrity (`● 100% On-Disk / Full Buffer`); documents boundary conditions (10MB HTTP ceiling, 2MB git diff ceiling) | Should | 🔨 | 🧪 | src/web/src/app.js, src/web/index.html |
+| R-069 | Multi-Hunk Navigation Radar & Spatial Quick-Jump Dropdown: Interactive dropdown selector for jumping directly to any hunk among 13+ hunks with AST symbols, line offsets, and change signs | Must | 🔨 | 🧪 | src/web/src/app.js, src/web/index.html |
+| R-070 | Minimap Holographic Tooltip Previews & Spatial Hover Radar: Floating acrylic tooltips on minimap hover and synchronized hover aura between gutter and code lines | Should | 🔨 | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-071 | Active Hunk Spotlight & Ambient Framing Rail: Dynamic illuminated framing rail highlighting the active hunk's line range in the left file viewer | Should | 🔨 | 🧪 | src/web/src/app.js, src/web/src/styles.css |
+| R-072 | High-Scale Viewport Virtualization & Safe Buffer Handling: Smooth 60fps scrolling and instant search across files up to 5,000 lines | Should | 🔨 | 🧪 | src/web/src/app.js |
 
 **Priority levels**: Must (required for MVP), Should (important), Could (nice-to-have)
 
@@ -582,6 +602,75 @@ Tests that MUST pass for this spec to be considered satisfied:
 | AC-114 | Given session cards grid, multi-day span pills are placed in a standardized metadata row to ensure aligned prompt snippet baselines across columns | R-051 |
 | AC-115 | Given prompt snippets in session cards, line-height padding prevents vertical glyph clipping on multi-line text | R-051 |
 | AC-116 | Given Session Trail step filters, toggling message types and refreshing the trail maintains `Showing X of Y steps` state integrity | R-052 |
+| AC-117 | When `GET /api/git/file/status?path=<path>` is called for a git-tracked file, it returns `is_git: true`, `git_root`, `branch`, `is_dirty`, and `remote_url` | R-053 |
+| AC-118 | When called for a non-git file, it returns `is_git: false` without error, allowing the UI to gracefully switch to Agent Step Chrono-Diff mode | R-053 |
+| AC-119 | The backend discovers machine-level `gh` CLI binary and checks authentication status (`gh auth status`) with zero user credentials required | R-053 |
+| AC-120 | `GET /api/git/file/diff?path=<path>&mode=unstaged` returns the unstaged working copy diff with lines added, deleted, and structured hunks | R-054 |
+| AC-121 | `GET /api/git/file/diff?path=<path>&mode=staged` returns the staged git index diff | R-054 |
+| AC-122 | `GET /api/git/file/diff?path=<path>&mode=commit&commit_sha=<sha>` returns the exact diff introduced by that commit for the file | R-054 |
+| AC-123 | `GET /api/git/file/commits?path=<path>&limit=30` returns up to 30 chronological commits touching the file, each with SHA, short SHA, author, timestamp, and message | R-054 |
+| AC-124 | If a git command takes longer than 3.0 seconds, the context cancels and returns HTTP 504 Gateway Timeout without hanging the server | R-054 |
+| AC-125 | Diff outputs exceeding 2MB are cleanly truncated with a notice capsule to preserve browser performance | R-054 |
+| AC-126 | For any session touching a file via `edit_file`, the system synthesizes a diff hunk where `Target` represents deleted lines (`-`) and `Replacement` represents added lines (`+`) | R-055 |
+| AC-127 | For `write_file` tool calls, the system detects whether it was an overwrite or append and creates corresponding addition hunks | R-055 |
+| AC-128 | Each agent step diff displays the step index, timestamp, tool call name, and an expandable capsule containing the agent's internal thought (`thinking`) | R-055 |
+| AC-129 | The UI provides a Step Timeline Scrubber allowing the user to step forward and backward across all agent turns touching that file | R-055 |
+| AC-130 | `#fileViewerReviewPane` mounts inside `.file-viewer-shell` to the right of `.file-viewer-body` | R-056 |
+| AC-131 | The Quantum Telemetry Ribbon displays current branch (`🌿 <branch>`), dirty status dot, net churn (`+A / -B`), and active vector mode pill | R-056 |
+| AC-132 | The Review Pane adheres to all 4 PolyTuring themes (Liquid Glass, Fluent Aero Mica, Holo Cyberpunk, Matrix Obsidian) with zero CSS contrast defects | R-056 |
+| AC-133 | The draggable resizer (`.file-viewer-resizer`) allows dynamic horizontal resizing between 25% and 75% of viewport width with smooth 60fps tracking | R-057 |
+| AC-134 | Double-clicking the resizer cycles through snap points: 50% $\to$ 65% $\to$ 35% | R-057 |
+| AC-135 | Resizer position persists in `localStorage` across page reloads and modal re-openings | R-057 |
+| AC-136 | Pressing `⌘\` (Mac) or `Ctrl+\` (Windows/Linux) or clicking the topbar review button toggles review pane collapse/expand | R-057 |
+| AC-137 | User can switch between Side-by-Side (Split) and Unified (Inline) diff views via segmented control | R-058 |
+| AC-138 | Code lines in diff blocks inherit Highlight.js syntax highlighting matching the file extension | R-058 |
+| AC-139 | Modified lines highlight sub-line changed tokens/words using intra-line Levenshtein/character diffing | R-058 |
+| AC-140 | Clicking a line number in the diff view scrolls and highlights the corresponding line in the left code viewer | R-059 |
+| AC-141 | When an active PR exists for the branch, the Review Pane renders a GitHub PR capsule showing PR number, title, review decision, and CI checks | R-060 |
+| AC-142 | Clicking `↗ GitHub` opens the commit or PR directly on github.com in a new tab | R-060 |
+| AC-143 | Unified diff rows render two distinct gutter columns (`diff-gutter-old` and `diff-gutter-new`) | R-061 |
+| AC-144 | On additions, `diff-gutter-old` is blank and `diff-gutter-new` renders the line number | R-061 |
+| AC-145 | On deletions, `diff-gutter-new` is blank and `diff-gutter-old` renders the line number | R-061 |
+| AC-146 | On context lines, both old and new columns render their respective numbers | R-061 |
+| AC-147 | Numbers in gutters use tabular numeric alignment without horizontal jitter | R-061 |
+| AC-148 | When a diff is rendered, the left file viewer gutter receives `.gutter-diff-add` for added lines | R-062 |
+| AC-149 | When a diff is rendered, modified lines receive `.gutter-diff-mod` | R-062 |
+| AC-150 | Deletion points render a rose marker `.gutter-diff-del` indicating insertion coordinates | R-062 |
+| AC-151 | Switching vectors (`⚡ Agent Steps` $\to$ `📝 Working Copy`) re-calculates file gutter decorations | R-062 |
+| AC-152 | Closing review pane or viewing a clean file removes all in-file diff decorations | R-062 |
+| AC-153 | Clicking a gutter decoration in the file viewer scrolls the review pane to that hunk | R-062 |
+| AC-154 | The vertical `.file-diff-minimap-rail` renders color-coded ticks corresponding to changed lines | R-063 |
+| AC-155 | Minimap ticks are calculated via percentage coordinates based on total file line count | R-063 |
+| AC-156 | Clicking a minimap tick smoothly scrolls the file viewer to that line | R-063 |
+| AC-157 | Topbar renders `⏮ Prev Hunk` and `⏭ Next Hunk` buttons and `Hunk X of Y` indicator | R-064 |
+| AC-158 | Keyboard shortcuts `⌥[` and `⌥]` trigger previous and next hunk stepping | R-064 |
+| AC-159 | Stepping to a hunk simultaneously centers both the review hunk and the file viewer line | R-064 |
+| AC-160 | Both target elements display a temporary animated cosmic pulse aura (`jump-pulse`) | R-064 |
+| AC-161 | Trailing symbol contexts in hunk headers are parsed into AST Scope Capsules | R-065 |
+| AC-162 | AST capsules display appropriate glyphs (`📦` struct, `⚡` func) | R-065 |
+| AC-163 | Each hunk header renders an individual `📋 Hunk` button | R-066 |
+| AC-164 | Clicking `📋 Hunk` copies only that specific hunk as a valid unified diff patch | R-066 |
+| AC-165 | `↗ IDE` action generates functional `vscode://` and `cursor://` deep links | R-066 |
+| AC-166 | Rendered code lines in `symbol_table.rs` (399 lines) MUST NOT contain empty blank lines between code lines | R-067 |
+| AC-167 | Line 1 of code and Line 1 of gutter MUST have identical vertical bounding client top: $\|y_{code}(1) - y_{gutter}(1)\| = 0.00\text{px}$ | R-067 |
+| AC-168 | Line 50 of code and Line 50 of gutter MUST have identical vertical bounding client top: $\|y_{code}(50) - y_{gutter}(50)\| = 0.00\text{px}$ | R-067 |
+| AC-169 | Line 200 of code and Line 200 of gutter MUST have identical vertical bounding client top: $\|y_{code}(200) - y_{gutter}(200)\| = 0.00\text{px}$ | R-067 |
+| AC-170 | Line 399 of code and Line 399 of gutter MUST have identical vertical bounding client top: $\|y_{code}(399) - y_{gutter}(399)\| = 0.00\text{px}$ | R-067 |
+| AC-171 | `code.hljs` MUST NOT have default Highlight.js padding pushing line 1 down | R-067 |
+| AC-172 | Toggling line wrapping on (`wrap: true`) MUST invoke `syncWrappedLineHeights()` and adapt gutter span heights | R-067 |
+| AC-173 | Toggling line wrapping off (`wrap: false`) MUST reset gutter span heights back to standard 22px | R-067 |
+| AC-174 | Header displays `#fileViewerBufferBadge` with `● 100% On-Disk` for files read from disk | R-068 |
+| AC-175 | Tooltip on buffer badge displays exact line count, file size in KB/MB, and confirms no truncation occurred | R-068 |
+| AC-176 | In `extractAgentStepDiffsForFile`, `write_file` agent step previews are NOT artificially limited to 300 lines | R-068 |
+| AC-177 | Review pane header displays `#hunkRadarSelect` dropdown alongside `<` and `>` buttons | R-069 |
+| AC-178 | For `symbol_table.rs` commit diff (13 hunks), `#hunkRadarSelect` lists all 13 hunks with their AST symbols and lines | R-069 |
+| AC-179 | Selecting an item from `#hunkRadarSelect` immediately steps to that hunk and smoothly scrolls the left file viewer | R-069 |
+| AC-180 | Clicking `<` or `>` or pressing `⌥[` / `⌥]` updates `#hunkRadarSelect.value` to reflect active hunk index | R-069 |
+| AC-181 | Hovering over a tick in `#fileDiffMinimapRail` displays an informative tooltip preview | R-070 |
+| AC-182 | Hovering over a gutter line number adds `.line-hover-sync` to highlight the corresponding code line | R-070 |
+| AC-183 | When a hunk is selected, lines in the left file viewer belonging to that hunk receive `.hunk-active-spotlight` | R-071 |
+| AC-184 | When stepping to the next hunk, previous spotlight classes are cleanly removed | R-071 |
+| AC-185 | Files up to 5,000 lines render in `< 50ms` and scroll smoothly at 60fps | R-072 |
 
 ---
 
@@ -661,3 +750,5 @@ Tests that MUST pass for this spec to be considered satisfied:
 | 2026-11-04 | @vadde | Add R-040 (Session Agent Brain & MCP Behavioral Matrix), R-041 (Command Execution & Tool Breakdown), and R-042 (Empirical Skill Invocation Telemetry & Standby Decomposition) |
 | 2026-11-05 | @vadde | Add R-043 (Bin-Packing Spatial Density & Panoramic Masonry Matrix), R-044 (Live Reactive Telemetry Sync), and R-045 (Session Files & Artifacts Holographic Matrix) |
 | 2026-11-06 | @vadde | Add R-046 (Universal Multi-Dimensional Forensic Sorting Engine & Touch Span Telemetry) |
+| 2026-11-09 | @vadde | Add R-053..R-066 (Holographic GitHub Review Diff Pane & Spatial Sync Engine) |
+| 2026-11-09 | @vadde | Add R-067..R-072 (Sub-Pixel Code Gutter Alignment, Multi-Hunk Navigation Radar & File Buffer Intelligence) |

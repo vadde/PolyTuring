@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-09
+
+### Fixed
+- **Sub-Pixel Zero-Drift Alignment Engine (R-067, AC-166..AC-169)**:
+  - Fixed spacing anomaly where code lines in `<pre>` blocks had double-line spacing (43.6px per code line vs 22px per gutter number) caused by `<span class="code-line">` block elements combined with trailing `\n` in `.join('\n')`.
+  - Joined code line spans with `''` (`.join('')`), normalized Highlight.js container styles (`padding: 0 !important; margin: 0 !important; background: transparent !important;`), and locked line heights to 22px.
+  - Added dynamic line-wrap reconciliation (`syncWrappedLineHeights()`) that syncs line heights dynamically when soft-wrap is enabled.
+  - Empirically verified across lines 1, 50, 100, 200, 399: $|y_{code} - y_{gutter}| = 0.00\text{px}$ across all viewports.
+- **Agent Step Preview Expansion (R-068)**:
+  - Expanded `write_file` agent step previews from 300 to 2,500 lines to support large file generation reviews without artificial truncation.
+
+### Added
+- **Forensic File Buffer Telemetry Capsule (R-068, AC-170..AC-173)**:
+  - Mounted `#fileViewerBufferBadge` in File Viewer header displaying `● 100% On-Disk` alongside exact physical line count and formatted byte size.
+  - Interactive tooltip confirms 10MB preview safety ceiling and provides transparent verification that no truncation occurred.
+- **Multi-Hunk Navigation Radar & Spatial Dropdown (R-069, AC-174..AC-177)**:
+  - Mounted `#hunkRadarSelect` quick-jump dropdown in the review subbar, listing all hunks with 1-indexed numbers, AST function names (`impl SymbolTable`, `func NewScanner`, etc.), and file line offsets.
+  - Provides instantaneous 1-click navigation across files with 13+ hunks, bidirectionally synchronized with `<` `>` buttons and `⌥[` / `⌥]` keyboard shortcuts.
+- **Holographic Minimap Tooltips & Gutter Hover Sync (R-070, AC-178..AC-181)**:
+  - Hovering over minimap heatmap rail ticks displays `#minimapFloatingTooltip` with hunk number, line number, diff sign, and enclosing AST symbol.
+  - Hovering over gutter line numbers highlights corresponding code lines via `.line-hover-sync`.
+- **Active Hunk Spotlight Framing Rail (R-071, AC-182..AC-183)**:
+  - Left file viewer frames lines belonging to the currently active hunk with an illuminated accent border rail (`.hunk-active-spotlight`).
+- **One-Click Unified Patch Export & Clipboard Bridge (R-072, AC-184..AC-185)**:
+  - Added 1-click patch export button to review header and individual hunks, copying Git-compatible unified diff blocks to the clipboard with tactile visual feedback.
+
+## [0.5.1] - 2026-11-09
+
+### Added
+- **Diff Spatial Sync & Gutter Intelligence (R-061..R-066, AC-143..AC-165)**:
+  - **GitHub-Standard Dual Line Number Gutter (R-061)**: Unified diff rows render dedicated `diff-gutter-old` (base line #) and `diff-gutter-new` (head line #) columns with tabular numeral alignment and blank states for additions/deletions.
+  - **In-File Code Gutter Diff Decorations (R-062)**: Dynamically annotates line numbers in the left file viewer with emerald borders (`.gutter-diff-add`), cyan borders (`.gutter-diff-mod`), and rose insertion markers (`.gutter-diff-del`). Clicking any decorated line scrolls the review pane directly to that hunk.
+  - **Holographic Diff Minimap Rail / Heatmap (R-063)**: 4px-10px vertical heatmap rail mounted alongside the file viewer scrollbar, rendering glowing percentage-based ticks across the entire file height with 1-click jump scrolling.
+  - **Synchronized Hunk Stepper Navigation (R-064)**: Dual-pane stepper (`⏮ Prev Hunk` / `⏭ Next Hunk`, `⌥[` / `⌥]`, `F7` / `F8`) that simultaneously centers both the review hunk and the left file viewer line with an animated cosmic pulse (`jump-pulse`).
+  - **AST Semantic Scope Breadcrumbs (R-065)**: Extracts trailing symbol signatures from hunk headers (`@@ ... @@ [symbol]`), rendering interactive capsules (`📦 struct Name`, `⚡ func Name`) on each hunk card.
+  - **Surgical Hunk Patch Copy & Desktop IDE Deep-Linking (R-066)**: Individual `📋 Hunk` patch copy button on each hunk header and `↗ IDE` launcher generating `cursor://file/<path>:<line>` deep-links.
+
+## [0.5.0] - 2026-11-09
+
+### Added
+- **Holographic Git & GitHub Review Pane (R-053..R-060, AC-117..AC-142)**:
+  - **Native Git Trackability Discovery (R-053)**: Automatic repository root discovery (`findGitRoot`), branch detection, dirty file detection (`git status --porcelain`), and ambient GitHub CLI (`gh`) integration with zero custom credentials required.
+  - **Multi-Vector Git Diff & History API (R-054)**: Backend REST endpoints `/api/git/file/status`, `/api/git/file/diff`, `/api/git/file/commits`, and `/api/sessions/{id}/file/steps`. Includes automatic `/dev/null` fallback for newly created/untracked files so all added lines render cleanly.
+  - **Agent Step Chrono-Diff Engine (R-055)**: Reconstructs exact file mutations from transcript `edit_file` (Target vs Replacement) and `write_file` calls per step, paired with an Agent Thought Card displaying raw LLM reasoning context (`thinking`).
+  - **Year 2500 Cosmic Holographic Review Pane UI (R-056)**: Integrated side-by-side review pane inside `#fileViewerModal` featuring Quantum Telemetry Ribbon (branch name, uncommitted indicator, churn counter `+A / -D`), vector tab switcher, and keyboard toggle shortcut (`⌘\`).
+  - **Interactive Draggable Splitter & Physics-Based Geometry (R-057)**: Smooth drag resizer (`.file-viewer-resizer`) with 25%-80% bounds clamping, double-click snap points (50% -> 70% -> 35%), and persistent column width via `localStorage` (`se_review_split`).
+  - **Dual-Mode Diff Engine with Sub-Line Token Highlighting (R-058)**: Unified inline and side-by-side split diff views with sub-line word/token diffing (`.diff-token-add`, `.diff-token-del`) calculated using common prefix/suffix token boundaries.
+  - **Bidirectional Viewport Synchronization (R-059)**: Click any diff line in the review pane to automatically jump and highlight that exact line in the code viewer pane.
+  - **Ambient Remote GitHub PR & Checks Integration (R-060)**: Leverages machine-level `gh pr view` to surface open pull requests, review decisions, and CI status checks directly in the review header.
+
 ## [0.4.0] - 2026-11-06
 
 ### Fixed

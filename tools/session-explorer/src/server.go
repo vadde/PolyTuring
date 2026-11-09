@@ -55,6 +55,10 @@ func StartServer(cfg Config, index *SessionIndex) error {
 			api.HandleSessionContext(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/file/steps") {
+			api.HandleSessionFileSteps(w, r)
+			return
+		}
 		api.HandleSessionDetail(w, r)
 	})
 	mux.HandleFunc("/api/search", api.HandleSearch)
@@ -63,6 +67,9 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/api/watch-interval", api.HandleWatchInterval)
 	mux.HandleFunc("/api/wip", api.HandleWIP)
 	mux.HandleFunc("/api/file", api.HandleFile)
+	mux.HandleFunc("/api/git/file/status", api.HandleGitFileStatus)
+	mux.HandleFunc("/api/git/file/diff", api.HandleGitFileDiff)
+	mux.HandleFunc("/api/git/file/commits", api.HandleGitFileCommits)
 	mux.HandleFunc("/api/skill/install", api.HandleInstallSkill)
 	mux.HandleFunc("/api/agent/context/global", api.HandleGlobalAgentContext)
 	mux.HandleFunc("/api/agent/context/workspace", api.HandleWorkspaceAgentContext)

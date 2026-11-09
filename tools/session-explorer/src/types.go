@@ -484,4 +484,92 @@ type SessionAgentContext struct {
 	TotalWordsInjected int                  `json:"total_words_injected"`
 }
 
+// GitFileStatus represents the git status and remote metadata of a file.
+// Implements: R-053, R-060
+type GitFileStatus struct {
+	IsGit           bool      `json:"is_git"`
+	GitRoot         string    `json:"git_root,omitempty"`
+	RelativePath    string    `json:"relative_path,omitempty"`
+	Branch          string    `json:"branch,omitempty"`
+	IsDirty         bool      `json:"is_dirty"`
+	HasStaged       bool      `json:"has_staged"`
+	HasUnstaged     bool      `json:"has_unstaged"`
+	RemoteURL       string    `json:"remote_url,omitempty"`
+	GHAvailable     bool      `json:"gh_available"`
+	GHAuthenticated bool      `json:"gh_authenticated"`
+	ActivePR        *GitHubPR `json:"active_pr,omitempty"`
+	SessionSteps    int       `json:"session_steps"`
+}
+
+// GitHubPR represents pull request metadata obtained from gh cli.
+// Implements: R-060
+type GitHubPR struct {
+	Number         int    `json:"number"`
+	Title          string `json:"title"`
+	URL            string `json:"url"`
+	State          string `json:"state"` // OPEN, CLOSED, MERGED
+	BaseRef        string `json:"base_ref"`
+	HeadRef        string `json:"head_ref"`
+	ReviewDecision string `json:"review_decision,omitempty"` // APPROVED, CHANGES_REQUESTED
+	StatusSummary  string `json:"status_summary,omitempty"`  // e.g. "12/12 passing"
+}
+
+// GitDiffResponse represents parsed diff hunks and statistics.
+// Implements: R-054
+type GitDiffResponse struct {
+	Path      string     `json:"path"`
+	Mode      string     `json:"mode"` // unstaged, staged, commit, pr, step
+	RawDiff   string     `json:"raw_diff"`
+	Additions int        `json:"additions"`
+	Deletions int        `json:"deletions"`
+	Hunks     []DiffHunk `json:"hunks"`
+	Truncated bool       `json:"truncated"`
+}
+
+// DiffHunk represents an individual diff chunk with header and lines.
+// Implements: R-054, R-058
+type DiffHunk struct {
+	Header   string     `json:"header"` // @@ -10,6 +10,8 @@
+	OldStart int        `json:"old_start"`
+	OldLines int        `json:"old_lines"`
+	NewStart int        `json:"new_start"`
+	NewLines int        `json:"new_lines"`
+	Lines    []DiffLine `json:"lines"`
+}
+
+// DiffLine represents a single line in a diff.
+// Implements: R-054, R-058
+type DiffLine struct {
+	Type       string `json:"type"` // "context", "add", "delete"
+	Content    string `json:"content"`
+	OldLineNum int    `json:"old_line_num,omitempty"`
+	NewLineNum int    `json:"new_line_num,omitempty"`
+}
+
+// GitCommitEntry represents a single commit from git log.
+// Implements: R-054
+type GitCommitEntry struct {
+	SHA          string `json:"sha"`
+	ShortSHA     string `json:"short_sha"`
+	AuthorName   string `json:"author_name"`
+	AuthorEmail  string `json:"author_email"`
+	Timestamp    int64  `json:"timestamp"`
+	RelativeTime string `json:"relative_time"`
+	Subject      string `json:"subject"`
+}
+
+// AgentStepDiff represents a synthetic diff hunk created from an LLM step.
+// Implements: R-055
+type AgentStepDiff struct {
+	StepIndex    int        `json:"step_index"`
+	ToolName     string     `json:"tool_name"`
+	Timestamp    string     `json:"timestamp"`
+	Thinking     string     `json:"thinking,omitempty"`
+	UserPrompt   string     `json:"user_prompt,omitempty"`
+	AgentSummary string     `json:"agent_summary,omitempty"`
+	Hunks        []DiffHunk `json:"hunks"`
+	Additions    int        `json:"additions"`
+	Deletions    int        `json:"deletions"`
+}
+
 
