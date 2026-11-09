@@ -1,10 +1,10 @@
 ---
 tool: session-explorer
 status: released
-version: 0.4.0
+version: 0.5.2
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-11-06
+last_updated: 2026-11-09
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---
@@ -45,6 +45,10 @@ spec: ../../specs/catalog/session-explorer.md
 | 2026-11-06 | `review` | `in-progress` | Implementing R-047 (1-Click Session ID Copy Capsule), R-048 (Dual-Temporal Telemetry & Multi-Day Tracking), R-049 (Tri-Modal Date Filtering Engine), R-050 (Session Trail Dual-Temporal Quantum Capsule), R-051 (Session Card UUID Copy & Layout Harmonization), and R-052 (Step Counter Integrity) |
 | 2026-11-06 | `in-progress` | `review` | R-047..R-052 fully implemented and verified via automated test suite and headless Playwright MCP |
 | 2026-11-06 | `review` | `released` | User approved release v0.4.0 (R-045..R-052 shipped) |
+| 2026-11-09 | `released` | `spec-review` | Crafted PRD and full SDD Specification for Holographic GitHub & Agent Step Review Pane (R-053..R-060, AC-117..AC-142) |
+| 2026-11-09 | `spec-review` | `in-progress` | Implemented R-053..R-066 (Spatial Sync, Dual Line Numbers, In-File Diff Decorations, Minimap Rail, Hunk Stepper) |
+| 2026-11-09 | `in-progress` | `review` | R-067..R-072 (Sub-Pixel Zero-Drift Alignment Engine, Forensic Buffer Telemetry, Multi-Hunk Navigation Radar) verified via Playwright on symbol_table.rs (13 hunks) |
+| 2026-11-09 | `review` | `released` | User approved release v0.5.2 (R-053..R-072 verified and shipped) |
 
 ---
 
@@ -52,8 +56,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 52 | 52 | 100% |
-| Acceptance Criteria (AC-XXX) | 116 | 116 | 100% |
+| Requirements (R-XXX) | 72 | 72 | 100% |
+| Acceptance Criteria (AC-XXX) | 185 | 185 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -114,6 +118,26 @@ spec: ../../specs/catalog/session-explorer.md
 | R-050 | Session Trail Dual-Temporal Quantum Capsule & Live Recency Telemetry (Live Pulse Dot, Initiated Timestamp, Lifespan Badge) | `src/web/src/app.js`, `src/web/src/styles.css`, `src/web/index.html` | headless browser | 🧪 |
 | R-051 | Session Card 1-Click UUID Copy & Layout Harmonization (Card Copy Button, Aligned Baseline Metadata, Glyph Padding) | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | 🧪 |
 | R-052 | Step Counter & Filter State Integrity (`Showing X of Y steps` Preserved Across Type Switches and Refresh) | `src/web/src/app.js` | headless browser | 🧪 |
+| R-053 | Native Git Trackability Discovery & Ambient Identity Engine | `src/git_service.go`, `src/api.go` | `src/git_test.go` | ✅ 🧪 |
+| R-054 | Multi-Vector Git File Diff & History REST API | `src/api.go`, `src/types.go`, `src/git_service.go` | `src/git_test.go` | ✅ 🧪 |
+| R-055 | Agent Step Chrono-Diff & Hunk Extraction Engine | `src/api.go`, `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-056 | Year 2500 Cosmic Holographic Review Pane UI | `src/web/index.html`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-057 | Interactive Draggable Splitter & Responsive Geometry | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-058 | Dual-Mode Diff Engine (Split & Unified) with Token Highlighting | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-059 | Bidirectional Viewport Synchronization & Anchor Navigation | `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-060 | Ambient Remote GitHub PR & Checks Integration | `src/git_service.go`, `src/api.go`, `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-061 | GitHub-Standard Dual Line Number Gutter (`diff-gutter-old` vs `diff-gutter-new`) | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-062 | In-File Code Gutter Diff Decorations & Change Markers (`+`, `~`, `-`) | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-063 | Holographic Diff Minimap Rail & Spatial Change Heatmap | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-064 | Synchronized Hunk Stepper Navigation (`⏮ Prev Hunk` / `⏭ Next Hunk`, `⌥[` / `⌥]`) | `src/web/src/app.js`, `src/web/index.html` | headless browser | ✅ 🧪 |
+| R-065 | AST Semantic Symbol Breadcrumbs & Enclosing Scope Detection | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-066 | Surgical Hunk Patch Copy & 1-Click Desktop IDE Deep-Linking | `src/web/src/app.js`, `src/web/index.html` | headless browser | ✅ 🧪 |
+| R-067 | Sub-Pixel Code & Gutter Synchronous Alignment Engine (Zero Drift) | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-068 | Forensic File Buffer Telemetry Capsule (`● 100% On-Disk`) | `src/web/src/app.js`, `src/web/index.html` | headless browser | ✅ 🧪 |
+| R-069 | Multi-Hunk Navigation Radar & Spatial Dropdown Quick-Jump | `src/web/src/app.js`, `src/web/index.html` | headless browser | ✅ 🧪 |
+| R-070 | Minimap Holographic Tooltip Previews & Spatial Hover Radar | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-071 | Active Hunk Spotlight & Ambient Framing Rail in File Viewer | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-072 | High-Scale Viewport Virtualization & Safe Buffer Handling | `src/web/src/app.js` | headless browser | ✅ 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

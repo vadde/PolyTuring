@@ -267,6 +267,21 @@ const state = {
   fileFindCaseSensitive: false,
   fileFindMatches: [],
   fileFindActiveIndex: -1,
+  // Holographic Review Pane State (R-056, R-057, R-058)
+  reviewPaneOpen: localStorage.getItem('se_review_open') !== 'false',
+  reviewPaneVector: 'steps', // 'steps' | 'working' | 'staged' | 'commits'
+  reviewDiffMode: localStorage.getItem('se_diff_mode') || 'unified', // 'unified' | 'split'
+  reviewSplitPercent: parseFloat(localStorage.getItem('se_review_split') || '55'),
+  reviewSteps: [],
+  reviewCurrentStepIdx: 0,
+  reviewCommits: [],
+  reviewSelectedCommit: '',
+  reviewStatus: null,
+  reviewDiff: null,
+  reviewThoughtExpanded: true,
+  reviewActiveHunkIndex: 0,
+  reviewHunkCount: 0,
+  reviewHunks: [],
   sessionFilesMap: new Map(), // cleanPath -> ForensicFileRecord
   sessionFiles: {
     lens: 'catalog', // 'catalog' | 'artifacts' | 'mutations' | 'telemetry'
@@ -391,6 +406,7 @@ const el = {
   fileViewerLangBadge: document.getElementById('fileViewerLangBadge'),
   fileViewerLinesBadge: document.getElementById('fileViewerLinesBadge'),
   fileViewerSizeBadge: document.getElementById('fileViewerSizeBadge'),
+  fileViewerBufferBadge: document.getElementById('fileViewerBufferBadge'),
   fileViewerModeControl: document.getElementById('fileViewerModeControl'),
   fileViewerWrapBtn: document.getElementById('fileViewerWrapBtn'),
   fileViewerCopyContentBtn: document.getElementById('fileViewerCopyContentBtn'),
@@ -406,6 +422,9 @@ const el = {
   fileViewerImageContainer: document.getElementById('fileViewerImageContainer'),
   fileViewerImage: document.getElementById('fileViewerImage'),
   fileViewerOpenFindBtn: document.getElementById('fileViewerOpenFindBtn'),
+  fileViewerIdeDeepLinkBtn: document.getElementById('fileViewerIdeDeepLinkBtn'),
+  fileDiffMinimapRail: document.getElementById('fileDiffMinimapRail'),
+  minimapFloatingTooltip: document.getElementById('minimapFloatingTooltip'),
   fileViewerFindWidget: document.getElementById('fileViewerFindWidget'),
   fileFindInput: document.getElementById('fileFindInput'),
   fileFindCaseBtn: document.getElementById('fileFindCaseBtn'),
@@ -413,6 +432,50 @@ const el = {
   fileFindPrevBtn: document.getElementById('fileFindPrevBtn'),
   fileFindNextBtn: document.getElementById('fileFindNextBtn'),
   fileFindCloseBtn: document.getElementById('fileFindCloseBtn'),
+  // Holographic Review Pane Elements (R-056, R-057, R-058)
+  fileViewerSplitContainer: document.getElementById('fileViewerSplitContainer'),
+  fileViewerResizer: document.getElementById('fileViewerResizer'),
+  fileViewerReviewPane: document.getElementById('fileViewerReviewPane'),
+  toggleReviewPaneBtn: document.getElementById('toggleReviewPaneBtn'),
+  reviewPaneBadge: document.getElementById('reviewPaneBadge'),
+  reviewBranchCapsule: document.getElementById('reviewBranchCapsule'),
+  reviewBranchName: document.getElementById('reviewBranchName'),
+  reviewDirtyIndicator: document.getElementById('reviewDirtyIndicator'),
+  reviewChurnCapsule: document.getElementById('reviewChurnCapsule'),
+  reviewChurnAdd: document.getElementById('reviewChurnAdd'),
+  reviewChurnDel: document.getElementById('reviewChurnDel'),
+  reviewPrCapsule: document.getElementById('reviewPrCapsule'),
+  reviewPrLink: document.getElementById('reviewPrLink'),
+  tabReviewSteps: document.getElementById('tabReviewSteps'),
+  tabReviewWorking: document.getElementById('tabReviewWorking'),
+  tabReviewStaged: document.getElementById('tabReviewStaged'),
+  tabReviewCommits: document.getElementById('tabReviewCommits'),
+  stepsCountBadge: document.getElementById('stepsCountBadge'),
+  reviewStepScrubber: document.getElementById('reviewStepScrubber'),
+  scrubberPrevBtn: document.getElementById('scrubberPrevBtn'),
+  scrubberLabel: document.getElementById('scrubberLabel'),
+  scrubberNextBtn: document.getElementById('scrubberNextBtn'),
+  reviewCommitPicker: document.getElementById('reviewCommitPicker'),
+  reviewCommitSelect: document.getElementById('reviewCommitSelect'),
+  diffViewModeControl: document.getElementById('diffViewModeControl'),
+  reviewHunkStepper: document.getElementById('reviewHunkStepper'),
+  hunkPrevBtn: document.getElementById('hunkPrevBtn'),
+  hunkNextBtn: document.getElementById('hunkNextBtn'),
+  hunkStepLabel: document.getElementById('hunkStepLabel'),
+  hunkRadarSelect: document.getElementById('hunkRadarSelect'),
+  copyDiffPatchBtn: document.getElementById('copyDiffPatchBtn'),
+  reviewAgentThoughtCard: document.getElementById('reviewAgentThoughtCard'),
+  thoughtCardHeader: document.getElementById('thoughtCardHeader'),
+  thoughtCardTitle: document.getElementById('thoughtCardTitle'),
+  thoughtStepPill: document.getElementById('thoughtStepPill'),
+  toggleThoughtBtn: document.getElementById('toggleThoughtBtn'),
+  reviewThoughtBody: document.getElementById('reviewThoughtBody'),
+  reviewDiffContainer: document.getElementById('reviewDiffContainer'),
+  reviewLoading: document.getElementById('reviewLoading'),
+  reviewEmptyState: document.getElementById('reviewEmptyState'),
+  reviewEmptyTitle: document.getElementById('reviewEmptyTitle'),
+  reviewEmptyDesc: document.getElementById('reviewEmptyDesc'),
+  reviewDiffSurface: document.getElementById('reviewDiffSurface'),
   // Session Files Holographic Matrix (R-045)
   sessionFilesModal: document.getElementById('sessionFilesModal'),
   closeSessionFilesModalBtn: document.getElementById('closeSessionFilesModalBtn'),
@@ -695,6 +758,37 @@ function initEventListeners() {
       if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open')) {
         e.preventDefault();
         openFileFindWidget();
+      }
+    }
+    // Cmd+\ or Ctrl+\ inside File Viewer (Toggle Review Pane R-057)
+    if ((e.metaKey || e.ctrlKey) && (e.key === '\\' || e.key === '|')) {
+      if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open')) {
+        e.preventDefault();
+        toggleReviewPane();
+      }
+    }
+    // Arrow keys for Step Scrubber when review pane is open in steps mode
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && state.reviewPaneOpen && state.reviewPaneVector === 'steps') {
+      if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open')) {
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            stepReviewScrubber(-1);
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            stepReviewScrubber(1);
+          }
+        }
+      }
+    }
+    // Alt+[ / Alt+] or F7 / F8 (Prev/Next Hunk Stepper R-064)
+    if (el.fileViewerModal && el.fileViewerModal.classList.contains('file-viewer-open') && state.reviewPaneOpen) {
+      if ((e.altKey && (e.key === '[' || e.key === '“')) || e.key === 'F7') {
+        e.preventDefault();
+        stepToHunk(state.reviewActiveHunkIndex - 1);
+      } else if ((e.altKey && (e.key === ']' || e.key === '‘')) || e.key === 'F8') {
+        e.preventDefault();
+        stepToHunk(state.reviewActiveHunkIndex + 1);
       }
     }
     // / to focus search if not inside input
@@ -1056,6 +1150,7 @@ function initEventListeners() {
       el.fileViewerWrapBtn.innerHTML = state.fileViewerWrap ? '✓ Wrapped' : '↩ Wrap';
       const pre = el.fileViewerCodeContainer?.querySelector('.code-content-pre');
       if (pre) pre.classList.toggle('wrap-code', state.fileViewerWrap);
+      syncWrappedLineHeights();
       showToast(state.fileViewerWrap ? 'Line wrap enabled' : 'Line wrap disabled');
     });
   }
@@ -1153,6 +1248,9 @@ function initEventListeners() {
 
   // Agent Matrix Listeners (R-039)
   initAgentMatrixListeners();
+
+  // Holographic Review Pane Listeners (R-056, R-057, R-058)
+  initReviewPaneListeners();
 }
 
 // Local date helper to prevent timezone skew (e.g. UTC shifting into tomorrow)
@@ -2804,7 +2902,9 @@ function attachStepInteractivity(container) {
       e.preventDefault();
       e.stopPropagation();
       const path = link.dataset.filepath || link.getAttribute('href');
-      openFileViewer(path);
+      const stepEl = link.closest('.message-card') || link.closest('.timeline-node');
+      const stepIdx = stepEl ? parseInt(stepEl.dataset.stepIndex, 10) : null;
+      openFileViewer(path, isNaN(stepIdx) ? null : stepIdx);
     };
   });
 
@@ -2828,7 +2928,9 @@ function attachStepInteractivity(container) {
     btn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openFileViewer(btn.dataset.filepath);
+      const stepEl = btn.closest('.message-card') || btn.closest('.timeline-node');
+      const stepIdx = stepEl ? parseInt(stepEl.dataset.stepIndex, 10) : null;
+      openFileViewer(btn.dataset.filepath, isNaN(stepIdx) ? null : stepIdx);
     };
   });
 
@@ -2852,7 +2954,9 @@ function attachStepInteractivity(container) {
     btn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openFileViewer(btn.dataset.filepath);
+      const stepEl = btn.closest('.message-card') || btn.closest('.timeline-node');
+      const stepIdx = stepEl ? parseInt(stepEl.dataset.stepIndex, 10) : null;
+      openFileViewer(btn.dataset.filepath, isNaN(stepIdx) ? null : stepIdx);
     };
   });
 
@@ -3563,7 +3667,7 @@ function getFileIcon(path) {
   }
 }
 
-async function openFileViewer(filePathWithAnchor) {
+async function openFileViewer(filePathWithAnchor, targetStepIdx = null) {
   if (!filePathWithAnchor || !el.fileViewerModal) return;
 
   // Parse optional line anchor e.g. /path/to/file.go#L45-L60 or /path/to/file.go:45
@@ -3618,6 +3722,7 @@ async function openFileViewer(filePathWithAnchor) {
     const fileData = await res.json();
     state.fileViewerData = fileData;
     renderFileViewerContent();
+    initReviewPaneForFile(cleanPath, targetStepIdx);
   } catch (err) {
     if (el.fileViewerLoading) el.fileViewerLoading.style.display = 'none';
     if (el.fileViewerError) {
@@ -3637,6 +3742,7 @@ function closeFileViewer() {
   el.fileViewerModal.classList.remove('file-viewer-open');
   document.body.style.overflow = '';
   state.fileViewerData = null;
+  cleanupReviewPane();
 }
 
 function renderFileViewerContent() {
@@ -3655,6 +3761,10 @@ function renderFileViewerContent() {
   if (el.fileViewerSizeBadge) {
     const kb = (data.size / 1024).toFixed(1);
     el.fileViewerSizeBadge.textContent = data.size > 1048576 ? `${(data.size / 1048576).toFixed(2)} MB` : `${kb} KB`;
+  }
+  if (el.fileViewerBufferBadge) {
+    el.fileViewerBufferBadge.textContent = '● 100% On-Disk';
+    el.fileViewerBufferBadge.title = `Loaded 100% of physical file from disk (${(data.line_count || 0).toLocaleString()} lines, ${(data.size / 1024).toFixed(1)} KB). Server ceiling: 10MB.`;
   }
 
   const isMarkdown = data.extension === '.md' || data.extension === '.markdown';
@@ -3712,29 +3822,46 @@ function renderFileViewerContent() {
     }
     el.fileViewerLineNumbers.innerHTML = gutterHtml;
 
+    // Attach Gutter <-> Code Hover Sync (R-070)
+    el.fileViewerLineNumbers.querySelectorAll('span').forEach(sp => {
+      const l = sp.dataset.line;
+      sp.addEventListener('mouseenter', () => {
+        const codeL = document.getElementById(`code-line-${l}`);
+        if (codeL) codeL.classList.add('line-hover-sync');
+        sp.classList.add('line-hover-sync');
+      });
+      sp.addEventListener('mouseleave', () => {
+        const codeL = document.getElementById(`code-line-${l}`);
+        if (codeL) codeL.classList.remove('line-hover-sync');
+        sp.classList.remove('line-hover-sync');
+      });
+    });
+
     const lang = (data.extension || '').replace('.', '').toLowerCase();
     const validLang = lang && hljs.getLanguage(lang);
     let highlighted = validLang
       ? hljs.highlight(data.content, { language: lang, ignoreIllegals: true }).value
       : escapeHtml(data.content);
 
-    if (startL) {
-      const highlightedLines = highlighted.split('\n');
-      highlighted = highlightedLines.map((line, idx) => {
-        const lineNum = idx + 1;
-        if (lineNum >= startL && lineNum <= endL) {
-          return `<mark class="line-highlight" id="file-line-${lineNum}">${line}</mark>`;
-        }
-        return line;
-      }).join('\n');
-    }
+    const rawLines = highlighted.split('\n');
+    const wrappedCode = rawLines.map((line, idx) => {
+      const lineNum = idx + 1;
+      const isTarget = startL && lineNum >= startL && lineNum <= endL;
+      return `<span class="code-line ${isTarget ? 'line-highlight' : ''}" id="code-line-${lineNum}">${line || ' '}</span>`;
+    }).join(''); // Zero-drift invariant: join with '' to eliminate phantom newline gaps (R-067)
 
     el.fileViewerCodeBlock.className = `hljs ${validLang ? 'language-' + lang : ''}`;
-    el.fileViewerCodeBlock.innerHTML = highlighted;
+    el.fileViewerCodeBlock.innerHTML = wrappedCode;
+
+    if (state.fileViewerWrap) {
+      setTimeout(syncWrappedLineHeights, 40);
+    }
 
     if (startL) {
       setTimeout(() => {
-        const targetEl = document.getElementById(`file-line-${startL}`) || el.fileViewerLineNumbers.querySelector(`[data-line="${startL}"]`);
+        const targetEl = document.getElementById(`file-line-${startL}`) ||
+          document.getElementById(`code-line-${startL}`) ||
+          el.fileViewerLineNumbers.querySelector(`[data-line="${startL}"]`);
         if (targetEl) {
           targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -3742,9 +3869,38 @@ function renderFileViewerContent() {
     }
   }
 
+  // If diff hunks are loaded, apply in-file gutter decorations and minimap rail (R-062, R-063)
+  if (state.reviewHunks && state.reviewHunks.length > 0) {
+    setTimeout(() => updateInFileDiffDecorations(state.reviewHunks), 40);
+  }
+
   // If Find widget is open, re-evaluate find matches in the current view
   if (el.fileViewerFindWidget && el.fileViewerFindWidget.style.display !== 'none' && state.fileFindQuery) {
     setTimeout(() => executeFileFind(), 40);
+  }
+}
+
+// Dynamic Wrap Reconciliation (R-067)
+function syncWrappedLineHeights() {
+  if (!el.fileViewerLineNumbers || !el.fileViewerCodeBlock) return;
+  const codeLines = el.fileViewerCodeBlock.querySelectorAll('.code-line');
+  const gutterSpans = el.fileViewerLineNumbers.querySelectorAll('span');
+  if (state.fileViewerWrap) {
+    for (let i = 0; i < codeLines.length && i < gutterSpans.length; i++) {
+      const h = codeLines[i].offsetHeight;
+      if (h > 22) {
+        gutterSpans[i].style.height = `${h}px`;
+        gutterSpans[i].style.lineHeight = `${h}px`;
+      } else {
+        gutterSpans[i].style.height = '22px';
+        gutterSpans[i].style.lineHeight = '22px';
+      }
+    }
+  } else {
+    gutterSpans.forEach(sp => {
+      sp.style.height = '';
+      sp.style.lineHeight = '';
+    });
   }
 }
 
@@ -3927,6 +4083,1245 @@ function goToPrevFindMatch() {
   if (state.fileFindMatches.length === 0) return;
   state.fileFindActiveIndex = (state.fileFindActiveIndex - 1 + state.fileFindMatches.length) % state.fileFindMatches.length;
   highlightActiveFindMatch();
+}
+
+// ============================================================================
+//  Holographic GitHub & Agent Step Review Pane Engine (R-056, R-057, R-058)
+// ============================================================================
+
+let isResizingReviewPane = false;
+let currentReviewFilePath = '';
+
+function initReviewPaneListeners() {
+  if (el.toggleReviewPaneBtn) {
+    el.toggleReviewPaneBtn.addEventListener('click', () => toggleReviewPane());
+  }
+
+  // Resizer dragging
+  if (el.fileViewerResizer) {
+    el.fileViewerResizer.addEventListener('pointerdown', handleResizerPointerDown);
+    el.fileViewerResizer.addEventListener('dblclick', cycleResizerSnapPoints);
+  }
+
+  // Vector tab buttons
+  [
+    { btn: el.tabReviewSteps, vector: 'steps' },
+    { btn: el.tabReviewWorking, vector: 'working' },
+    { btn: el.tabReviewStaged, vector: 'staged' },
+    { btn: el.tabReviewCommits, vector: 'commits' }
+  ].forEach(({ btn, vector }) => {
+    if (btn) {
+      btn.addEventListener('click', () => switchReviewVector(vector));
+    }
+  });
+
+  // Scrubber controls
+  if (el.scrubberPrevBtn) {
+    el.scrubberPrevBtn.addEventListener('click', () => stepReviewScrubber(-1));
+  }
+  if (el.scrubberNextBtn) {
+    el.scrubberNextBtn.addEventListener('click', () => stepReviewScrubber(1));
+  }
+
+  // Thought card toggle
+  if (el.thoughtCardHeader) {
+    el.thoughtCardHeader.addEventListener('click', () => {
+      state.reviewThoughtExpanded = !state.reviewThoughtExpanded;
+      if (el.reviewThoughtBody) {
+        el.reviewThoughtBody.style.display = state.reviewThoughtExpanded ? 'block' : 'none';
+      }
+      if (el.toggleThoughtBtn) {
+        el.toggleThoughtBtn.textContent = state.reviewThoughtExpanded ? '▾' : '▸';
+      }
+    });
+  }
+
+  // Commit picker
+  if (el.reviewCommitSelect) {
+    el.reviewCommitSelect.addEventListener('change', (e) => {
+      const sha = e.target.value;
+      if (sha) {
+        state.reviewSelectedCommit = sha;
+        fetchAndRenderCommitDiff(sha);
+      }
+    });
+  }
+
+  // Diff view mode (unified vs split)
+  if (el.diffViewModeControl) {
+    el.diffViewModeControl.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.reviewDiffMode = btn.dataset.diffMode || 'unified';
+        localStorage.setItem('se_diff_mode', state.reviewDiffMode);
+        el.diffViewModeControl.querySelectorAll('.segment-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.diffMode === state.reviewDiffMode);
+        });
+        renderCurrentReviewDiff();
+      });
+    });
+  }
+
+  // Copy diff patch button
+  if (el.copyDiffPatchBtn) {
+    el.copyDiffPatchBtn.addEventListener('click', copyCurrentDiffPatch);
+  }
+
+  // Hunk Stepper Controls (R-064, R-069)
+  if (el.hunkPrevBtn) {
+    el.hunkPrevBtn.addEventListener('click', () => stepToHunk(state.reviewActiveHunkIndex - 1));
+  }
+  if (el.hunkNextBtn) {
+    el.hunkNextBtn.addEventListener('click', () => stepToHunk(state.reviewActiveHunkIndex + 1));
+  }
+  if (el.hunkRadarSelect) {
+    el.hunkRadarSelect.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      if (!isNaN(idx)) stepToHunk(idx);
+    });
+  }
+
+  // Desktop IDE Deep-Linking (R-066)
+  if (el.fileViewerIdeDeepLinkBtn) {
+    el.fileViewerIdeDeepLinkBtn.addEventListener('click', openInDesktopIde);
+  }
+}
+
+function handleResizerPointerDown(e) {
+  e.preventDefault();
+  isResizingReviewPane = true;
+  if (el.fileViewerResizer) el.fileViewerResizer.classList.add('resizing');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  const onPointerMove = (ev) => {
+    if (!isResizingReviewPane || !el.fileViewerSplitContainer) return;
+    const rect = el.fileViewerSplitContainer.getBoundingClientRect();
+    const pointerX = ev.clientX - rect.left;
+    const percent = Math.min(80, Math.max(25, (pointerX / rect.width) * 100));
+    state.reviewSplitPercent = +(percent.toFixed(1));
+    applyReviewSplitWidth(state.reviewSplitPercent);
+  };
+
+  const onPointerUp = () => {
+    if (isResizingReviewPane) {
+      isResizingReviewPane = false;
+      if (el.fileViewerResizer) el.fileViewerResizer.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('se_review_split', state.reviewSplitPercent);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    }
+  };
+
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+}
+
+function cycleResizerSnapPoints() {
+  const current = state.reviewSplitPercent;
+  let next = 55;
+  if (current >= 50 && current <= 60) {
+    next = 70; // wide code view
+  } else if (current > 60) {
+    next = 35; // wide review pane
+  } else {
+    next = 55; // balanced default
+  }
+  state.reviewSplitPercent = next;
+  applyReviewSplitWidth(next);
+  localStorage.setItem('se_review_split', next);
+  showToast(`Review pane snapped to ${100 - next}% width`);
+}
+
+function applyReviewSplitWidth(percent) {
+  if (el.fileViewerSplitContainer) {
+    el.fileViewerSplitContainer.style.setProperty('--code-pane-width', `${percent}%`);
+  }
+}
+
+function toggleReviewPane(forceState) {
+  state.reviewPaneOpen = typeof forceState === 'boolean' ? forceState : !state.reviewPaneOpen;
+  localStorage.setItem('se_review_open', state.reviewPaneOpen ? 'true' : 'false');
+  updateReviewPaneVisibility();
+}
+
+function updateReviewPaneVisibility() {
+  if (!el.fileViewerSplitContainer) return;
+  el.fileViewerSplitContainer.classList.toggle('review-pane-collapsed', !state.reviewPaneOpen);
+  if (el.toggleReviewPaneBtn) {
+    el.toggleReviewPaneBtn.classList.toggle('active', state.reviewPaneOpen);
+  }
+  if (state.reviewPaneOpen) {
+    applyReviewSplitWidth(state.reviewSplitPercent);
+  }
+}
+
+function cleanupReviewPane() {
+  currentReviewFilePath = '';
+  state.reviewSteps = [];
+  state.reviewCurrentStepIdx = 0;
+  state.reviewCommits = [];
+  state.reviewSelectedCommit = '';
+  state.reviewStatus = null;
+  state.reviewDiff = null;
+  state.reviewHunks = [];
+  state.reviewHunkCount = 0;
+  state.reviewActiveHunkIndex = 0;
+  clearInFileDiffDecorations();
+}
+
+async function initReviewPaneForFile(filePath, targetStepIdx = null) {
+  currentReviewFilePath = filePath;
+  updateReviewPaneVisibility();
+
+  if (el.reviewLoading) el.reviewLoading.style.display = 'flex';
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+  if (el.reviewDiffSurface) el.reviewDiffSurface.innerHTML = '';
+
+  // 1. Extract agent session step diffs from detail messages
+  extractAgentStepDiffsForFile(filePath);
+
+  // 2. Fetch git status from backend
+  try {
+    const sid = state.selectedSessionId || '';
+    const res = await fetch(`/api/git/file/status?path=${encodeURIComponent(filePath)}&session_id=${encodeURIComponent(sid)}`);
+    if (res.ok) {
+      const status = await res.json();
+      state.reviewStatus = status;
+      updateReviewTelemetryRibbon(status);
+    }
+  } catch (err) {
+    console.warn('Failed to load git file status:', err);
+  }
+
+  // 3. Determine initial vector
+  if (targetStepIdx != null && state.reviewSteps.length > 0) {
+    const idx = state.reviewSteps.findIndex(s => s.step_index === targetStepIdx);
+    state.reviewCurrentStepIdx = idx >= 0 ? idx : 0;
+    state.reviewPaneVector = 'steps';
+  } else if (state.reviewSteps.length > 0) {
+    state.reviewCurrentStepIdx = state.reviewSteps.length - 1; // latest step
+    state.reviewPaneVector = 'steps';
+  } else if (state.reviewStatus && state.reviewStatus.is_git) {
+    state.reviewPaneVector = state.reviewStatus.is_dirty ? 'working' : 'commits';
+  } else {
+    state.reviewPaneVector = 'steps';
+  }
+
+  switchReviewVector(state.reviewPaneVector);
+}
+
+// Locate exact line number and enclosing symbol in the open file for agent step mutations (R-059, R-065)
+function locateStepDiffInFile(targetStr, replaceStr, fileContent) {
+  let startLine = 1;
+  let symbol = '';
+
+  if (!fileContent || typeof fileContent !== 'string') {
+    return { startLine: 1, symbol: '' };
+  }
+
+  let foundIdx = -1;
+  // 1. Try exact target string in current file
+  if (targetStr && targetStr.trim()) {
+    foundIdx = fileContent.indexOf(targetStr);
+  }
+
+  // 2. If target was already replaced in file, try finding replacement string
+  if (foundIdx === -1 && replaceStr && replaceStr.trim()) {
+    foundIdx = fileContent.indexOf(replaceStr);
+  }
+
+  // 3. Fallback: match first significant line (>5 chars) from target or replacement
+  if (foundIdx === -1) {
+    const probeLines = (targetStr ? targetStr.split('\n') : [])
+      .concat(replaceStr ? replaceStr.split('\n') : [])
+      .map(s => s.trim())
+      .filter(s => s.length > 5);
+    for (const probe of probeLines) {
+      const idx = fileContent.indexOf(probe);
+      if (idx !== -1) {
+        foundIdx = idx;
+        break;
+      }
+    }
+  }
+
+  // 4. Calculate line number from character offset
+  if (foundIdx !== -1) {
+    const prefix = fileContent.substring(0, foundIdx);
+    startLine = (prefix.match(/\n/g) || []).length + 1;
+  }
+
+  // 5. Look backwards up to 60 lines to identify enclosing function, method, struct, or class
+  const fileLines = fileContent.split('\n');
+  const scanLimit = Math.max(0, startLine - 1);
+  const scanStart = Math.min(fileLines.length - 1, scanLimit);
+  for (let i = scanStart; i >= 0 && i >= scanStart - 60; i--) {
+    const line = fileLines[i].trim();
+    if (/^(?:export\s+)?(?:async\s+)?(?:func|function|def|fn|pub\s+fn|class|type|struct|interface)\s+([A-Za-z0-9_]+(?:\([^)]*\))?)/i.test(line)) {
+      symbol = line.length > 55 ? line.substring(0, 52) + '...' : line;
+      break;
+    }
+  }
+
+  return { startLine, symbol };
+}
+
+function extractAgentStepDiffsForFile(filePath) {
+  state.reviewSteps = [];
+  state.reviewCurrentStepIdx = 0;
+
+  const detail = state.selectedSessionDetail;
+  if (!detail || !detail.messages) {
+    updateStepsBadge();
+    return;
+  }
+
+  const normTarget = filePath.toLowerCase().replace(/^file:\/\//, '').split('#')[0];
+  const baseTarget = normTarget.split('/').pop() || '';
+  const fileContent = state.fileViewerData && state.fileViewerData.content ? state.fileViewerData.content : '';
+
+  detail.messages.forEach(msg => {
+    const stepIdx = typeof msg.step_index === 'number' ? msg.step_index : 0;
+    if (!msg.tool_calls || !Array.isArray(msg.tool_calls)) return;
+
+    msg.tool_calls.forEach(tc => {
+      const args = tc.args || {};
+      let p = args.Path || args.path || args.AbsolutePath || args.TargetFile || args.target_file || args.file_path || args.FilePath;
+      if (!p || typeof p !== 'string') return;
+
+      const normP = p.toLowerCase().replace(/^file:\/\//, '').split('#')[0];
+      const baseP = normP.split('/').pop() || '';
+
+      if (normP === normTarget || normP.endsWith('/' + baseTarget) || normTarget.endsWith('/' + baseP)) {
+        // Matched file mutation in this step!
+        const stepDiff = {
+          step_index: stepIdx,
+          tool_name: tc.name,
+          timestamp: msg.created_at || '',
+          thinking: msg.thinking || '',
+          hunks: [],
+          additions: 0,
+          deletions: 0
+        };
+
+        if (tc.name === 'edit_file' || tc.name === 'replace_file_content') {
+          const targetStr = String(args.Target || args.target || '');
+          const replaceStr = String(args.Replacement || args.replacement || '');
+          const { startLine, symbol } = locateStepDiffInFile(targetStr, replaceStr, fileContent);
+
+          const delLines = targetStr ? targetStr.split('\n') : [];
+          const addLines = replaceStr ? replaceStr.split('\n') : [];
+          const symLabel = symbol ? ` ${symbol}` : ` Step ${stepIdx} [${tc.name}]`;
+
+          const hunk = {
+            header: `@@ -${startLine},${delLines.length} +${startLine},${addLines.length} @@${symLabel}`,
+            old_start: startLine,
+            old_lines: delLines.length,
+            new_start: startLine,
+            new_lines: addLines.length,
+            lines: []
+          };
+
+          delLines.forEach((delL, idx) => {
+            stepDiff.deletions++;
+            hunk.lines.push({
+              type: 'delete',
+              content: delL,
+              old_line_num: startLine + idx,
+              new_line_num: null
+            });
+          });
+
+          addLines.forEach((addL, idx) => {
+            stepDiff.additions++;
+            hunk.lines.push({
+              type: 'add',
+              content: addL,
+              old_line_num: null,
+              new_line_num: startLine + idx
+            });
+          });
+
+          stepDiff.hunks = [hunk];
+          state.reviewSteps.push(stepDiff);
+        } else if (tc.name === 'write_file' || tc.name === 'create_file') {
+          const contentStr = String(args.Content || args.content || '');
+          const lines = contentStr.split('\n');
+          const maxLines = Math.min(lines.length, 2500);
+
+          const hunk = {
+            header: `@@ -1,0 +1,${lines.length} @@ Step ${stepIdx} [${tc.name}]`,
+            old_start: 1,
+            old_lines: 0,
+            new_start: 1,
+            new_lines: lines.length,
+            lines: []
+          };
+
+          for (let i = 0; i < maxLines; i++) {
+            stepDiff.additions++;
+            hunk.lines.push({
+              type: 'add',
+              content: lines[i],
+              old_line_num: null,
+              new_line_num: i + 1
+            });
+          }
+          stepDiff.hunks = [hunk];
+          state.reviewSteps.push(stepDiff);
+        }
+      }
+    });
+  });
+
+  updateStepsBadge();
+}
+
+function updateStepsBadge() {
+  if (el.stepsCountBadge) {
+    el.stepsCountBadge.textContent = state.reviewSteps.length;
+  }
+}
+
+function updateReviewTelemetryRibbon(status) {
+  if (!status) return;
+
+  if (el.reviewBranchCapsule) {
+    if (status.is_git && status.branch) {
+      el.reviewBranchCapsule.style.display = 'inline-flex';
+      if (el.reviewBranchName) el.reviewBranchName.textContent = status.branch;
+      if (el.reviewDirtyIndicator) {
+        el.reviewDirtyIndicator.style.display = status.is_dirty ? 'inline' : 'none';
+      }
+    } else {
+      el.reviewBranchCapsule.style.display = 'none';
+    }
+  }
+
+  if (el.reviewPrCapsule) {
+    if (status.active_pr && status.active_pr.number > 0) {
+      el.reviewPrCapsule.style.display = 'inline-flex';
+      if (el.reviewPrLink) {
+        el.reviewPrLink.textContent = `PR #${status.active_pr.number} (${status.active_pr.state})`;
+        el.reviewPrLink.href = status.active_pr.url || '#';
+        el.reviewPrLink.title = `${status.active_pr.title} — ${status.active_pr.status_summary || ''}`;
+      }
+    } else {
+      el.reviewPrCapsule.style.display = 'none';
+    }
+  }
+}
+
+function switchReviewVector(vector) {
+  state.reviewPaneVector = vector;
+
+  // Update tabs UI
+  const tabMap = {
+    steps: el.tabReviewSteps,
+    working: el.tabReviewWorking,
+    staged: el.tabReviewStaged,
+    commits: el.tabReviewCommits
+  };
+  Object.entries(tabMap).forEach(([k, btn]) => {
+    if (btn) btn.classList.toggle('active', k === vector);
+  });
+
+  // Toggle subbar controls
+  if (el.reviewStepScrubber) {
+    el.reviewStepScrubber.style.display = vector === 'steps' ? 'inline-flex' : 'none';
+  }
+  if (el.reviewCommitPicker) {
+    el.reviewCommitPicker.style.display = vector === 'commits' ? 'block' : 'none';
+  }
+  if (el.reviewAgentThoughtCard) {
+    el.reviewAgentThoughtCard.style.display = (vector === 'steps' && state.reviewSteps.length > 0) ? 'block' : 'none';
+  }
+
+  renderCurrentReviewDiff();
+}
+
+async function renderCurrentReviewDiff() {
+  const vector = state.reviewPaneVector;
+  const filePath = currentReviewFilePath;
+  if (!filePath) return;
+
+  if (vector === 'steps') {
+    renderStepsVector();
+  } else if (vector === 'working') {
+    await fetchAndRenderGitDiff('unstaged');
+  } else if (vector === 'staged') {
+    await fetchAndRenderGitDiff('staged');
+  } else if (vector === 'commits') {
+    await loadCommitsVector();
+  }
+}
+
+function renderStepsVector() {
+  if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+
+  if (state.reviewSteps.length === 0) {
+    if (el.reviewEmptyState) {
+      el.reviewEmptyState.style.display = 'flex';
+      if (el.reviewEmptyTitle) el.reviewEmptyTitle.textContent = 'No Agent Steps';
+      if (el.reviewEmptyDesc) el.reviewEmptyDesc.textContent = 'This file was not modified by the agent during the current session.';
+    }
+    if (el.reviewDiffSurface) el.reviewDiffSurface.innerHTML = '';
+    if (el.reviewAgentThoughtCard) el.reviewAgentThoughtCard.style.display = 'none';
+    if (el.reviewChurnAdd) el.reviewChurnAdd.textContent = '+0';
+    if (el.reviewChurnDel) el.reviewChurnDel.textContent = '-0';
+    return;
+  }
+
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+
+  const idx = Math.min(Math.max(0, state.reviewCurrentStepIdx), state.reviewSteps.length - 1);
+  state.reviewCurrentStepIdx = idx;
+  const currentStep = state.reviewSteps[idx];
+
+  // Update scrubber
+  if (el.scrubberLabel) {
+    el.scrubberLabel.textContent = `Step ${currentStep.step_index} (${idx + 1}/${state.reviewSteps.length})`;
+  }
+  if (el.scrubberPrevBtn) el.scrubberPrevBtn.disabled = idx === 0;
+  if (el.scrubberNextBtn) el.scrubberNextBtn.disabled = idx === state.reviewSteps.length - 1;
+
+  // Update thought card
+  if (el.reviewAgentThoughtCard) {
+    el.reviewAgentThoughtCard.style.display = 'block';
+    if (el.thoughtStepPill) el.thoughtStepPill.textContent = `Turn #${currentStep.step_index}`;
+    if (el.thoughtCardTitle) el.thoughtCardTitle.textContent = `Agent Rationale [${currentStep.tool_name}]`;
+    if (el.reviewThoughtBody) {
+      el.reviewThoughtBody.textContent = currentStep.thinking || 'No internal reasoning thoughts recorded for this turn.';
+    }
+  }
+
+  // Render Diff Surface
+  renderDiffSurface(currentStep, true);
+}
+
+function stepReviewScrubber(delta) {
+  if (state.reviewSteps.length === 0) return;
+  const nextIdx = state.reviewCurrentStepIdx + delta;
+  if (nextIdx >= 0 && nextIdx < state.reviewSteps.length) {
+    state.reviewCurrentStepIdx = nextIdx;
+    renderStepsVector();
+  }
+}
+
+async function fetchAndRenderGitDiff(mode) {
+  if (el.reviewLoading) el.reviewLoading.style.display = 'flex';
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+  if (el.reviewDiffSurface) el.reviewDiffSurface.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/git/file/diff?path=${encodeURIComponent(currentReviewFilePath)}&mode=${mode}`);
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+
+    if (!res.ok) {
+      const errText = await res.text();
+      showReviewDiffError(errText || `Git diff error ${res.status}`);
+      return;
+    }
+
+    const diffData = await res.json();
+    state.reviewDiff = diffData;
+
+    if (!diffData.hunks || diffData.hunks.length === 0) {
+      if (el.reviewEmptyState) {
+        el.reviewEmptyState.style.display = 'flex';
+        if (el.reviewEmptyTitle) el.reviewEmptyTitle.textContent = mode === 'staged' ? 'Index Clean' : 'Working Copy Clean';
+        if (el.reviewEmptyDesc) el.reviewEmptyDesc.textContent = mode === 'staged' ? 'No staged changes for this file.' : 'No unstaged modifications found.';
+      }
+      if (el.reviewChurnAdd) el.reviewChurnAdd.textContent = '+0';
+      if (el.reviewChurnDel) el.reviewChurnDel.textContent = '-0';
+      return;
+    }
+
+    renderDiffSurface(diffData, false);
+  } catch (err) {
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+    showReviewDiffError(err.message);
+  }
+}
+
+async function loadCommitsVector() {
+  if (el.reviewLoading) el.reviewLoading.style.display = 'flex';
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+  if (el.reviewDiffSurface) el.reviewDiffSurface.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/git/file/commits?path=${encodeURIComponent(currentReviewFilePath)}&limit=30`);
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+
+    if (!res.ok) {
+      const errText = await res.text();
+      showReviewDiffError(errText || `Git commits error ${res.status}`);
+      return;
+    }
+
+    const commits = await res.json();
+    state.reviewCommits = commits || [];
+
+    if (state.reviewCommits.length === 0) {
+      if (el.reviewEmptyState) {
+        el.reviewEmptyState.style.display = 'flex';
+        if (el.reviewEmptyTitle) el.reviewEmptyTitle.textContent = 'No Commits Found';
+        if (el.reviewEmptyDesc) el.reviewEmptyDesc.textContent = 'This file has no commit history in the current branch.';
+      }
+      return;
+    }
+
+    // Populate select dropdown
+    if (el.reviewCommitSelect) {
+      el.reviewCommitSelect.innerHTML = state.reviewCommits.map(c => `
+        <option value="${escapeHtml(c.sha)}">${escapeHtml(c.short_sha)} — ${escapeHtml(c.subject)} (${escapeHtml(c.relative_time)})</option>
+      `).join('');
+
+      state.reviewSelectedCommit = state.reviewCommits[0].sha;
+      fetchAndRenderCommitDiff(state.reviewSelectedCommit);
+    }
+  } catch (err) {
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+    showReviewDiffError(err.message);
+  }
+}
+
+async function fetchAndRenderCommitDiff(sha) {
+  if (el.reviewLoading) el.reviewLoading.style.display = 'flex';
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+  if (el.reviewDiffSurface) el.reviewDiffSurface.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/git/file/diff?path=${encodeURIComponent(currentReviewFilePath)}&mode=commit&commit_sha=${encodeURIComponent(sha)}`);
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+
+    if (!res.ok) {
+      const errText = await res.text();
+      showReviewDiffError(errText || `Commit diff error ${res.status}`);
+      return;
+    }
+
+    const diffData = await res.json();
+    state.reviewDiff = diffData;
+    renderDiffSurface(diffData, false);
+  } catch (err) {
+    if (el.reviewLoading) el.reviewLoading.style.display = 'none';
+    showReviewDiffError(err.message);
+  }
+}
+
+function showReviewDiffError(msg) {
+  if (el.reviewDiffSurface) {
+    el.reviewDiffSurface.innerHTML = `
+      <div style="padding: 1.5rem; margin: 1rem; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); border-radius: 8px; color: #fecdd3; text-align: center; font-family: var(--font-sans);">
+        <div style="font-weight: 700; margin-bottom: 0.5rem; font-size: 0.95rem;">⚠️ Review Diff Notice</div>
+        <div style="font-size: 0.82rem; opacity: 0.9;">${escapeHtml(msg)}</div>
+      </div>
+    `;
+  }
+}
+
+function renderDiffSurface(diffData, isStep = false) {
+  if (!el.reviewDiffSurface || !diffData) return;
+
+  // Update Churn Counters
+  if (el.reviewChurnAdd) el.reviewChurnAdd.textContent = `+${diffData.additions || 0}`;
+  if (el.reviewChurnDel) el.reviewChurnDel.textContent = `-${diffData.deletions || 0}`;
+
+  const hunks = diffData.hunks || [];
+  state.reviewHunks = hunks;
+  state.reviewHunkCount = hunks.length;
+  state.reviewActiveHunkIndex = 0;
+
+  // Update Hunk Stepper Controls (R-064) & Radar Dropdown (R-069)
+  if (el.reviewHunkStepper) {
+    if (hunks.length > 0) {
+      el.reviewHunkStepper.style.display = 'inline-flex';
+      if (el.hunkStepLabel) el.hunkStepLabel.textContent = `Hunk 1/${hunks.length}`;
+      if (el.hunkRadarSelect) {
+        if (hunks.length > 1) {
+          el.hunkRadarSelect.style.display = 'inline-block';
+          el.hunkRadarSelect.innerHTML = hunks.map((h, i) => {
+            const ast = parseHunkAstSymbol(h.header);
+            const symName = ast ? ast.name : (h.header || `Hunk ${i + 1}`);
+            const shortSym = symName.length > 22 ? symName.substring(0, 20) + '...' : symName;
+            const targetL = h.new_start || h.old_start || 1;
+            return `<option value="${i}">${i + 1}. L${targetL} ${escapeHtml(shortSym)}</option>`;
+          }).join('');
+          el.hunkRadarSelect.value = "0";
+        } else {
+          el.hunkRadarSelect.style.display = 'none';
+        }
+      }
+    } else {
+      el.reviewHunkStepper.style.display = 'none';
+    }
+  }
+
+  if (hunks.length === 0) {
+    if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'flex';
+    el.reviewDiffSurface.innerHTML = '';
+    clearInFileDiffDecorations();
+    return;
+  }
+  if (el.reviewEmptyState) el.reviewEmptyState.style.display = 'none';
+
+  const ext = (currentReviewFilePath.split('.').pop() || '').toLowerCase();
+
+  if (state.reviewDiffMode === 'split') {
+    el.reviewDiffSurface.innerHTML = renderSplitDiffHtml(hunks, ext);
+  } else {
+    el.reviewDiffSurface.innerHTML = renderUnifiedDiffHtml(hunks, ext);
+  }
+
+  // Attach line click sync (R-059)
+  el.reviewDiffSurface.querySelectorAll('.diff-line').forEach(lineEl => {
+    lineEl.addEventListener('click', () => {
+      const lineNum = parseInt(lineEl.dataset.lineNum, 10);
+      if (!isNaN(lineNum) && lineNum > 0) {
+        jumpToFileViewerLine(lineNum);
+      }
+    });
+  });
+
+  // Attach hunk header click sync (R-059, R-065)
+  el.reviewDiffSurface.querySelectorAll('.diff-hunk-header').forEach(headerEl => {
+    headerEl.addEventListener('click', (e) => {
+      if (e.target.closest('.hunk-copy-btn')) return;
+      const targetLine = parseInt(headerEl.dataset.targetLine, 10);
+      const hunkIdx = parseInt(headerEl.dataset.hunkIdx, 10);
+      if (!isNaN(targetLine) && targetLine > 0) {
+        jumpToFileViewerLine(targetLine);
+      }
+      if (!isNaN(hunkIdx)) {
+        state.reviewActiveHunkIndex = hunkIdx;
+        if (el.hunkStepLabel && state.reviewHunks) {
+          el.hunkStepLabel.textContent = `Hunk ${hunkIdx + 1}/${state.reviewHunks.length}`;
+        }
+      }
+    });
+  });
+
+  // Attach hunk copy buttons (R-066)
+  el.reviewDiffSurface.querySelectorAll('.hunk-copy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const hIdx = parseInt(btn.dataset.hunkIdx, 10);
+      copyHunkPatch(hIdx);
+    });
+  });
+
+  // Update Left File Viewer Gutter Decorations & Minimap Rail (R-062, R-063)
+  updateInFileDiffDecorations(hunks);
+}
+
+// AST Scope Breadcrumb Extractor (R-065)
+function parseHunkAstSymbol(header) {
+  if (!header) return null;
+  const idx = header.lastIndexOf('@@');
+  if (idx === -1) return null;
+  const trailing = header.substring(idx + 2).trim();
+  if (!trailing) return null;
+
+  let glyph = '⚡';
+  if (/^(type|struct|class|interface|enum)\b/i.test(trailing) || /struct\s*\{/.test(trailing)) {
+    glyph = '📦';
+  } else if (/^(const|var|val|let)\b/i.test(trailing)) {
+    glyph = '💎';
+  } else if (/^(func|function|def|fn|pub fn|private|public)\b/i.test(trailing)) {
+    glyph = '⚡';
+  }
+  return { glyph, name: trailing };
+}
+
+function renderUnifiedDiffHtml(hunks, ext) {
+  return hunks.map((hunk, hIdx) => {
+    const linesHtml = [];
+    const rawLines = hunk.lines || [];
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const nextLine = rawLines[i + 1];
+
+      let renderedContent = escapeHtml(line.content);
+
+      // Token-level diff comparison between adjacent del and add lines
+      if (line.type === 'delete' && nextLine && nextLine.type === 'add') {
+        const tokenDiff = computeSublineTokenDiff(line.content, nextLine.content);
+        renderedContent = tokenDiff.delHtml;
+
+        // Deleted line: old_line present, new_line blank
+        linesHtml.push(`
+          <div class="diff-line diff-del" data-line-num="${line.old_line_num || ''}" title="Line ${line.old_line_num || ''} (Click to jump)">
+            <span class="diff-gutter-num diff-gutter-old">${line.old_line_num || ''}</span>
+            <span class="diff-gutter-num diff-gutter-new"></span>
+            <span class="diff-gutter-sign">-</span>
+            <span class="diff-line-code">${renderedContent}</span>
+          </div>
+        `);
+
+        // Added line: old_line blank, new_line present
+        i++;
+        linesHtml.push(`
+          <div class="diff-line diff-add" data-line-num="${nextLine.new_line_num || ''}" title="Line ${nextLine.new_line_num || ''} (Click to jump)">
+            <span class="diff-gutter-num diff-gutter-old"></span>
+            <span class="diff-gutter-num diff-gutter-new">${nextLine.new_line_num || ''}</span>
+            <span class="diff-gutter-sign">+</span>
+            <span class="diff-line-code">${tokenDiff.addHtml}</span>
+          </div>
+        `);
+        continue;
+      }
+
+      const lineClass = line.type === 'add' ? 'diff-add' : (line.type === 'delete' ? 'diff-del' : 'diff-ctx');
+      const sign = line.type === 'add' ? '+' : (line.type === 'delete' ? '-' : ' ');
+      const targetLine = line.new_line_num || line.old_line_num || '';
+
+      const oldGutter = line.type === 'add' ? '' : (line.old_line_num || '');
+      const newGutter = line.type === 'delete' ? '' : (line.new_line_num || '');
+
+      linesHtml.push(`
+        <div class="diff-line ${lineClass}" data-line-num="${targetLine}" title="Line ${targetLine} (Click to jump)">
+          <span class="diff-gutter-num diff-gutter-old">${oldGutter}</span>
+          <span class="diff-gutter-num diff-gutter-new">${newGutter}</span>
+          <span class="diff-gutter-sign">${sign}</span>
+          <span class="diff-line-code">${renderedContent}</span>
+        </div>
+      `);
+    }
+
+    const ast = parseHunkAstSymbol(hunk.header);
+    const astPillHtml = ast ? `
+      <span class="diff-hunk-ast-pill" title="Enclosing Symbol: ${escapeHtml(ast.name)}">
+        <span class="ast-glyph">${ast.glyph}</span>
+        <span>${escapeHtml(ast.name)}</span>
+      </span>
+    ` : '';
+
+    return `
+      <div class="diff-hunk" id="review-hunk-${hIdx}" data-hunk-idx="${hIdx}">
+        <div class="diff-hunk-header clickable-hunk-header" data-target-line="${hunk.new_start || hunk.old_start || 1}" data-hunk-idx="${hIdx}" title="Click to scroll to this function/section in file viewer (Line ${hunk.new_start || hunk.old_start || 1})">
+          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; pointer-events: none;">
+            <span style="font-weight: 600;">${escapeHtml(hunk.header)}</span>
+            ${astPillHtml}
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+            <button class="hunk-copy-btn" data-hunk-idx="${hIdx}" title="Copy Hunk Patch">📋 Hunk</button>
+            <span style="font-size: 0.68rem; opacity: 0.8;">Hunk ${hIdx + 1}</span>
+          </div>
+        </div>
+        <div class="diff-hunk-lines">
+          ${linesHtml.join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderSplitDiffHtml(hunks, ext) {
+  return hunks.map((hunk, hIdx) => {
+    const rowsHtml = [];
+    const lines = hunk.lines || [];
+
+    let leftLines = [];
+    let rightLines = [];
+
+    lines.forEach(l => {
+      if (l.type === 'delete') {
+        leftLines.push(l);
+      } else if (l.type === 'add') {
+        rightLines.push(l);
+      } else {
+        const maxLen = Math.max(leftLines.length, rightLines.length);
+        for (let j = 0; j < maxLen; j++) {
+          rowsHtml.push(buildSplitRow(leftLines[j], rightLines[j]));
+        }
+        leftLines = [];
+        rightLines = [];
+        rowsHtml.push(buildSplitRow(l, l));
+      }
+    });
+
+    const maxLen = Math.max(leftLines.length, rightLines.length);
+    for (let j = 0; j < maxLen; j++) {
+      rowsHtml.push(buildSplitRow(leftLines[j], rightLines[j]));
+    }
+
+    const ast = parseHunkAstSymbol(hunk.header);
+    const astPillHtml = ast ? `
+      <span class="diff-hunk-ast-pill" title="Enclosing Symbol: ${escapeHtml(ast.name)}">
+        <span class="ast-glyph">${ast.glyph}</span>
+        <span>${escapeHtml(ast.name)}</span>
+      </span>
+    ` : '';
+
+    return `
+      <div class="diff-hunk" id="review-hunk-${hIdx}" data-hunk-idx="${hIdx}">
+        <div class="diff-hunk-header clickable-hunk-header" data-target-line="${hunk.new_start || hunk.old_start || 1}" data-hunk-idx="${hIdx}" title="Click to scroll to this function/section in file viewer (Line ${hunk.new_start || hunk.old_start || 1})">
+          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; pointer-events: none;">
+            <span style="font-weight: 600;">${escapeHtml(hunk.header)}</span>
+            ${astPillHtml}
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+            <button class="hunk-copy-btn" data-hunk-idx="${hIdx}" title="Copy Hunk Patch">📋 Hunk</button>
+            <span style="font-size: 0.68rem; opacity: 0.8;">Hunk ${hIdx + 1} (Split)</span>
+          </div>
+        </div>
+        <div class="diff-split-container">
+          <div style="width: 100%;">
+            ${rowsHtml.join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildSplitRow(leftLine, rightLine) {
+  let leftHtml = '';
+  let rightHtml = '';
+
+  if (leftLine) {
+    const lClass = leftLine.type === 'delete' ? 'diff-del' : 'diff-ctx';
+    leftHtml = `
+      <div class="diff-line ${lClass}" style="flex: 1; border-right: 1px solid rgba(255,255,255,0.06);" data-line-num="${leftLine.old_line_num || ''}">
+        <span class="diff-gutter-num diff-gutter-old">${leftLine.old_line_num || ''}</span>
+        <span class="diff-gutter-sign">${leftLine.type === 'delete' ? '-' : ' '}</span>
+        <span class="diff-line-code">${escapeHtml(leftLine.content)}</span>
+      </div>
+    `;
+  } else {
+    leftHtml = `<div class="diff-line diff-ctx" style="flex: 1; border-right: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.15);"><span class="diff-gutter-num diff-gutter-old"></span><span class="diff-gutter-sign"></span><span class="diff-line-code"></span></div>`;
+  }
+
+  if (rightLine) {
+    const rClass = rightLine.type === 'add' ? 'diff-add' : 'diff-ctx';
+    rightHtml = `
+      <div class="diff-line ${rClass}" style="flex: 1;" data-line-num="${rightLine.new_line_num || ''}">
+        <span class="diff-gutter-num diff-gutter-new">${rightLine.new_line_num || ''}</span>
+        <span class="diff-gutter-sign">${rightLine.type === 'add' ? '+' : ' '}</span>
+        <span class="diff-line-code">${escapeHtml(rightLine.content)}</span>
+      </div>
+    `;
+  } else {
+    rightHtml = `<div class="diff-line diff-ctx" style="flex: 1; background: rgba(0,0,0,0.15);"><span class="diff-gutter-num diff-gutter-new"></span><span class="diff-gutter-sign"></span><span class="diff-line-code"></span></div>`;
+  }
+
+  return `<div style="display: flex; width: 100%;">${leftHtml}${rightHtml}</div>`;
+}
+
+// Sub-line Token / Word Diff Engine (R-058)
+function computeSublineTokenDiff(delStr, addStr) {
+  const tokenRegex = /[\w]+|[^\w\s]+|\s+/g;
+  const delTokens = delStr.match(tokenRegex) || [delStr];
+  const addTokens = addStr.match(tokenRegex) || [addStr];
+
+  let prefixLen = 0;
+  while (prefixLen < delTokens.length && prefixLen < addTokens.length && delTokens[prefixLen] === addTokens[prefixLen]) {
+    prefixLen++;
+  }
+
+  let delSuffix = delTokens.length - 1;
+  let addSuffix = addTokens.length - 1;
+  while (delSuffix >= prefixLen && addSuffix >= prefixLen && delTokens[delSuffix] === addTokens[addSuffix]) {
+    delSuffix--;
+    addSuffix--;
+  }
+
+  const prefix = escapeHtml(delTokens.slice(0, prefixLen).join(''));
+  const suffix = escapeHtml(delTokens.slice(delSuffix + 1).join(''));
+
+  const delMiddle = delTokens.slice(prefixLen, delSuffix + 1).join('');
+  const addMiddle = addTokens.slice(prefixLen, addSuffix + 1).join('');
+
+  return {
+    delHtml: `${prefix}<span class="diff-token-del">${escapeHtml(delMiddle)}</span>${suffix}`,
+    addHtml: `${prefix}<span class="diff-token-add">${escapeHtml(addMiddle)}</span>${suffix}`
+  };
+}
+
+// Bidirectional Navigation Sync (R-059)
+function jumpToFileViewerLine(lineNum) {
+  if (!lineNum || !el.fileViewerLineNumbers) return;
+
+  const totalLines = state.fileViewerData ? (state.fileViewerData.line_count || 1) : 1;
+  const clampedLine = Math.max(1, Math.min(lineNum, totalLines));
+
+  const gutterEl = el.fileViewerLineNumbers.querySelector(`[data-line="${clampedLine}"]`);
+  const codeEl = document.getElementById(`code-line-${clampedLine}`);
+
+  const targetEl = codeEl || gutterEl;
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  if (gutterEl) {
+    gutterEl.classList.add('jump-pulse');
+    setTimeout(() => {
+      gutterEl.classList.remove('jump-pulse');
+    }, 1600);
+  }
+  if (codeEl) {
+    codeEl.classList.add('jump-pulse-line');
+    setTimeout(() => {
+      codeEl.classList.remove('jump-pulse-line');
+    }, 1600);
+  }
+  showToast(`Jumped to line ${clampedLine}`);
+}
+
+// Synchronized Hunk Stepper Navigation & Multi-Hunk Radar (R-064, R-069, R-071)
+function stepToHunk(hunkIdx) {
+  if (!state.reviewHunks || state.reviewHunks.length === 0) return;
+  const count = state.reviewHunks.length;
+  const idx = ((hunkIdx % count) + count) % count;
+  state.reviewActiveHunkIndex = idx;
+
+  if (el.hunkStepLabel) {
+    el.hunkStepLabel.textContent = `Hunk ${idx + 1}/${count}`;
+  }
+  if (el.hunkRadarSelect) {
+    el.hunkRadarSelect.value = String(idx);
+  }
+
+  // Smooth scroll review pane to hunk
+  const hunkEl = document.getElementById(`review-hunk-${idx}`);
+  if (hunkEl) {
+    hunkEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    hunkEl.classList.add('jump-pulse');
+    setTimeout(() => hunkEl.classList.remove('jump-pulse'), 1600);
+  }
+
+  // Find target line in file viewer
+  const hunk = state.reviewHunks[idx];
+  let targetLine = hunk.new_start || hunk.old_start || 1;
+  if (hunk.lines && hunk.lines.length > 0) {
+    const firstChanged = hunk.lines.find(l => l.type === 'add' || l.type === 'delete');
+    if (firstChanged) {
+      targetLine = firstChanged.new_line_num || firstChanged.old_line_num || targetLine;
+    }
+  }
+
+  // Active Hunk Spotlight & Ambient Framing Rail (R-071)
+  if (el.fileViewerCodeBlock) {
+    el.fileViewerCodeBlock.querySelectorAll('.hunk-active-spotlight').forEach(node => {
+      node.classList.remove('hunk-active-spotlight');
+    });
+    const startLine = hunk.new_start || hunk.old_start || targetLine;
+    const lineCount = hunk.new_lines || hunk.old_lines || (hunk.lines ? hunk.lines.length : 1);
+    const endLine = startLine + Math.max(1, lineCount) - 1;
+    for (let l = startLine; l <= endLine; l++) {
+      const codeLine = document.getElementById(`code-line-${l}`);
+      if (codeLine) codeLine.classList.add('hunk-active-spotlight');
+    }
+  }
+
+  jumpToFileViewerLine(targetLine);
+}
+
+// Surgical Hunk Patch Copy (R-066)
+function copyHunkPatch(hIdx) {
+  if (!state.reviewHunks || !state.reviewHunks[hIdx]) return;
+  const hunk = state.reviewHunks[hIdx];
+  const lines = (hunk.lines || []).map(l => {
+    const sign = l.type === 'add' ? '+' : (l.type === 'delete' ? '-' : ' ');
+    return sign + l.content;
+  }).join('\n');
+  const patch = `${hunk.header}\n${lines}\n`;
+  copyToClipboard(patch, `Hunk ${hIdx + 1} patch copied to clipboard!`);
+}
+
+// In-File Code Gutter Diff Decorations & Change Markers (R-062)
+function clearInFileDiffDecorations() {
+  if (el.fileViewerLineNumbers) {
+    el.fileViewerLineNumbers.querySelectorAll('.gutter-diff-add, .gutter-diff-mod, .gutter-diff-del').forEach(sp => {
+      sp.classList.remove('gutter-diff-add', 'gutter-diff-mod', 'gutter-diff-del');
+      sp.onclick = null;
+      sp.removeAttribute('title');
+    });
+  }
+  if (el.fileViewerCodeBlock) {
+    el.fileViewerCodeBlock.querySelectorAll('.hunk-active-spotlight').forEach(node => {
+      node.classList.remove('hunk-active-spotlight');
+    });
+  }
+  if (el.minimapFloatingTooltip) {
+    el.minimapFloatingTooltip.style.display = 'none';
+  }
+  if (el.fileDiffMinimapRail) {
+    el.fileDiffMinimapRail.innerHTML = '';
+    el.fileDiffMinimapRail.style.display = 'none';
+  }
+}
+
+function updateInFileDiffDecorations(hunks) {
+  if (!el.fileViewerLineNumbers) return;
+  clearInFileDiffDecorations();
+
+  if (!hunks || hunks.length === 0) return;
+
+  const addLines = [];
+  const modLines = [];
+  const delLines = [];
+
+  hunks.forEach((h, hIdx) => {
+    const lines = h.lines || [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const next = lines[i + 1];
+
+      if (l.type === 'delete' && next && next.type === 'add') {
+        if (next.new_line_num) modLines.push({ line: next.new_line_num, hunkIdx: hIdx });
+        i++; // skip paired addition
+      } else if (l.type === 'add') {
+        if (l.new_line_num) addLines.push({ line: l.new_line_num, hunkIdx: hIdx });
+      } else if (l.type === 'delete') {
+        const line = l.old_line_num || 1;
+        delLines.push({ line, hunkIdx: hIdx });
+      }
+    }
+  });
+
+  addLines.forEach(item => {
+    const sp = el.fileViewerLineNumbers.querySelector(`[data-line="${item.line}"]`);
+    if (sp && !sp.classList.contains('gutter-diff-mod')) {
+      sp.classList.add('gutter-diff-add');
+      sp.dataset.hunkIdx = item.hunkIdx;
+    }
+  });
+
+  modLines.forEach(item => {
+    const sp = el.fileViewerLineNumbers.querySelector(`[data-line="${item.line}"]`);
+    if (sp) {
+      sp.classList.remove('gutter-diff-add');
+      sp.classList.add('gutter-diff-mod');
+      sp.dataset.hunkIdx = item.hunkIdx;
+    }
+  });
+
+  delLines.forEach(item => {
+    const sp = el.fileViewerLineNumbers.querySelector(`[data-line="${item.line}"]`);
+    if (sp && !sp.classList.contains('gutter-diff-add') && !sp.classList.contains('gutter-diff-mod')) {
+      sp.classList.add('gutter-diff-del');
+      sp.dataset.hunkIdx = item.hunkIdx;
+    }
+  });
+
+  // Attach click listener on decorated line numbers
+  el.fileViewerLineNumbers.querySelectorAll('.gutter-diff-add, .gutter-diff-mod, .gutter-diff-del').forEach(sp => {
+    sp.title = `Diff change (Click to navigate review hunk)`;
+    sp.onclick = () => {
+      const hIdx = parseInt(sp.dataset.hunkIdx, 10);
+      if (!isNaN(hIdx)) {
+        stepToHunk(hIdx);
+      }
+    };
+  });
+
+  renderMinimapRail(addLines, modLines, delLines);
+}
+
+// Holographic Diff Minimap Rail / Heatmap (R-063)
+function renderMinimapRail(addLines, modLines, delLines) {
+  if (!el.fileDiffMinimapRail || !state.fileViewerData) return;
+  const totalLines = state.fileViewerData.line_count || 1;
+  let html = '';
+
+  addLines.forEach(item => {
+    const pct = Math.min(100, Math.max(0, (item.line / totalLines) * 100)).toFixed(2);
+    html += `<div class="minimap-tick minimap-tick-add" style="top: ${pct}%;" data-line="${item.line}" data-hunk-idx="${item.hunkIdx}" title="Addition at line ${item.line}"></div>`;
+  });
+
+  modLines.forEach(item => {
+    const pct = Math.min(100, Math.max(0, (item.line / totalLines) * 100)).toFixed(2);
+    html += `<div class="minimap-tick minimap-tick-mod" style="top: ${pct}%;" data-line="${item.line}" data-hunk-idx="${item.hunkIdx}" title="Modification at line ${item.line}"></div>`;
+  });
+
+  delLines.forEach(item => {
+    const pct = Math.min(100, Math.max(0, (item.line / totalLines) * 100)).toFixed(2);
+    html += `<div class="minimap-tick minimap-tick-del" style="top: ${pct}%;" data-line="${item.line}" data-hunk-idx="${item.hunkIdx}" title="Deletion at line ${item.line}"></div>`;
+  });
+
+  el.fileDiffMinimapRail.innerHTML = html;
+  el.fileDiffMinimapRail.style.display = (addLines.length + modLines.length + delLines.length > 0) ? 'block' : 'none';
+
+  // Tooltip previews on minimap hover (R-070)
+  el.fileDiffMinimapRail.onmousemove = (e) => {
+    const tick = e.target.closest('.minimap-tick');
+    if (tick && el.minimapFloatingTooltip && el.fileViewerCodeContainer) {
+      const line = tick.dataset.line;
+      const hIdx = parseInt(tick.dataset.hunkIdx, 10);
+      const hunk = (state.reviewHunks && !isNaN(hIdx)) ? state.reviewHunks[hIdx] : null;
+      let sym = '';
+      if (hunk) {
+        const ast = parseHunkAstSymbol(hunk.header);
+        sym = ast ? ` • ${ast.glyph} ${ast.name}` : '';
+      }
+      const type = tick.classList.contains('minimap-tick-add') ? 'Addition (+)' :
+                   (tick.classList.contains('minimap-tick-mod') ? 'Modification (~)' : 'Deletion (-)');
+      
+      el.minimapFloatingTooltip.innerHTML = `<strong>Hunk ${hIdx + 1}</strong> • Line ${line} (${type})${escapeHtml(sym)}`;
+      const rect = el.fileViewerCodeContainer.getBoundingClientRect();
+      const relY = Math.max(10, Math.min(e.clientY - rect.top, rect.height - 20));
+      el.minimapFloatingTooltip.style.top = `${relY}px`;
+      el.minimapFloatingTooltip.style.display = 'block';
+    } else if (el.minimapFloatingTooltip) {
+      el.minimapFloatingTooltip.style.display = 'none';
+    }
+  };
+
+  el.fileDiffMinimapRail.onmouseleave = () => {
+    if (el.minimapFloatingTooltip) el.minimapFloatingTooltip.style.display = 'none';
+  };
+
+  // Attach click on minimap rail
+  el.fileDiffMinimapRail.onclick = (e) => {
+    const tick = e.target.closest('.minimap-tick');
+    if (tick) {
+      const line = parseInt(tick.dataset.line, 10);
+      const hIdx = parseInt(tick.dataset.hunkIdx, 10);
+      if (!isNaN(line)) jumpToFileViewerLine(line);
+      if (!isNaN(hIdx)) stepToHunk(hIdx);
+    } else {
+      const rect = el.fileDiffMinimapRail.getBoundingClientRect();
+      const clickPct = (e.clientY - rect.top) / rect.height;
+      const targetLine = Math.max(1, Math.round(clickPct * totalLines));
+      jumpToFileViewerLine(targetLine);
+    }
+  };
+}
+
+// 1-Click Desktop IDE Deep-Linking (R-066)
+function openInDesktopIde() {
+  if (!currentReviewFilePath) return;
+  const targetLine = state.fileViewerTargetLine || 1;
+  const absPath = currentReviewFilePath;
+  const uri = `cursor://file/${absPath}:${targetLine}`;
+  window.open(uri, '_blank');
+  showToast(`Opening Desktop IDE at line ${targetLine}...`);
+}
+
+function copyCurrentDiffPatch() {
+  let patch = '';
+  if (state.reviewPaneVector === 'steps' && state.reviewSteps.length > 0) {
+    const s = state.reviewSteps[state.reviewCurrentStepIdx];
+    if (s && s.hunks) {
+      patch = s.hunks.map(h => {
+        const lines = h.lines.map(l => (l.type === 'add' ? '+' : (l.type === 'delete' ? '-' : ' ')) + l.content).join('\n');
+        return `${h.header}\n${lines}`;
+      }).join('\n\n');
+    }
+  } else if (state.reviewDiff && state.reviewDiff.raw_diff) {
+    patch = state.reviewDiff.raw_diff;
+  }
+
+  if (patch) {
+    copyToClipboard(patch, 'Diff patch copied to clipboard!');
+  } else {
+    showToast('No diff patch available to copy');
+  }
 }
 
 // ============================================================================

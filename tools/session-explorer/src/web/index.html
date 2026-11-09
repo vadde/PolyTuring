@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=0.5.2">
 </head>
 <body>
 
@@ -420,6 +420,7 @@
           <span class="file-meta-pill" id="fileViewerLangBadge">TEXT</span>
           <span class="file-meta-pill" id="fileViewerLinesBadge">0 lines</span>
           <span class="file-meta-pill" id="fileViewerSizeBadge">0 KB</span>
+          <span class="file-meta-pill file-buffer-pill" id="fileViewerBufferBadge" title="100% complete buffer read directly from disk (No truncation)">● Full Buffer</span>
         </div>
         <div class="file-viewer-actions">
           <div class="segmented-control" id="fileViewerModeControl" style="display: none;" role="group" aria-label="View mode">
@@ -430,6 +431,8 @@
           <button class="btn-ghost-sm" id="fileViewerWrapBtn" title="Toggle Line Wrap">↩ Wrap</button>
           <button class="btn-ghost-sm" id="fileViewerCopyContentBtn" title="Copy Content">📋 Copy</button>
           <button class="btn-ghost-sm" id="fileViewerCopyPathBtn" title="Copy Path">🔗 Path</button>
+          <button class="btn-ghost-sm" id="fileViewerIdeDeepLinkBtn" title="Open in Desktop IDE (Cursor / VS Code)">↗ IDE</button>
+          <button class="btn-ghost-sm active" id="toggleReviewPaneBtn" title="Toggle Review Pane (⌘\ / Ctrl+\)"><span class="btn-icon-glyph">🔀</span> Review <span class="badge-mini" id="reviewPaneBadge">Diff</span></button>
           <button class="btn-icon" id="closeFileViewerBtn" title="Close File Viewer (Esc)">✕</button>
         </div>
       </div>
@@ -447,21 +450,131 @@
           <button class="find-nav-btn find-close-btn" id="fileFindCloseBtn" title="Close Find (Escape)">✕</button>
         </div>
       </div>
-      <div class="file-viewer-body" id="fileViewerBody">
 
-        <div class="file-viewer-loading" id="fileViewerLoading">
-          <div class="loading-spinner"></div>
-          <span>Loading file from disk...</span>
+      <!-- Fluid Split Container for File Content & Holographic Review Pane (R-056, R-057) -->
+      <div class="file-viewer-split-container" id="fileViewerSplitContainer">
+        <div class="file-viewer-body" id="fileViewerBody">
+          <div class="file-viewer-loading" id="fileViewerLoading">
+            <div class="loading-spinner"></div>
+            <span>Loading file from disk...</span>
+          </div>
+          <div class="file-viewer-error" id="fileViewerError" style="display: none;"></div>
+          <div class="file-viewer-markdown markdown-body" id="fileViewerMarkdown" style="display: none;"></div>
+          <div class="file-viewer-code-container" id="fileViewerCodeContainer" style="display: none;">
+            <div class="code-line-numbers" id="fileViewerLineNumbers"></div>
+            <pre class="code-content-pre"><code id="fileViewerCodeBlock" class="hljs"></code></pre>
+            <div class="file-diff-minimap-rail" id="fileDiffMinimapRail" title="Diff Heatmap Rail (Click to jump)"></div>
+            <div class="minimap-floating-tooltip" id="minimapFloatingTooltip" style="display: none;"></div>
+          </div>
+          <div class="file-viewer-image-container" id="fileViewerImageContainer" style="display: none;">
+            <img id="fileViewerImage" src="" alt="File Preview">
+          </div>
         </div>
-        <div class="file-viewer-error" id="fileViewerError" style="display: none;"></div>
-        <div class="file-viewer-markdown markdown-body" id="fileViewerMarkdown" style="display: none;"></div>
-        <div class="file-viewer-code-container" id="fileViewerCodeContainer" style="display: none;">
-          <div class="code-line-numbers" id="fileViewerLineNumbers"></div>
-          <pre class="code-content-pre"><code id="fileViewerCodeBlock" class="hljs"></code></pre>
+
+        <!-- Draggable Resizer Bar (R-057) -->
+        <div class="file-viewer-resizer" id="fileViewerResizer" title="Drag to resize review pane (Double-click to snap 50/50, 65/35, 35/65)">
+          <div class="resizer-handle"></div>
         </div>
-        <div class="file-viewer-image-container" id="fileViewerImageContainer" style="display: none;">
-          <img id="fileViewerImage" src="" alt="File Preview">
-        </div>
+
+        <!-- Holographic Review Pane (R-056) -->
+        <aside class="file-viewer-review-pane" id="fileViewerReviewPane">
+          <!-- Quantum Telemetry Ribbon -->
+          <div class="review-telemetry-ribbon" id="reviewTelemetryRibbon">
+            <div class="review-branch-capsule" id="reviewBranchCapsule" title="Current Git Branch">
+              <span class="branch-icon">🌿</span>
+              <span class="branch-name" id="reviewBranchName">main</span>
+              <span class="dirty-indicator" id="reviewDirtyIndicator" title="Uncommitted changes">•</span>
+            </div>
+            <div class="review-churn-capsule" id="reviewChurnCapsule" title="Net Churn (Additions / Deletions)">
+              <span class="churn-add" id="reviewChurnAdd">+0</span>
+              <span class="churn-del" id="reviewChurnDel">-0</span>
+            </div>
+            <div class="review-pr-capsule" id="reviewPrCapsule" style="display: none;" title="Active GitHub Pull Request">
+              <span class="pr-icon">🐙</span>
+              <a class="pr-link" id="reviewPrLink" target="_blank" rel="noopener">PR #0</a>
+            </div>
+          </div>
+
+          <!-- Review Vector Tabs (R-054, R-055, R-060) -->
+          <div class="review-vector-tabs" role="tablist">
+            <button class="review-tab-btn active" data-vector="steps" id="tabReviewSteps" title="Autonomous Agent Step Mutations">
+              ⚡ Agent Steps <span class="tab-count" id="stepsCountBadge">0</span>
+            </button>
+            <button class="review-tab-btn" data-vector="working" id="tabReviewWorking" title="Unstaged Working Copy vs HEAD">
+              📝 Working Copy
+            </button>
+            <button class="review-tab-btn" data-vector="staged" id="tabReviewStaged" title="Staged Index Changes">
+              📦 Staged
+            </button>
+            <button class="review-tab-btn" data-vector="commits" id="tabReviewCommits" title="File Commit History">
+              📜 Commits
+            </button>
+          </div>
+
+          <!-- Review Subbar: Scrubber & Diff View Mode Switcher (R-057, R-058) -->
+          <div class="review-subbar">
+            <!-- Step Scrubber Controls (when vector == steps) -->
+            <div class="review-step-scrubber" id="reviewStepScrubber">
+              <button class="scrubber-btn" id="scrubberPrevBtn" title="Previous Step (Left Arrow)">◀</button>
+              <span class="scrubber-label" id="scrubberLabel">Step 0 of 0</span>
+              <button class="scrubber-btn" id="scrubberNextBtn" title="Next Step (Right Arrow)">▶</button>
+            </div>
+
+            <!-- Commit Picker Dropdown (when vector == commits) -->
+            <div class="review-commit-picker" id="reviewCommitPicker" style="display: none;">
+              <select id="reviewCommitSelect" class="holo-matrix-select" aria-label="Select Commit">
+                <option value="">Select a commit...</option>
+              </select>
+            </div>
+
+            <!-- Diff Mode Segmented Control: Inline vs Split -->
+            <div class="segmented-control segmented-control-sm" id="diffViewModeControl" role="group" aria-label="Diff view mode">
+              <button class="segment-btn active" data-diff-mode="unified" title="Unified Inline View">☰ Inline</button>
+              <button class="segment-btn" data-diff-mode="split" title="Side-by-Side Split View">☵ Split</button>
+            </div>
+
+            <!-- Hunk Stepper Controls & Radar Dropdown (R-064, R-069) -->
+            <div class="hunk-stepper-control" id="reviewHunkStepper" style="display: none;" title="Navigate Diff Hunks (⌥[ / ⌥])">
+              <button class="hunk-step-btn" id="hunkPrevBtn" title="Previous Hunk (⌥[ / F7)">▲</button>
+              <span class="hunk-step-label" id="hunkStepLabel">Hunk 0/0</span>
+              <button class="hunk-step-btn" id="hunkNextBtn" title="Next Hunk (⌥] / F8)">▼</button>
+              <select class="hunk-radar-select" id="hunkRadarSelect" title="Hunk Navigation Radar (Jump directly to any hunk)"></select>
+            </div>
+
+            <!-- Copy Patch Button -->
+            <button class="btn-ghost-xs" id="copyDiffPatchBtn" title="Copy Diff as Patch">📋 Patch</button>
+          </div>
+
+          <!-- Agent Thinking & Rationale Card (when vector == steps) -->
+          <div class="review-agent-thought-card" id="reviewAgentThoughtCard" style="display: none;">
+            <div class="thought-card-header" id="thoughtCardHeader">
+              <span class="thought-brain-icon">🧠</span>
+              <span class="thought-title" id="thoughtCardTitle">Agent Rationale &amp; Goal</span>
+              <span class="thought-step-pill" id="thoughtStepPill">Step 0</span>
+              <button class="thought-toggle-btn" id="toggleThoughtBtn" title="Expand/Collapse Thought">▾</button>
+            </div>
+            <div class="thought-card-body" id="reviewThoughtBody"></div>
+          </div>
+
+          <!-- Diff Content Container -->
+          <div class="review-diff-container" id="reviewDiffContainer">
+            <!-- Loading State -->
+            <div class="review-loading" id="reviewLoading" style="display: none;">
+              <div class="loading-spinner-sm"></div>
+              <span>Analyzing repository diffs...</span>
+            </div>
+
+            <!-- Empty / Clean State -->
+            <div class="review-empty-state" id="reviewEmptyState" style="display: none;">
+              <span class="empty-icon">✓</span>
+              <span class="empty-title" id="reviewEmptyTitle">Working Tree Clean</span>
+              <span class="empty-desc" id="reviewEmptyDesc">No modifications found for this file.</span>
+            </div>
+
+            <!-- Diff Surface (rendered hunks injected here) -->
+            <div class="review-diff-surface" id="reviewDiffSurface"></div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
@@ -757,7 +870,7 @@
   </div>
 
   <!-- JavaScript Bundle (Built with Bun) -->
-  <script src="app.bundle.js"></script>
+  <script src="app.bundle.js?v=0.5.2"></script>
 </body>
 </html>
 

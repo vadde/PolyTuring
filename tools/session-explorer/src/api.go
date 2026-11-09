@@ -26,6 +26,7 @@ import (
 // APIHandler holds the session index and provides HTTP handlers.
 type APIHandler struct {
 	index           *SessionIndex
+	gitService      *GitService
 	verbose         bool
 	watchInterval   int
 	watchIntervalMu sync.RWMutex
@@ -36,6 +37,7 @@ type APIHandler struct {
 func NewAPIHandler(index *SessionIndex, verbose bool) *APIHandler {
 	return &APIHandler{
 		index:           index,
+		gitService:      NewGitService(index),
 		verbose:         verbose,
 		watchInterval:   10,
 		watchIntervalCh: make(chan int, 10),
@@ -769,6 +771,241 @@ func (h *APIHandler) HandleSessionContext(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, sctx)
 }
+
+// HandleGitFileStatus handles GET /api/git/file/status?path=<path>&session_id=<id>
+// Implements: R-053, R-060, AC-117, AC-118, AC-119, AC-141
+func (h *APIHandler) HandleGitFileStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if strings.TrimSpace(path) == "" {
+		http.Error(w, "Query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+	sessionID := r.URL.Query().Get("session_id")
+
+	if h.gitService == nil {
+		h.gitService = NewGitService(h.index)
+	}
+
+	status, err := h.gitService.GetFileStatus(path, sessionID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, status)
+}
+
+// HandleGitFileDiff handles GET /api/git/file/diff?path=<path>&mode=<mode>&commit_sha=<sha>
+// Implements: R-054, AC-120, AC-121, AC-122, AC-124, AC-125
+func (h *APIHandler) HandleGitFileDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if strings.TrimSpace(path) == "" {
+		http.Error(w, "Query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+	mode := r.URL.Query().Get("mode")
+	commitSHA := r.URL.Query().Get("commit_sha")
+
+	if h.gitService == nil {
+		h.gitService = NewGitService(h.index)
+	}
+
+	diffResp, err := h.gitService.GetFileDiff(path, mode, commitSHA)
+	if err != nil {
+		if strings.Contains(err.Error(), "timed out") {
+			http.Error(w, err.Error(), http.StatusGatewayTimeout)
+			return
+		}
+		if strings.Contains(err.Error(), "not inside a git repository") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, diffResp)
+}
+
+// HandleGitFileCommits handles GET /api/git/file/commits?path=<path>&limit=<limit>
+// Implements: R-054, AC-123
+func (h *APIHandler) HandleGitFileCommits(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if strings.TrimSpace(path) == "" {
+		http.Error(w, "Query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+	limit := 30
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	if h.gitService == nil {
+		h.gitService = NewGitService(h.index)
+	}
+
+	commits, err := h.gitService.GetFileCommits(path, limit)
+	if err != nil {
+		if strings.Contains(err.Error(), "not inside a git repository") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if commits == nil {
+		commits = []GitCommitEntry{}
+	}
+	writeJSON(w, commits)
+}
+
+// HandleSessionFileSteps handles GET /api/sessions/{id}/file/steps?path=<path>
+// Implements: R-055, AC-126, AC-127, AC-128, AC-129
+func (h *APIHandler) HandleSessionFileSteps(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/sessions/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Session ID required", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[0]
+
+	targetPath := r.URL.Query().Get("path")
+	if strings.TrimSpace(targetPath) == "" {
+		http.Error(w, "Query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+
+	cleanTarget := strings.TrimPrefix(targetPath, "file://")
+	if idx := strings.Index(cleanTarget, "#"); idx != -1 {
+		cleanTarget = cleanTarget[:idx]
+	}
+	normTarget := strings.ToLower(filepath.Clean(cleanTarget))
+	baseTarget := strings.ToLower(filepath.Base(cleanTarget))
+
+	detail, err := h.index.GetSessionDetail(sessionID)
+	if err != nil {
+		http.Error(w, "Session not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	var stepDiffs []AgentStepDiff
+	for _, msg := range detail.Messages {
+		stepIdx := msg.StepIndex
+		for _, tc := range msg.ToolCalls {
+			tcPath := ""
+			for k, v := range tc.Args {
+				lk := strings.ToLower(k)
+				if lk == "path" || lk == "filepath" || lk == "file_path" || lk == "targetfile" || lk == "target_file" {
+					if sv, ok := v.(string); ok {
+						tcPath = sv
+						break
+					}
+				}
+			}
+			if tcPath == "" {
+				continue
+			}
+
+			normTC := strings.ToLower(strings.TrimPrefix(tcPath, "file://"))
+			if idx := strings.Index(normTC, "#"); idx != -1 {
+				normTC = normTC[:idx]
+			}
+			normTC = filepath.Clean(normTC)
+
+			// Match by full path or matching base filename
+			if normTC == normTarget || strings.HasSuffix(normTC, "/"+baseTarget) || strings.HasSuffix(normTarget, "/"+filepath.Base(normTC)) {
+				stepDiff := AgentStepDiff{
+					StepIndex:  stepIdx,
+					ToolName:   tc.Name,
+					Timestamp:  msg.CreatedAt.Format(time.RFC3339),
+					Thinking:   msg.Thinking,
+					UserPrompt: "",
+				}
+
+				if tc.Name == "edit_file" || tc.Name == "replace_file_content" {
+					targetStr, _ := tc.Args["Target"].(string)
+					replaceStr, _ := tc.Args["Replacement"].(string)
+					if targetStr == "" {
+						targetStr, _ = tc.Args["target"].(string)
+					}
+					if replaceStr == "" {
+						replaceStr, _ = tc.Args["replacement"].(string)
+					}
+
+					hunk := DiffHunk{
+						Header: "@@ -1,1 +1,1 @@ (Step Mutation)",
+						Lines:  make([]DiffLine, 0),
+					}
+					if targetStr != "" {
+						for _, delL := range strings.Split(targetStr, "\n") {
+							stepDiff.Deletions++
+							hunk.Lines = append(hunk.Lines, DiffLine{
+								Type:    "delete",
+								Content: delL,
+							})
+						}
+					}
+					if replaceStr != "" {
+						for _, addL := range strings.Split(replaceStr, "\n") {
+							stepDiff.Additions++
+							hunk.Lines = append(hunk.Lines, DiffLine{
+								Type:    "add",
+								Content: addL,
+							})
+						}
+					}
+					stepDiff.Hunks = []DiffHunk{hunk}
+				} else if tc.Name == "write_file" || tc.Name == "create_file" {
+					contentStr, _ := tc.Args["Content"].(string)
+					if contentStr == "" {
+						contentStr, _ = tc.Args["content"].(string)
+					}
+					hunk := DiffHunk{
+						Header: "@@ +1,1 @@ (File Created / Overwritten)",
+						Lines:  make([]DiffLine, 0),
+					}
+					lines := strings.Split(contentStr, "\n")
+					if len(lines) > 200 {
+						lines = lines[:200]
+					}
+					for _, l := range lines {
+						stepDiff.Additions++
+						hunk.Lines = append(hunk.Lines, DiffLine{
+							Type:    "add",
+							Content: l,
+						})
+					}
+					stepDiff.Hunks = []DiffHunk{hunk}
+				}
+
+				stepDiffs = append(stepDiffs, stepDiff)
+			}
+		}
+	}
+
+	if stepDiffs == nil {
+		stepDiffs = []AgentStepDiff{}
+	}
+	writeJSON(w, stepDiffs)
+}
+
 
 
 
