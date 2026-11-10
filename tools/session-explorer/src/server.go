@@ -70,6 +70,8 @@ func StartServer(cfg Config, index *SessionIndex) error {
 	mux.HandleFunc("/api/git/file/status", api.HandleGitFileStatus)
 	mux.HandleFunc("/api/git/file/diff", api.HandleGitFileDiff)
 	mux.HandleFunc("/api/git/file/commits", api.HandleGitFileCommits)
+	mux.HandleFunc("/api/ide/open", api.HandleOpenInIDE)
+	mux.HandleFunc("/api/ide/detected", api.HandleDetectIDEs)
 	mux.HandleFunc("/api/skill/install", api.HandleInstallSkill)
 	mux.HandleFunc("/api/agent/context/global", api.HandleGlobalAgentContext)
 	mux.HandleFunc("/api/agent/context/workspace", api.HandleWorkspaceAgentContext)

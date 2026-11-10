@@ -2884,7 +2884,8 @@ body {
 .file-viewer-code-container {
   display: flex;
   min-height: 100%;
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   box-sizing: border-box;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.84rem;
@@ -2892,9 +2893,15 @@ body {
 }
 
 .code-line-numbers {
+  position: sticky;
+  left: 0;
+  z-index: 10;
   padding: 1.25rem 0.75rem;
-  background: rgba(11, 15, 25, 0.65);
+  background: rgba(11, 15, 25, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid var(--border-glass);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.45);
   color: var(--text-dim);
   text-align: right;
   user-select: none;
@@ -2903,6 +2910,7 @@ body {
   line-height: 22px;
   min-width: 54px;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .code-line-numbers span {
@@ -5538,6 +5546,7 @@ mark.find-match.find-match-current {
 
 .review-diff-surface {
   min-width: 100%;
+  width: max-content;
   display: block;
 }
 
@@ -5574,33 +5583,103 @@ mark.find-match.find-match-current {
 
 /* Diff Hunk & Line Styling */
 .diff-hunk {
+  min-width: 100%;
+  width: max-content;
+  box-sizing: border-box;
   margin-bottom: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .diff-hunk-header {
-  padding: 4px 12px;
-  background: rgba(56, 189, 248, 0.1);
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 10px;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   color: #38bdf8;
   font-size: 0.74rem;
   font-weight: 600;
   border-left: 3px solid #38bdf8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   user-select: none;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 2px;
+}
+
+.diff-hunk-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.diff-hunk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.diff-hunk-range {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7dd3fc;
+  flex-shrink: 0;
+}
+
+.diff-hunk-ast-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  color: var(--text-muted, #94a3b8);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 1;
+}
+
+.diff-hunk-ast-pill .ast-symbol-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diff-hunk-lines {
   display: block;
+  min-width: 100%;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .diff-line {
   display: flex;
-  width: 100%;
   min-width: 100%;
+  width: max-content;
   box-sizing: border-box;
   transition: background 0.1s;
   cursor: pointer;
@@ -5633,6 +5712,8 @@ mark.find-match.find-match-current {
 }
 
 .diff-gutter-num {
+  position: sticky;
+  z-index: 3;
   width: 40px;
   min-width: 40px;
   padding: 0 6px;
@@ -5643,31 +5724,40 @@ mark.find-match.find-match-current {
   font-size: 0.73rem;
   font-variant-numeric: tabular-nums;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(11, 15, 26, 0.98);
 }
 
 .diff-gutter-old {
+  left: 0;
   color: rgba(255, 255, 255, 0.28);
 }
 
 .diff-gutter-new {
+  left: 40px;
   color: rgba(255, 255, 255, 0.38);
 }
 
 .diff-gutter-sign {
+  position: sticky;
+  left: 80px;
+  z-index: 3;
   width: 20px;
   text-align: center;
   font-weight: 700;
   user-select: none;
   flex-shrink: 0;
   font-size: 0.85rem;
+  background: rgba(11, 15, 26, 0.98);
 }
 
-.diff-add .diff-gutter-sign {
-  color: #10b981;
+.diff-line.diff-add .diff-gutter-num,
+.diff-line.diff-add .diff-gutter-sign {
+  background: #064e3b;
 }
 
-.diff-del .diff-gutter-sign {
-  color: #f43f5e;
+.diff-line.diff-del .diff-gutter-num,
+.diff-line.diff-del .diff-gutter-sign {
+  background: #4c0519;
 }
 
 .diff-line-code {
@@ -5701,7 +5791,7 @@ mark.find-match.find-match-current {
 .diff-split-container {
   display: flex;
   width: 100%;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .diff-split-side {
@@ -5737,6 +5827,20 @@ mark.find-match.find-match-current {
   background: rgba(2, 132, 199, 0.15);
   border-color: rgba(2, 132, 199, 0.35);
   color: #0284c7;
+}
+[data-theme="mica"] .diff-hunk-header {
+  background: rgba(241, 245, 249, 0.96);
+  border-left-color: #6366f1;
+  color: #1e293b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+[data-theme="mica"] .diff-hunk-badge {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #4338ca;
+}
+[data-theme="mica"] .diff-hunk-range {
+  color: #334155;
 }
 [data-theme="mica"] .review-subbar {
   background: rgba(241, 245, 249, 0.9);
@@ -5775,15 +5879,40 @@ mark.find-match.find-match-current {
   box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
 }
 [data-theme="holo"] .diff-hunk-header {
-  background: rgba(236, 72, 153, 0.15);
+  background: rgba(24, 12, 45, 0.96);
   color: #f472b6;
   border-left-color: #ec4899;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.3);
+}
+[data-theme="holo"] .diff-hunk-badge {
+  background: rgba(236, 72, 153, 0.18);
+  border-color: #ec4899;
+  color: #f472b6;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.3);
+}
+[data-theme="holo"] .diff-hunk-range {
+  color: #f472b6;
 }
 
 /* 3. Matrix Obsidian */
 [data-theme="matrix"] .file-viewer-review-pane {
   background: rgba(2, 15, 6, 0.98);
   border-left: 1px solid rgba(34, 197, 94, 0.3);
+}
+[data-theme="matrix"] .diff-hunk-header {
+  background: rgba(2, 20, 8, 0.96);
+  border-left-color: #22c55e;
+  color: #86efac;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+[data-theme="matrix"] .diff-hunk-badge {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: #22c55e;
+  color: #86efac;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+}
+[data-theme="matrix"] .diff-hunk-range {
+  color: #86efac;
 }
 [data-theme="matrix"] .review-branch-capsule {
   color: #22c55e;
@@ -5926,19 +6055,24 @@ mark.find-match.find-match-current {
   z-index: 2;
 }
 
-/* Holographic Diff Minimap Rail (R-063) */
+/* Holographic Diff Minimap Rail (R-063, R-075) */
 .file-diff-minimap-rail {
-  position: absolute;
+  position: sticky;
   top: 0;
   right: 0;
+  margin-left: auto;
   width: 6px;
   height: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 10;
+  min-height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 12;
   cursor: pointer;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   transition: width 0.15s ease, background 0.15s ease;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .file-diff-minimap-rail:hover {
@@ -6017,17 +6151,14 @@ mark.find-match.find-match-current {
   0% {
     background: rgba(99, 102, 241, 0.7);
     box-shadow: 0 0 24px rgba(99, 102, 241, 0.9);
-    transform: scale(1.02);
   }
   35% {
     background: rgba(99, 102, 241, 0.45);
     box-shadow: 0 0 16px rgba(99, 102, 241, 0.6);
-    transform: scale(1.01);
   }
   100% {
     background: transparent;
     box-shadow: none;
-    transform: scale(1);
   }
 }
 
@@ -6143,3 +6274,333 @@ mark.find-match.find-match-current {
   background: rgba(255, 255, 255, 0.12) !important;
   border-left-color: #6366f1 !important;
 }
+
+/* ============================================================================
+   Holographic Multi-IDE Selector Split-Button & Glassmorphic Palette (R-076)
+   ============================================================================ */
+
+.ide-split-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-md, 8px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.ide-split-group:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ide-split-main-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal, #f1f5f9);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-top-left-radius: var(--radius-md, 8px);
+  border-bottom-left-radius: var(--radius-md, 8px);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ide-split-main-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #fff;
+}
+
+.ide-split-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 7px;
+  border: none;
+  border-left: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.72rem;
+  cursor: pointer;
+  border-top-right-radius: var(--radius-md, 8px);
+  border-bottom-right-radius: var(--radius-md, 8px);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ide-split-trigger-btn:hover,
+.ide-split-group.menu-open .ide-split-trigger-btn {
+  background: rgba(99, 102, 241, 0.25);
+  color: #fff;
+}
+
+.ide-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 270px;
+  background: rgba(11, 15, 28, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(99, 102, 241, 0.25);
+  padding: 6px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: ideMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes ideMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ide-menu-header {
+  padding: 6px 10px 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim, #64748b);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
+}
+
+.ide-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal, #f1f5f9);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.08s ease, color 0.12s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ide-menu-item:hover {
+  background: rgba(99, 102, 241, 0.18);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.ide-menu-item.active {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  font-weight: 600;
+}
+
+.ide-menu-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ide-menu-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ide-menu-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ide-menu-desc {
+  font-size: 0.68rem;
+  color: var(--text-dim, #64748b);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ide-menu-radio {
+  font-size: 0.75rem;
+  color: #818cf8;
+  flex-shrink: 0;
+}
+
+.ide-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.ide-badge.installed {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.ide-badge.not-installed {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  opacity: 0.7;
+}
+
+.ide-menu-section-header {
+  padding: 6px 10px 2px 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim, #64748b);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ide-menu-item.not-installed {
+  opacity: 0.65;
+}
+
+.ide-menu-item.not-installed:hover {
+  opacity: 1;
+}
+
+.ide-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 0;
+}
+
+.ide-menu-copy {
+  color: var(--text-muted, #94a3b8);
+}
+
+.ide-menu-copy:hover {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+/* ============================================================================
+   Theme Adaptations for Sticky Gutter & IDE Palette
+   ============================================================================ */
+
+/* 1. Fluent Aero Mica */
+[data-theme="mica"] .code-line-numbers {
+  background: rgba(248, 250, 252, 0.96) !important;
+  border-right-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08) !important;
+  color: #64748b !important;
+}
+[data-theme="mica"] .file-diff-minimap-rail {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-left-color: rgba(0, 0, 0, 0.12) !important;
+}
+[data-theme="mica"] .ide-split-group {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+[data-theme="mica"] .ide-split-main-btn {
+  color: #1e293b;
+}
+[data-theme="mica"] .ide-split-trigger-btn {
+  border-left-color: rgba(0, 0, 0, 0.12);
+  color: #64748b;
+}
+[data-theme="mica"] .ide-picker-menu {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+[data-theme="mica"] .ide-menu-header {
+  color: #64748b;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="mica"] .ide-menu-item {
+  color: #334155;
+}
+[data-theme="mica"] .ide-menu-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #1e1b4b;
+}
+[data-theme="mica"] .ide-menu-item.active {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4338ca;
+}
+[data-theme="mica"] .ide-menu-desc {
+  color: #94a3b8;
+}
+[data-theme="mica"] .ide-menu-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* 2. Holo Cyberpunk */
+[data-theme="holo"] .code-line-numbers {
+  background: rgba(13, 6, 32, 0.96) !important;
+  border-right-color: rgba(236, 72, 153, 0.35) !important;
+  box-shadow: 4px 0 20px rgba(236, 72, 153, 0.25) !important;
+  color: #f472b6 !important;
+}
+[data-theme="holo"] .ide-split-group {
+  border-color: rgba(236, 72, 153, 0.35);
+  box-shadow: 0 0 10px rgba(236, 72, 153, 0.2);
+}
+[data-theme="holo"] .ide-split-group:hover {
+  border-color: #ec4899;
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.4);
+}
+[data-theme="holo"] .ide-picker-menu {
+  background: rgba(13, 6, 32, 0.96);
+  border-color: #ec4899;
+  box-shadow: 0 0 24px rgba(236, 72, 153, 0.35);
+}
+
+/* 3. Matrix Obsidian */
+[data-theme="matrix"] .code-line-numbers {
+  background: rgba(0, 15, 5, 0.96) !important;
+  border-right-color: rgba(34, 197, 94, 0.35) !important;
+  box-shadow: 4px 0 20px rgba(34, 197, 94, 0.25) !important;
+  color: #86efac !important;
+}
+[data-theme="matrix"] .ide-split-group {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+}
+[data-theme="matrix"] .ide-split-group:hover {
+  border-color: #22c55e;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+}
+[data-theme="matrix"] .ide-picker-menu {
+  background: rgba(0, 15, 5, 0.96);
+  border-color: #22c55e;
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.35);
+}
+

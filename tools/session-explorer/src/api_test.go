@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -761,5 +762,135 @@ func TestAPI_HandleSessions_TimezoneOffsetFilter(t *testing.T) {
 		t.Fatalf("expected 0 sessions with UTC tz_offset=0 for 2026-11-06, got %d", len(respUTC.Sessions))
 	}
 }
+
+func TestAPI_HandleOpenInIDE(t *testing.T) {
+	idx := setupTestIndex(t)
+	handler := NewAPIHandler(idx, false)
+
+	// 1. Method not allowed
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/ide/open", nil)
+	recGet := httptest.NewRecorder()
+	handler.HandleOpenInIDE(recGet, reqGet)
+	if recGet.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405 Method Not Allowed, got %d", recGet.Code)
+	}
+
+	// 2. Invalid JSON
+	reqBadJSON := httptest.NewRequest(http.MethodPost, "/api/ide/open", bytes.NewBufferString("not-json"))
+	recBadJSON := httptest.NewRecorder()
+	handler.HandleOpenInIDE(recBadJSON, reqBadJSON)
+	if recBadJSON.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request for invalid JSON, got %d", recBadJSON.Code)
+	}
+
+	// 3. Non-existent file
+	reqNonExistent := httptest.NewRequest(http.MethodPost, "/api/ide/open", bytes.NewBufferString(`{"path":"/tmp/non_existent_file_xyz_123.rs","editor":"vscode","line":10}`))
+	recNonExistent := httptest.NewRecorder()
+	handler.HandleOpenInIDE(recNonExistent, reqNonExistent)
+	if recNonExistent.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for non-existent file, got %d", recNonExistent.Code)
+	}
+
+	// 4. Create real temporary file
+	tmpFile, err := os.CreateTemp("", "test_ide_open_*.rs")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.WriteString("// test content\nfn main() {}\n")
+	tmpFile.Close()
+
+	// 5. Test multiple editors on real file
+	editors := []struct {
+		editor      string
+		expectedURI string
+	}{
+		{"cursor", fmt.Sprintf("cursor://file/%s:42", tmpFile.Name())},
+		{"vscode", fmt.Sprintf("vscode://file/%s:42", tmpFile.Name())},
+		{"windsurf", fmt.Sprintf("windsurf://file/%s:42", tmpFile.Name())},
+		{"idea", fmt.Sprintf("idea://open?file=%s&line=42", tmpFile.Name())},
+		{"sublime", fmt.Sprintf("subl://open?url=file://%s&line=42", tmpFile.Name())},
+		{"system", fmt.Sprintf("file://%s", tmpFile.Name())},
+	}
+
+	for _, tc := range editors {
+		payload := fmt.Sprintf(`{"path":"%s","editor":"%s","line":42}`, tmpFile.Name(), tc.editor)
+		req := httptest.NewRequest(http.MethodPost, "/api/ide/open", bytes.NewBufferString(payload))
+		rec := httptest.NewRecorder()
+		handler.HandleOpenInIDE(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK for editor %s, got %d: %s", tc.editor, rec.Code, rec.Body.String())
+			continue
+		}
+
+		var resp OpenInIDEResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Errorf("failed to decode response for editor %s: %v", tc.editor, err)
+			continue
+		}
+
+		if resp.Editor != tc.editor && !(tc.editor == "idea" && resp.Editor == "intellij") {
+			t.Errorf("expected editor %s, got %s", tc.editor, resp.Editor)
+		}
+		if resp.FallbackURI != tc.expectedURI {
+			t.Errorf("expected fallback URI %s, got %s", tc.expectedURI, resp.FallbackURI)
+		}
+		if resp.Command == "" {
+			t.Errorf("expected non-empty command for editor %s", tc.editor)
+		}
+	}
+}
+
+func TestAPI_HandleDetectIDEs(t *testing.T) {
+	idx := setupTestIndex(t)
+	handler := NewAPIHandler(idx, false)
+
+	// 1. Method Not Allowed
+	reqPost := httptest.NewRequest(http.MethodPost, "/api/ide/detected", nil)
+	recPost := httptest.NewRecorder()
+	handler.HandleDetectIDEs(recPost, reqPost)
+	if recPost.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405 Method Not Allowed, got %d", recPost.Code)
+	}
+
+	// 2. Successful GET
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/ide/detected", nil)
+	recGet := httptest.NewRecorder()
+	handler.HandleDetectIDEs(recGet, reqGet)
+
+	if recGet.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", recGet.Code, recGet.Body.String())
+	}
+
+	var resp DetectIDEsResponse
+	if err := json.NewDecoder(recGet.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode DetectIDEsResponse: %v", err)
+	}
+
+	if len(resp.Detected) == 0 {
+		t.Errorf("expected at least 1 known editor in detected list")
+	}
+
+	// Verify System Default is present and installed
+	foundSystem := false
+	for _, ide := range resp.Detected {
+		if ide.ID == "system" {
+			foundSystem = true
+			if !ide.Installed {
+				t.Errorf("expected system default editor to be installed")
+			}
+			break
+		}
+	}
+	if !foundSystem {
+		t.Errorf("expected 'system' editor in detected list")
+	}
+
+	if resp.Preferred == "" {
+		t.Errorf("expected non-empty preferred IDE")
+	}
+}
+
 
 

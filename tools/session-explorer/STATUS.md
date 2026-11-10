@@ -1,17 +1,17 @@
 ---
 tool: session-explorer
-status: released
-version: 0.5.2
+status: review
+version: 0.5.3
 category: GenAI & ML
 created: 2026-09-18
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 owner: "@vadde"
 spec: ../../specs/catalog/session-explorer.md
 ---
 
 # SDLC Status
 
-## Current Phase: `released`
+## Current Phase: `review`
 
 ### Status Definitions
 
@@ -49,6 +49,8 @@ spec: ../../specs/catalog/session-explorer.md
 | 2026-11-09 | `spec-review` | `in-progress` | Implemented R-053..R-066 (Spatial Sync, Dual Line Numbers, In-File Diff Decorations, Minimap Rail, Hunk Stepper) |
 | 2026-11-09 | `in-progress` | `review` | R-067..R-072 (Sub-Pixel Zero-Drift Alignment Engine, Forensic Buffer Telemetry, Multi-Hunk Navigation Radar) verified via Playwright on symbol_table.rs (13 hunks) |
 | 2026-11-09 | `review` | `released` | User approved release v0.5.2 (R-053..R-072 verified and shipped) |
+| 2026-11-10 | `released` | `in-progress` | Implementing R-073..R-078 (Spatial Auto-Lock, Sticky Zero-Drift Gutter, Minimap Docking, Multi-IDE Cockpit) |
+| 2026-11-10 | `in-progress` | `review` | R-073..R-078 implemented & verified via automated Playwright and 43 unit tests; ready for human review |
 
 ---
 
@@ -56,8 +58,8 @@ spec: ../../specs/catalog/session-explorer.md
 
 | Category | Done | Total | Percentage |
 |----------|------|-------|------------|
-| Requirements (R-XXX) | 72 | 72 | 100% |
-| Acceptance Criteria (AC-XXX) | 185 | 185 | 100% |
+| Requirements (R-XXX) | 78 | 78 | 100% |
+| Acceptance Criteria (AC-XXX) | 207 | 207 | 100% |
 | Non-Functional (NF-XXX) | 9 | 9 | 100% |
 
 ---
@@ -138,6 +140,13 @@ spec: ../../specs/catalog/session-explorer.md
 | R-070 | Minimap Holographic Tooltip Previews & Spatial Hover Radar | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
 | R-071 | Active Hunk Spotlight & Ambient Framing Rail in File Viewer | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
 | R-072 | High-Scale Viewport Virtualization & Safe Buffer Handling | `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-073 | Step Scrubber Spatial Change Autolock & Spotlight Centering | `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-074 | Zero-Drift Sticky Line Number Gutters Across Resize Splits | `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-075 | Dynamic Viewport-Bounded Tooltip Clamp | `src/web/src/app.js`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-076 | Holographic Multi-IDE Selector Cockpit UI | `src/web/index.html`, `src/web/src/styles.css` | headless browser | ✅ 🧪 |
+| R-077 | Dual-Vector Process & Protocol IDE Execution Engine | `src/ide_detector.go`, `src/api.go`, `src/web/src/app.js` | `src/api_test.go` | ✅ 🧪 |
+| R-078 | Seamless Hunk Navigation Without Manual Step Stalling | `src/web/src/app.js` | headless browser | ✅ 🧪 |
+| R-079 | Host-Aware Multi-IDE Detection & Dynamic Palette Renderer | `src/ide_detector.go`, `src/api.go`, `src/web/src/app.js` | `src/api_test.go` | ✅ 🧪 |
 
 **Status Legend**: ⬜ Not started · 🔨 In progress · ✅ Implemented · 🧪 Tested · ❌ Blocked
 

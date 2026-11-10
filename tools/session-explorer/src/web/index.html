@@ -431,7 +431,85 @@
           <button class="btn-ghost-sm" id="fileViewerWrapBtn" title="Toggle Line Wrap">↩ Wrap</button>
           <button class="btn-ghost-sm" id="fileViewerCopyContentBtn" title="Copy Content">📋 Copy</button>
           <button class="btn-ghost-sm" id="fileViewerCopyPathBtn" title="Copy Path">🔗 Path</button>
-          <button class="btn-ghost-sm" id="fileViewerIdeDeepLinkBtn" title="Open in Desktop IDE (Cursor / VS Code)">↗ IDE</button>
+          <!-- Holographic Multi-IDE Selector Split-Button & Glassmorphic Palette (R-076) -->
+          <div class="ide-split-group" id="fileViewerIdeGroup" title="Launch Desktop IDE at active hunk line">
+            <button class="btn-ghost-sm ide-split-main-btn" id="fileViewerIdePrimaryBtn" title="Open in Preferred IDE">
+              <span class="ide-icon" id="fileViewerIdeIcon">🚀</span>
+              <span class="ide-label" id="fileViewerIdeName">Cursor</span>
+            </button>
+            <button class="btn-ghost-sm ide-split-trigger-btn" id="fileViewerIdeDropdownBtn" title="Choose Desktop IDE (Cursor, VS Code, Windsurf, JetBrains, Sublime)">
+              ▾
+            </button>
+            <div class="ide-picker-menu holo-glassmorphic-menu" id="fileViewerIdeMenu" style="display: none;">
+              <div class="ide-menu-header">Select Desktop IDE</div>
+              <button class="ide-menu-item active" data-editor="cursor" type="button">
+                <span class="ide-menu-icon">🚀</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">Cursor</span>
+                  <span class="ide-menu-desc">cursor://file/{path}:{line}</span>
+                </span>
+                <span class="ide-menu-radio">●</span>
+              </button>
+              <button class="ide-menu-item" data-editor="vscode" type="button">
+                <span class="ide-menu-icon">💙</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">Visual Studio Code</span>
+                  <span class="ide-menu-desc">vscode://file/{path}:{line}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <button class="ide-menu-item" data-editor="windsurf" type="button">
+                <span class="ide-menu-icon">🌊</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">Windsurf</span>
+                  <span class="ide-menu-desc">windsurf://file/{path}:{line}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <button class="ide-menu-item" data-editor="idea" type="button">
+                <span class="ide-menu-icon">🧠</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">JetBrains (IDEA / PyCharm / GoLand)</span>
+                  <span class="ide-menu-desc">idea://open?file={path}&line={line}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <button class="ide-menu-item" data-editor="vscode-insiders" type="button">
+                <span class="ide-menu-icon">⚡</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">VS Code Insiders</span>
+                  <span class="ide-menu-desc">vscode-insiders://file/{path}:{line}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <button class="ide-menu-item" data-editor="sublime" type="button">
+                <span class="ide-menu-icon">📜</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">Sublime Text</span>
+                  <span class="ide-menu-desc">subl://open?url=file://{path}&line={line}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <button class="ide-menu-item" data-editor="system" type="button">
+                <span class="ide-menu-icon">🍎</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">System Default</span>
+                  <span class="ide-menu-desc">open {path}</span>
+                </span>
+                <span class="ide-menu-radio">○</span>
+              </button>
+              <div class="ide-menu-divider"></div>
+              <button class="ide-menu-item ide-menu-copy" id="ideMenuCopyCliBtn" type="button">
+                <span class="ide-menu-icon">📋</span>
+                <span class="ide-menu-text">
+                  <span class="ide-menu-name">Copy CLI Launch Command</span>
+                  <span class="ide-menu-desc" id="ideMenuCopyCliDesc">cursor -g /path:line</span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <!-- Backward-compatible invisible shim for legacy references -->
+          <button id="fileViewerIdeDeepLinkBtn" style="display: none;"></button>
           <button class="btn-ghost-sm active" id="toggleReviewPaneBtn" title="Toggle Review Pane (⌘\ / Ctrl+\)"><span class="btn-icon-glyph">🔀</span> Review <span class="badge-mini" id="reviewPaneBadge">Diff</span></button>
           <button class="btn-icon" id="closeFileViewerBtn" title="Close File Viewer (Esc)">✕</button>
         </div>
