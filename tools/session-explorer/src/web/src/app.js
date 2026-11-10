@@ -423,6 +423,14 @@ const el = {
   fileViewerImage: document.getElementById('fileViewerImage'),
   fileViewerOpenFindBtn: document.getElementById('fileViewerOpenFindBtn'),
   fileViewerIdeDeepLinkBtn: document.getElementById('fileViewerIdeDeepLinkBtn'),
+  fileViewerIdeGroup: document.getElementById('fileViewerIdeGroup'),
+  fileViewerIdePrimaryBtn: document.getElementById('fileViewerIdePrimaryBtn'),
+  fileViewerIdeIcon: document.getElementById('fileViewerIdeIcon'),
+  fileViewerIdeName: document.getElementById('fileViewerIdeName'),
+  fileViewerIdeDropdownBtn: document.getElementById('fileViewerIdeDropdownBtn'),
+  fileViewerIdeMenu: document.getElementById('fileViewerIdeMenu'),
+  ideMenuCopyCliBtn: document.getElementById('ideMenuCopyCliBtn'),
+  ideMenuCopyCliDesc: document.getElementById('ideMenuCopyCliDesc'),
   fileDiffMinimapRail: document.getElementById('fileDiffMinimapRail'),
   minimapFloatingTooltip: document.getElementById('minimapFloatingTooltip'),
   fileViewerFindWidget: document.getElementById('fileViewerFindWidget'),
@@ -3859,12 +3867,7 @@ function renderFileViewerContent() {
 
     if (startL) {
       setTimeout(() => {
-        const targetEl = document.getElementById(`file-line-${startL}`) ||
-          document.getElementById(`code-line-${startL}`) ||
-          el.fileViewerLineNumbers.querySelector(`[data-line="${startL}"]`);
-        if (targetEl) {
-          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        jumpToFileViewerLine(startL, true);
       }, 60);
     }
   }
@@ -4180,16 +4183,22 @@ function initReviewPaneListeners() {
     });
   }
 
-  // Desktop IDE Deep-Linking (R-066)
+  // Desktop IDE Deep-Linking (R-066, R-076, R-077)
   if (el.fileViewerIdeDeepLinkBtn) {
-    el.fileViewerIdeDeepLinkBtn.addEventListener('click', openInDesktopIde);
+    el.fileViewerIdeDeepLinkBtn.addEventListener('click', () => openInDesktopIde());
   }
+  initIdeCockpit();
 }
 
 function handleResizerPointerDown(e) {
   e.preventDefault();
   isResizingReviewPane = true;
-  if (el.fileViewerResizer) el.fileViewerResizer.classList.add('resizing');
+  if (el.fileViewerResizer) {
+    el.fileViewerResizer.classList.add('resizing');
+    if (el.fileViewerResizer.setPointerCapture) {
+      try { el.fileViewerResizer.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+  }
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 
@@ -4202,10 +4211,15 @@ function handleResizerPointerDown(e) {
     applyReviewSplitWidth(state.reviewSplitPercent);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (ev) => {
     if (isResizingReviewPane) {
       isResizingReviewPane = false;
-      if (el.fileViewerResizer) el.fileViewerResizer.classList.remove('resizing');
+      if (el.fileViewerResizer) {
+        el.fileViewerResizer.classList.remove('resizing');
+        if (el.fileViewerResizer.releasePointerCapture && ev && ev.pointerId) {
+          try { el.fileViewerResizer.releasePointerCapture(ev.pointerId); } catch (_) {}
+        }
+      }
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       localStorage.setItem('se_review_split', state.reviewSplitPercent);
@@ -4516,6 +4530,7 @@ function updateReviewTelemetryRibbon(status) {
 
 function switchReviewVector(vector) {
   state.reviewPaneVector = vector;
+  resetPanesHorizontalScroll();
 
   // Update tabs UI
   const tabMap = {
@@ -4606,6 +4621,7 @@ function stepReviewScrubber(delta) {
   const nextIdx = state.reviewCurrentStepIdx + delta;
   if (nextIdx >= 0 && nextIdx < state.reviewSteps.length) {
     state.reviewCurrentStepIdx = nextIdx;
+    resetPanesHorizontalScroll();
     renderStepsVector();
   }
 }
@@ -4776,9 +4792,10 @@ function renderDiffSurface(diffData, isStep = false) {
     el.reviewDiffSurface.innerHTML = renderUnifiedDiffHtml(hunks, ext);
   }
 
-  // Attach line click sync (R-059)
+  // Attach line click sync (R-059, R-074, R-078)
   el.reviewDiffSurface.querySelectorAll('.diff-line').forEach(lineEl => {
     lineEl.addEventListener('click', () => {
+      resetPanesHorizontalScroll();
       const lineNum = parseInt(lineEl.dataset.lineNum, 10);
       if (!isNaN(lineNum) && lineNum > 0) {
         jumpToFileViewerLine(lineNum);
@@ -4786,19 +4803,18 @@ function renderDiffSurface(diffData, isStep = false) {
     });
   });
 
-  // Attach hunk header click sync (R-059, R-065)
+  // Attach hunk header click sync (R-059, R-065, R-074, R-078)
   el.reviewDiffSurface.querySelectorAll('.diff-hunk-header').forEach(headerEl => {
     headerEl.addEventListener('click', (e) => {
       if (e.target.closest('.hunk-copy-btn')) return;
-      const targetLine = parseInt(headerEl.dataset.targetLine, 10);
+      resetPanesHorizontalScroll();
       const hunkIdx = parseInt(headerEl.dataset.hunkIdx, 10);
-      if (!isNaN(targetLine) && targetLine > 0) {
-        jumpToFileViewerLine(targetLine);
-      }
       if (!isNaN(hunkIdx)) {
-        state.reviewActiveHunkIndex = hunkIdx;
-        if (el.hunkStepLabel && state.reviewHunks) {
-          el.hunkStepLabel.textContent = `Hunk ${hunkIdx + 1}/${state.reviewHunks.length}`;
+        stepToHunk(hunkIdx);
+      } else {
+        const targetLine = parseInt(headerEl.dataset.targetLine, 10);
+        if (!isNaN(targetLine) && targetLine > 0) {
+          jumpToFileViewerLine(targetLine);
         }
       }
     });
@@ -4815,6 +4831,11 @@ function renderDiffSurface(diffData, isStep = false) {
 
   // Update Left File Viewer Gutter Decorations & Minimap Rail (R-062, R-063)
   updateInFileDiffDecorations(hunks);
+
+  // Automatic Hunk 1 Spatial Auto-Lock & Framing on Scrubber Navigation (R-073)
+  if (hunks.length > 0) {
+    stepToHunk(0, true);
+  }
 }
 
 // AST Scope Breadcrumb Extractor (R-065)
@@ -4892,24 +4913,24 @@ function renderUnifiedDiffHtml(hunks, ext) {
       `);
     }
 
+    const rangeMatch = (hunk.header || '').match(/@@\s*-[0-9,]+\s*\+[0-9,]+\s*@@/);
+    const rangeStr = rangeMatch ? rangeMatch[0] : (hunk.header || '');
     const ast = parseHunkAstSymbol(hunk.header);
     const astPillHtml = ast ? `
       <span class="diff-hunk-ast-pill" title="Enclosing Symbol: ${escapeHtml(ast.name)}">
         <span class="ast-glyph">${ast.glyph}</span>
-        <span>${escapeHtml(ast.name)}</span>
+        <span class="ast-symbol-text">${escapeHtml(ast.name)}</span>
       </span>
     ` : '';
 
     return `
       <div class="diff-hunk" id="review-hunk-${hIdx}" data-hunk-idx="${hIdx}">
         <div class="diff-hunk-header clickable-hunk-header" data-target-line="${hunk.new_start || hunk.old_start || 1}" data-hunk-idx="${hIdx}" title="Click to scroll to this function/section in file viewer (Line ${hunk.new_start || hunk.old_start || 1})">
-          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; pointer-events: none;">
-            <span style="font-weight: 600;">${escapeHtml(hunk.header)}</span>
-            ${astPillHtml}
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+          <div class="diff-hunk-header-left">
+            <span class="diff-hunk-badge">Hunk ${hIdx + 1}</span>
             <button class="hunk-copy-btn" data-hunk-idx="${hIdx}" title="Copy Hunk Patch">📋 Hunk</button>
-            <span style="font-size: 0.68rem; opacity: 0.8;">Hunk ${hIdx + 1}</span>
+            <span class="diff-hunk-range">${escapeHtml(rangeStr)}</span>
+            ${astPillHtml}
           </div>
         </div>
         <div class="diff-hunk-lines">
@@ -4949,24 +4970,24 @@ function renderSplitDiffHtml(hunks, ext) {
       rowsHtml.push(buildSplitRow(leftLines[j], rightLines[j]));
     }
 
+    const rangeMatch = (hunk.header || '').match(/@@\s*-[0-9,]+\s*\+[0-9,]+\s*@@/);
+    const rangeStr = rangeMatch ? rangeMatch[0] : (hunk.header || '');
     const ast = parseHunkAstSymbol(hunk.header);
     const astPillHtml = ast ? `
       <span class="diff-hunk-ast-pill" title="Enclosing Symbol: ${escapeHtml(ast.name)}">
         <span class="ast-glyph">${ast.glyph}</span>
-        <span>${escapeHtml(ast.name)}</span>
+        <span class="ast-symbol-text">${escapeHtml(ast.name)}</span>
       </span>
     ` : '';
 
     return `
       <div class="diff-hunk" id="review-hunk-${hIdx}" data-hunk-idx="${hIdx}">
         <div class="diff-hunk-header clickable-hunk-header" data-target-line="${hunk.new_start || hunk.old_start || 1}" data-hunk-idx="${hIdx}" title="Click to scroll to this function/section in file viewer (Line ${hunk.new_start || hunk.old_start || 1})">
-          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; pointer-events: none;">
-            <span style="font-weight: 600;">${escapeHtml(hunk.header)}</span>
-            ${astPillHtml}
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+          <div class="diff-hunk-header-left">
+            <span class="diff-hunk-badge">Hunk ${hIdx + 1} (Split)</span>
             <button class="hunk-copy-btn" data-hunk-idx="${hIdx}" title="Copy Hunk Patch">📋 Hunk</button>
-            <span style="font-size: 0.68rem; opacity: 0.8;">Hunk ${hIdx + 1} (Split)</span>
+            <span class="diff-hunk-range">${escapeHtml(rangeStr)}</span>
+            ${astPillHtml}
           </div>
         </div>
         <div class="diff-split-container">
@@ -5042,8 +5063,19 @@ function computeSublineTokenDiff(delStr, addStr) {
   };
 }
 
-// Bidirectional Navigation Sync (R-059)
-function jumpToFileViewerLine(lineNum) {
+// Horizontal Scroll Reset Utility (R-074, R-078)
+function resetPanesHorizontalScroll() {
+  if (el.fileViewerBody) {
+    el.fileViewerBody.scrollLeft = 0;
+  }
+  const reviewDiffCont = document.querySelector('.review-diff-container');
+  if (reviewDiffCont) {
+    reviewDiffCont.scrollLeft = 0;
+  }
+}
+
+// Bidirectional Navigation Sync (R-059, R-073)
+function jumpToFileViewerLine(lineNum, quiet = false) {
   if (!lineNum || !el.fileViewerLineNumbers) return;
 
   const totalLines = state.fileViewerData ? (state.fileViewerData.line_count || 1) : 1;
@@ -5051,10 +5083,20 @@ function jumpToFileViewerLine(lineNum) {
 
   const gutterEl = el.fileViewerLineNumbers.querySelector(`[data-line="${clampedLine}"]`);
   const codeEl = document.getElementById(`code-line-${clampedLine}`);
+  const targetEl = gutterEl || codeEl;
 
-  const targetEl = codeEl || gutterEl;
-  if (targetEl) {
-    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (targetEl && el.fileViewerBody) {
+    el.fileViewerBody.scrollLeft = 0;
+    const bodyRect = el.fileViewerBody.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    const targetTopRelative = targetRect.top - bodyRect.top + el.fileViewerBody.scrollTop;
+    const targetScrollTop = Math.max(0, targetTopRelative - (el.fileViewerBody.clientHeight / 2));
+
+    el.fileViewerBody.scrollTo({
+      top: targetScrollTop,
+      left: 0, // ALWAYS maintain left = 0 (leftmost default position)!
+      behavior: 'smooth'
+    });
   }
 
   if (gutterEl) {
@@ -5069,15 +5111,19 @@ function jumpToFileViewerLine(lineNum) {
       codeEl.classList.remove('jump-pulse-line');
     }, 1600);
   }
-  showToast(`Jumped to line ${clampedLine}`);
+  if (!quiet) {
+    showToast(`Jumped to line ${clampedLine}`);
+  }
 }
 
-// Synchronized Hunk Stepper Navigation & Multi-Hunk Radar (R-064, R-069, R-071)
-function stepToHunk(hunkIdx) {
+// Synchronized Hunk Stepper Navigation & Multi-Hunk Radar (R-064, R-069, R-071, R-073)
+function stepToHunk(hunkIdx, quiet = false) {
   if (!state.reviewHunks || state.reviewHunks.length === 0) return;
   const count = state.reviewHunks.length;
   const idx = ((hunkIdx % count) + count) % count;
   state.reviewActiveHunkIndex = idx;
+
+  resetPanesHorizontalScroll();
 
   if (el.hunkStepLabel) {
     el.hunkStepLabel.textContent = `Hunk ${idx + 1}/${count}`;
@@ -5086,10 +5132,21 @@ function stepToHunk(hunkIdx) {
     el.hunkRadarSelect.value = String(idx);
   }
 
-  // Smooth scroll review pane to hunk
+  // Smooth scroll review pane to hunk on Y-axis only, keeping horizontal scroll at left = 0
   const hunkEl = document.getElementById(`review-hunk-${idx}`);
-  if (hunkEl) {
-    hunkEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const reviewDiffCont = document.querySelector('.review-diff-container');
+  if (hunkEl && reviewDiffCont) {
+    reviewDiffCont.scrollLeft = 0;
+    const contRect = reviewDiffCont.getBoundingClientRect();
+    const hunkRect = hunkEl.getBoundingClientRect();
+    const hunkTopRelative = hunkRect.top - contRect.top + reviewDiffCont.scrollTop;
+    const targetScrollTop = Math.max(0, hunkTopRelative - 20);
+
+    reviewDiffCont.scrollTo({
+      top: targetScrollTop,
+      left: 0, // ALWAYS maintain left = 0 (leftmost default position)!
+      behavior: 'smooth'
+    });
     hunkEl.classList.add('jump-pulse');
     setTimeout(() => hunkEl.classList.remove('jump-pulse'), 1600);
   }
@@ -5102,6 +5159,14 @@ function stepToHunk(hunkIdx) {
     if (firstChanged) {
       targetLine = firstChanged.new_line_num || firstChanged.old_line_num || targetLine;
     }
+  }
+
+  // Update target line for desktop IDE deep-linking (R-076, R-077)
+  state.fileViewerTargetLine = targetLine;
+  updateIdeCliCopyDesc();
+  if (el.fileViewerIdePrimaryBtn) {
+    const ed = IDE_EDITORS[state.preferredIde] || IDE_EDITORS.cursor;
+    el.fileViewerIdePrimaryBtn.title = `Open in ${ed.name} at line ${targetLine}`;
   }
 
   // Active Hunk Spotlight & Ambient Framing Rail (R-071)
@@ -5118,7 +5183,7 @@ function stepToHunk(hunkIdx) {
     }
   }
 
-  jumpToFileViewerLine(targetLine);
+  jumpToFileViewerLine(targetLine, quiet);
 }
 
 // Surgical Hunk Patch Copy (R-066)
@@ -5293,15 +5358,401 @@ function renderMinimapRail(addLines, modLines, delLines) {
   };
 }
 
-// 1-Click Desktop IDE Deep-Linking (R-066)
-function openInDesktopIde() {
-  if (!currentReviewFilePath) return;
+// ============================================================================
+// Holographic Multi-IDE Selector Cockpit & Dual-Vector Dispatcher (R-076, R-077)
+// ============================================================================
+
+const IDE_EDITORS = {
+  vscode: {
+    id: 'vscode',
+    name: 'Visual Studio Code',
+    icon: '💙',
+    bin: 'code',
+    uriPrefix: 'vscode://file/',
+    cmdTpl: (path, line) => `code -g ${path}:${line}`
+  },
+  cursor: {
+    id: 'cursor',
+    name: 'Cursor',
+    icon: '🚀',
+    bin: 'cursor',
+    uriPrefix: 'cursor://file/',
+    cmdTpl: (path, line) => `cursor -g ${path}:${line}`
+  },
+  windsurf: {
+    id: 'windsurf',
+    name: 'Windsurf',
+    icon: '🌊',
+    bin: 'windsurf',
+    uriPrefix: 'windsurf://file/',
+    cmdTpl: (path, line) => `windsurf -g ${path}:${line}`
+  },
+  idea: {
+    id: 'idea',
+    name: 'IntelliJ IDEA',
+    icon: '🧠',
+    bin: 'idea',
+    uriPrefix: 'idea://open?file=',
+    cmdTpl: (path, line) => `idea --line ${line} ${path}`
+  },
+  goland: {
+    id: 'goland',
+    name: 'GoLand',
+    icon: '🐹',
+    bin: 'goland',
+    uriPrefix: 'goland://open?file=',
+    cmdTpl: (path, line) => `goland --line ${line} ${path}`
+  },
+  pycharm: {
+    id: 'pycharm',
+    name: 'PyCharm',
+    icon: '🐍',
+    bin: 'pycharm',
+    uriPrefix: 'pycharm://open?file=',
+    cmdTpl: (path, line) => `pycharm --line ${line} ${path}`
+  },
+  webstorm: {
+    id: 'webstorm',
+    name: 'WebStorm',
+    icon: '⚡',
+    bin: 'webstorm',
+    uriPrefix: 'webstorm://open?file=',
+    cmdTpl: (path, line) => `webstorm --line ${line} ${path}`
+  },
+  sublime: {
+    id: 'sublime',
+    name: 'Sublime Text',
+    icon: '📜',
+    bin: 'subl',
+    uriPrefix: 'subl://open?url=file://',
+    cmdTpl: (path, line) => `subl ${path}:${line}`
+  },
+  'vscode-insiders': {
+    id: 'vscode-insiders',
+    name: 'VS Code Insiders',
+    icon: '⚡',
+    bin: 'code-insiders',
+    uriPrefix: 'vscode-insiders://file/',
+    cmdTpl: (path, line) => `code-insiders -g ${path}:${line}`
+  },
+  antigravity: {
+    id: 'antigravity',
+    name: 'Antigravity IDE',
+    icon: '🛸',
+    bin: 'agy',
+    uriPrefix: 'antigravity://file/',
+    cmdTpl: (path, line) => `agy ${path}:${line}`
+  },
+  xcode: {
+    id: 'xcode',
+    name: 'Xcode',
+    icon: '🛠️',
+    bin: 'xed',
+    uriPrefix: 'xcode://file/',
+    cmdTpl: (path, line) => `xed -l ${line} ${path}`
+  },
+  zed: {
+    id: 'zed',
+    name: 'Zed',
+    icon: '⚡',
+    bin: 'zed',
+    uriPrefix: 'zed://file/',
+    cmdTpl: (path, line) => `zed -g ${path}:${line}`
+  },
+  system: {
+    id: 'system',
+    name: 'System Default',
+    icon: '🍎',
+    bin: 'open',
+    uriPrefix: 'file://',
+    cmdTpl: (path) => `open ${path}`
+  }
+};
+
+function initIdeCockpit() {
+  const saved = localStorage.getItem('se_preferred_ide');
+  state.preferredIde = (saved && IDE_EDITORS[saved]) ? saved : 'vscode';
+  updateIdeSplitButtonUI(state.preferredIde);
+
+  // Split Main Button: 1-click launch preferred IDE
+  if (el.fileViewerIdePrimaryBtn) {
+    el.fileViewerIdePrimaryBtn.addEventListener('click', () => {
+      openInDesktopIde(state.preferredIde);
+    });
+  }
+
+  // Split Trigger Button: toggle menu
+  if (el.fileViewerIdeDropdownBtn) {
+    el.fileViewerIdeDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleIdePickerMenu();
+    });
+  }
+
+  // Close menu on outside click
+  document.addEventListener('click', (e) => {
+    if (el.fileViewerIdeGroup && !el.fileViewerIdeGroup.contains(e.target)) {
+      toggleIdePickerMenu(false);
+    }
+  });
+
+  // Asynchronously query server for host-detected IDEs
+  loadDetectedIDEs();
+}
+
+async function loadDetectedIDEs() {
+  try {
+    const res = await fetch('/api/ide/detected');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !Array.isArray(data.detected)) return;
+
+    state.detectedIdes = data.detected;
+
+    // Update IDE_EDITORS definitions with detected status
+    data.detected.forEach(ide => {
+      if (!IDE_EDITORS[ide.id]) {
+        IDE_EDITORS[ide.id] = {
+          id: ide.id,
+          name: ide.name,
+          icon: ide.icon || '🚀',
+          bin: ide.cli_binary || ide.id,
+          uriPrefix: ide.uri_scheme || `${ide.id}://file/`,
+          cmdTpl: (path, line) => `${ide.cli_binary || ide.id} -g ${path}:${line}`
+        };
+      }
+      IDE_EDITORS[ide.id].installed = ide.installed;
+      IDE_EDITORS[ide.id].appPath = ide.app_path;
+      IDE_EDITORS[ide.id].cliBinary = ide.cli_binary;
+    });
+
+    // If no user preference saved, pick preferred from backend
+    const saved = localStorage.getItem('se_preferred_ide');
+    if (!saved && data.preferred && IDE_EDITORS[data.preferred]) {
+      state.preferredIde = data.preferred;
+    }
+
+    renderIdePickerMenu(data.detected);
+    updateIdeSplitButtonUI(state.preferredIde);
+  } catch (err) {
+    console.warn('[IDE] detection fetch error:', err);
+  }
+}
+
+function renderIdePickerMenu(detectedList) {
+  if (!el.fileViewerIdeMenu) return;
+
+  const currentPref = state.preferredIde || 'vscode';
+  const installed = [];
+  const notInstalled = [];
+
+  detectedList.forEach(item => {
+    if (item.installed) {
+      installed.push(item);
+    } else {
+      notInstalled.push(item);
+    }
+  });
+
+  let html = `<div class="ide-menu-header">Detected Desktop IDEs</div>`;
+
+  if (installed.length > 0) {
+    html += `<div class="ide-menu-section-header"><span>Installed on this Machine</span><span class="badge-mini" style="background:rgba(16,185,129,0.2);color:#34d399;">${installed.length} Ready</span></div>`;
+    installed.forEach(item => {
+      const isSel = item.id === currentPref;
+      const sub = item.cli_binary || item.app_path || item.uri_scheme || '';
+      html += `
+        <button class="ide-menu-item installed ${isSel ? 'active' : ''}" data-editor="${item.id}" type="button">
+          <span class="ide-menu-icon">${item.icon}</span>
+          <span class="ide-menu-text">
+            <span class="ide-menu-name">${escapeHtml(item.name)} <span class="ide-badge installed">● Installed</span></span>
+            <span class="ide-menu-desc" title="${escapeHtml(sub)}">${escapeHtml(sub)}</span>
+          </span>
+          <span class="ide-menu-radio">${isSel ? '●' : '○'}</span>
+        </button>
+      `;
+    });
+  }
+
+  if (notInstalled.length > 0) {
+    html += `<div class="ide-menu-divider"></div>`;
+    html += `<div class="ide-menu-section-header"><span>Other Supported Editors</span><span class="badge-mini" style="opacity:0.6;">Protocol Link</span></div>`;
+    notInstalled.forEach(item => {
+      const isSel = item.id === currentPref;
+      const sub = item.uri_scheme || '';
+      html += `
+        <button class="ide-menu-item not-installed ${isSel ? 'active' : ''}" data-editor="${item.id}" type="button">
+          <span class="ide-menu-icon">${item.icon}</span>
+          <span class="ide-menu-text">
+            <span class="ide-menu-name">${escapeHtml(item.name)} <span class="ide-badge not-installed">Not detected</span></span>
+            <span class="ide-menu-desc" title="${escapeHtml(sub)}">${escapeHtml(sub)}</span>
+          </span>
+          <span class="ide-menu-radio">${isSel ? '●' : '○'}</span>
+        </button>
+      `;
+    });
+  }
+
+  html += `<div class="ide-menu-divider"></div>`;
+  html += `
+    <button class="ide-menu-item ide-menu-copy" id="ideMenuCopyCliBtn" type="button">
+      <span class="ide-menu-icon">📋</span>
+      <span class="ide-menu-text">
+        <span class="ide-menu-name">Copy CLI Launch Command</span>
+        <span class="ide-menu-desc" id="ideMenuCopyCliDesc">code -g /path:line</span>
+      </span>
+    </button>
+  `;
+
+  el.fileViewerIdeMenu.innerHTML = html;
+
+  // Re-cache copy btn and bind listeners
+  el.ideMenuCopyCliBtn = document.getElementById('ideMenuCopyCliBtn');
+  el.ideMenuCopyCliDesc = document.getElementById('ideMenuCopyCliDesc');
+  if (el.ideMenuCopyCliBtn) {
+    el.ideMenuCopyCliBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyCurrentIdeCliCommand();
+      toggleIdePickerMenu(false);
+    });
+  }
+
+  // Re-bind item click listeners
+  el.fileViewerIdeMenu.querySelectorAll('.ide-menu-item[data-editor]').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const editorId = item.dataset.editor;
+      if (editorId && IDE_EDITORS[editorId]) {
+        setPreferredIde(editorId);
+        toggleIdePickerMenu(false);
+        openInDesktopIde(editorId);
+      }
+    });
+  });
+
+  updateIdeCliCopyDesc();
+}
+
+function updateIdeSplitButtonUI(editorId) {
+  const ed = IDE_EDITORS[editorId] || IDE_EDITORS.vscode || IDE_EDITORS.cursor;
+  if (el.fileViewerIdeIcon) el.fileViewerIdeIcon.textContent = ed.icon;
+  if (el.fileViewerIdeName) el.fileViewerIdeName.textContent = ed.name;
+  if (el.fileViewerIdePrimaryBtn) {
+    el.fileViewerIdePrimaryBtn.title = `Open in ${ed.name} at line ${state.fileViewerTargetLine || 1}`;
+  }
+
+  // Update active radio in menu
+  if (el.fileViewerIdeMenu) {
+    el.fileViewerIdeMenu.querySelectorAll('.ide-menu-item[data-editor]').forEach(item => {
+      const isSel = item.dataset.editor === editorId;
+      item.classList.toggle('active', isSel);
+      const radio = item.querySelector('.ide-menu-radio');
+      if (radio) radio.textContent = isSel ? '●' : '○';
+    });
+  }
+
+  updateIdeCliCopyDesc();
+}
+
+function setPreferredIde(editorId) {
+  if (!IDE_EDITORS[editorId]) return;
+  state.preferredIde = editorId;
+  localStorage.setItem('se_preferred_ide', editorId);
+  updateIdeSplitButtonUI(editorId);
+  showToast(`Default IDE set to ${IDE_EDITORS[editorId].name}`);
+}
+
+function toggleIdePickerMenu(forceState) {
+  if (!el.fileViewerIdeMenu || !el.fileViewerIdeGroup) return;
+  const isVisible = el.fileViewerIdeMenu.style.display !== 'none';
+  const shouldShow = typeof forceState === 'boolean' ? forceState : !isVisible;
+  el.fileViewerIdeMenu.style.display = shouldShow ? 'flex' : 'none';
+  el.fileViewerIdeGroup.classList.toggle('menu-open', shouldShow);
+  if (shouldShow) updateIdeCliCopyDesc();
+}
+
+function updateIdeCliCopyDesc() {
+  if (!el.ideMenuCopyCliDesc) return;
+  const ed = IDE_EDITORS[state.preferredIde] || IDE_EDITORS.cursor;
+  const absPath = currentReviewFilePath || '/path/to/file';
+  const targetLine = state.fileViewerTargetLine || 1;
+  const cmd = ed.cmdTpl ? ed.cmdTpl(absPath, targetLine) : `${ed.bin} ${absPath}:${targetLine}`;
+  el.ideMenuCopyCliDesc.textContent = cmd;
+}
+
+function copyCurrentIdeCliCommand() {
+  const ed = IDE_EDITORS[state.preferredIde] || IDE_EDITORS.cursor;
+  const absPath = currentReviewFilePath || '';
+  const targetLine = state.fileViewerTargetLine || 1;
+  if (!absPath) {
+    showToast('No active file to open');
+    return;
+  }
+  const cmd = ed.cmdTpl ? ed.cmdTpl(absPath, targetLine) : `${ed.bin} ${absPath}:${targetLine}`;
+  copyToClipboard(cmd, `CLI launch command copied: ${cmd}`);
+}
+
+async function openInDesktopIde(editorId) {
+  if (!currentReviewFilePath) {
+    showToast('No active file open in viewer');
+    return;
+  }
+  const edKey = editorId || state.preferredIde || 'cursor';
+  const ed = IDE_EDITORS[edKey] || IDE_EDITORS.cursor;
   const targetLine = state.fileViewerTargetLine || 1;
   const absPath = currentReviewFilePath;
-  const uri = `cursor://file/${absPath}:${targetLine}`;
-  window.open(uri, '_blank');
-  showToast(`Opening Desktop IDE at line ${targetLine}...`);
+
+  // Build fallback URI
+  let fallbackUri = '';
+  if (edKey === 'idea' || edKey === 'intellij') {
+    fallbackUri = `idea://open?file=${absPath}&line=${targetLine}`;
+  } else if (edKey === 'goland') {
+    fallbackUri = `goland://open?file=${absPath}&line=${targetLine}`;
+  } else if (edKey === 'pycharm') {
+    fallbackUri = `pycharm://open?file=${absPath}&line=${targetLine}`;
+  } else if (edKey === 'webstorm') {
+    fallbackUri = `webstorm://open?file=${absPath}&line=${targetLine}`;
+  } else if (edKey === 'sublime') {
+    fallbackUri = `subl://open?url=file://${absPath}&line=${targetLine}`;
+  } else if (edKey === 'system') {
+    fallbackUri = `file://${absPath}`;
+  } else {
+    fallbackUri = `${ed.uriPrefix}${absPath}:${targetLine}`;
+  }
+
+  showToast(`Opening ${ed.name} at line ${targetLine}...`);
+
+  // Vector A: Attempt Native Go Process Execution via REST API
+  try {
+    const res = await fetch('/api/ide/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        editor: edKey,
+        path: absPath,
+        line: targetLine
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        // Native process successfully started on host!
+        return;
+      }
+    }
+  } catch (err) {
+    // Backend API not reachable or network error; fall through to Vector B
+  }
+
+  // Vector B: Browser Protocol URI Scheme Fallback
+  try {
+    window.open(fallbackUri, '_blank');
+  } catch (e) {
+    window.location.href = fallbackUri;
+  }
 }
+
 
 function copyCurrentDiffPatch() {
   let patch = '';

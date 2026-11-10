@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-10
+
+### Fixed
+- **Front-Pinned Hunk Controls & Spatial Visibility (R-078, AC-205..AC-209)**:
+  - Re-architected `.diff-hunk-header` in unified and split diff views to place `[Hunk #]` and `[📋 Hunk]` at the very front (left edge), followed by the isolated range `[@@ -old,len +new,len @@]` and a flexible `[⚡ AST Symbol]` pill with truncation ellipsis.
+  - Eliminated horizontal off-screen clipping where copy buttons were pushed to $x > 440\text{px}$ on narrower panes or long line headers. Core controls are pinned at `left: 0` (`z-index: 6`) and stay immediately accessible across all viewport splits (20% to 80%).
+- **Bi-Pane Horizontal Scroll Auto-Reset & Jitter Elimination (R-074, AC-186..AC-191)**:
+  - Removed `transform: scale(1.02)` and `scale(1.01)` from `@keyframes jumpPulseAnim`, completely eliminating code line bounding box expansion and browser scroll engine twitches during line pulses.
+  - Implemented `resetPanesHorizontalScroll()` and wired it into `stepToHunk`, `stepReviewScrubber`, `jumpToFileViewerLine`, diff line clicks, and hunk header clicks, ensuring both panes always default to `scrollLeft = 0`.
+- **Zero-Drift Sticky Gutters on Horizontal Scroll (R-075, AC-192..AC-195)**:
+  - Set `.file-viewer-code-container` to `min-width: 100%; width: max-content;` and pinned `.code-line-numbers` at `position: sticky; left: 0; z-index: 10;`, maintaining 0.00px gutter drift even under extreme horizontal scrolling.
+
+### Added
+- **Automated Host-Wide Desktop IDE Auto-Discovery Engine (R-076, R-077, AC-196..AC-204)**:
+  - Implemented `ide_detector.go` probing `/Applications`, `~/Applications`, and system `$PATH` for 9 desktop IDEs (VS Code, IntelliJ IDEA, GoLand, PyCharm, WebStorm, Sublime Text, Antigravity IDE, Xcode, System Default).
+  - Added REST endpoints `GET /api/ide/detected` and `POST /api/ide/open` with native OS process execution and fallback browser protocol URI schemes.
+  - Mounted split dropdown cockpit in the File Viewer header with glowing `● Installed` badges and 1-click CLI launch command copying.
+
+
 ## [0.5.2] - 2026-11-09
 
 ### Fixed

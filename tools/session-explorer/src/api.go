@@ -1006,6 +1006,83 @@ func (h *APIHandler) HandleSessionFileSteps(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, stepDiffs)
 }
 
+// HandleOpenInIDE handles POST /api/ide/open
+// Implements: R-077, AC-202, AC-203, AC-204, AC-205
+func (h *APIHandler) HandleOpenInIDE(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req OpenInIDERequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	cleanPath := strings.TrimSpace(req.Path)
+	cleanPath = strings.TrimPrefix(cleanPath, "file://")
+	if idx := strings.Index(cleanPath, "#"); idx != -1 {
+		cleanPath = cleanPath[:idx]
+	}
+	cleanPath = filepath.Clean(cleanPath)
+
+	if cleanPath == "" {
+		http.Error(w, "File path is required", http.StatusBadRequest)
+		return
+	}
+
+	// Security: Verify file exists on disk
+	fileInfo, err := os.Stat(cleanPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("File not accessible: %v", err), http.StatusNotFound)
+		return
+	}
+	if fileInfo.IsDir() {
+		http.Error(w, "Target path is a directory, not a file", http.StatusBadRequest)
+		return
+	}
+
+	line := req.Line
+	if line < 1 {
+		line = 1
+	}
+
+	editor := strings.ToLower(strings.TrimSpace(req.Editor))
+	if editor == "" {
+		editor = "vscode"
+	}
+
+	resp := LaunchIDE(editor, cleanPath, line)
+	writeJSON(w, resp)
+}
+
+// HandleDetectIDEs handles GET /api/ide/detected
+// Implements: R-079, AC-208, AC-209
+func (h *APIHandler) HandleDetectIDEs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	detected := DetectInstalledIDEs()
+	preferred := "vscode"
+	for _, ide := range detected {
+		if ide.Installed && ide.ID != "system" {
+			preferred = ide.ID
+			break
+		}
+	}
+
+	resp := DetectIDEsResponse{
+		Detected:  detected,
+		Preferred: preferred,
+		OS:        "darwin",
+	}
+	writeJSON(w, resp)
+}
+
+
 
 
 

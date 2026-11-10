@@ -6,6 +6,37 @@
 
 ---
 
+### 2026-11-10 — Hunk Header Front-Pinned Controls & Bi-Pane Horizontal Scroll Auto-Reset (R-074, R-078)
+
+**Agent/Author**: Antigravity (Google DeepMind)
+**SDLC Phase**: `review` (Version 0.5.3)
+**Duration**: ~35m
+
+#### What Was Done
+- **User Problem & Forensic Root Cause Resolution**:
+  1. *Hunk Copy & Number Hidden on Extreme Right*:
+     - User feedback: In the Git review diff pane, the user had to scroll all the way to the far right to see the `📋 Hunk` copy button and `Hunk #` label. The header line was wide, pushing controls off-screen when the review pane was narrower (e.g. 300px-400px split).
+     - Root Cause: In `renderUnifiedDiffHtml` and `renderSplitDiffHtml`, controls were placed after the unconstrained `hunk.header` string and duplicated AST symbol pill (~450px offset). When the diff pane was narrowed or content was wide, `📋 Hunk` and `Hunk #` overflowed to x > 440px.
+     - Solution: Re-architected `.diff-hunk-header` to place `[Hunk #]` and `[📋 Hunk]` as the FIRST two elements on the left, followed by the isolated range `[@@ -old,len +new,len @@]` and a flexible `[⚡ AST Symbol]` pill with truncation ellipsis. Total core width is only ~230px. Even on a narrow 250px pane, controls are immediately visible. Pinned with `position: sticky; left: 0; z-index: 6;` so they remain visible under any horizontal scroll.
+  2. *File Viewer Horizontal Scroll Drift on Hunk/Step Navigation*:
+     - User feedback: Clicking Hunk up/down or steps moved the left file viewer horizontal scrollbar slightly to the right (~78px). User requested that horizontal scrollbars on BOTH panes always default to the utmost left (`scrollLeft = 0`) on any step or hunk navigation.
+     - Root Causes:
+       a) Legacy `targetEl.scrollIntoView({ block: 'center' })` without horizontal isolation centered indented code lines.
+       b) `@keyframes jumpPulseAnim` contained `transform: scale(1.02)`, which expanded the code line's bounding box and caused browser scroll engine twitches.
+     - Solution:
+       a) Removed `transform: scale(...)` from `jumpPulseAnim` (pure color and box-shadow pulse).
+       b) Implemented `resetPanesHorizontalScroll()` and wired it into `stepToHunk`, `stepReviewScrubber`, `jumpToFileViewerLine`, diff line clicks, and hunk header clicks.
+       c) Enforced `scrollLeft = 0` prior to and during `scrollTo({ top: targetScrollTop, left: 0, behavior: 'smooth' })`.
+- **Deterministic Playwright Verification**:
+  - Pinned Hunk Controls: Verified `copyBtn.left` sits ~77px from container left (`btn.left: 924px` vs `cont.left: 847px`), stays visible and pinned when diff container scrolls horizontally (`scrollLeft = 125px`).
+  - Scroll Reset: Empirically verified across `hunkNextBtn`, `hunkPrevBtn`, `scrubberNextBtn`, and `scrubberPrevBtn` that starting from `fileLeft = 250px, diffLeft = 120px`, navigation triggers instant reset to `fileLeft = 0px, diffLeft = 0px`.
+  - Tested across both Inline Unified Diff and Split Diff views.
+- **SDD & Specs**:
+  - `make validate-specs` passes with 0 errors, 0 warnings.
+  - Recompiled Go binary with embedded frontend bundle and verified daemon on port 9876.
+
+---
+
 ### 2026-11-09 — Release v0.5.2: Holographic Review Diff, Spatial Sync, Zero-Drift & Living Docs Integration
 
 **Agent/Author**: Antigravity (Google DeepMind)
@@ -1826,3 +1857,43 @@ User observed that session `7efd4f68-0d1d-44fc-8a74-2e45f171bbcf` on `Default` a
   - Verified clicking line 487 in the left code gutter scrolled to Hunk 1 and triggered `jump-pulse`.
   - Verified Hunk Stepper navigation from Hunk 1/2 to Hunk 2/2 on commit `509af9d`.
   - Captured screenshots: `artifacts/dual-gutter-and-in-file-diff-decorations.png` and `artifacts/hunk-stepper-navigation-sync.png`.
+
+---
+
+### 2026-11-10 — Implementation & Verification: Spatial Autolock, Sticky Zero-Drift Gutters & Holographic Multi-IDE Cockpit v0.5.3 (R-073..R-079, AC-186..AC-209)
+
+**Agent/Author**: Antigravity  
+**SDLC Phase**: `review` (Spatial Change Autolock & Multi-IDE Integration)  
+**Spec Reference**: `specs/catalog/session-explorer-spatial-autolock-and-ide-cockpit.md` (`SPEC-SE-008`), `specs/catalog/session-explorer-spatial-autolock-and-ide-cockpit-prd.md` (`PRD-SE-008`)
+
+#### What Was Built & Verified
+1. **Zero-Drift Sticky Line Number Gutters (R-074, AC-192..AC-195)**:
+   - Root-cause fix for horizontal scroll line number loss: `.file-viewer-code-container` given `min-width: 100%; width: max-content;`.
+   - `.code-line-numbers` configured with `position: sticky; left: 0; z-index: 10;`, `background: rgba(11, 15, 25, 0.98);`, blur, and shadow.
+   - Tested across all separator split positions (20%, 25%, 35%, 50%, 65%, 80%) with maximum horizontal scroll (`scrollLeft = 578px`): measured exactly **0.00px drift**, perfectly visible on screen at all times.
+2. **Review Pane Diff Scroll & Sticky Line Numbers (R-074, AC-194)**:
+   - Updated `.review-diff-surface`, `.diff-hunk`, and `.diff-line` to `min-width: 100%; width: max-content;`, preventing colored line background clipping on long code lines.
+   - Configured `.diff-gutter-num` and `.diff-gutter-sign` with `position: sticky` (`left: 0`, `left: 40px`, `left: 80px`).
+   - Removed nested `overflow-x: auto` from `.diff-split-container`, enabling smooth, unclipped split-diff scrolling.
+3. **Resilient Draggable Separator Bar (R-057, R-074)**:
+   - Enhanced `handleResizerPointerDown` with modern Pointer Capture API (`e.target.setPointerCapture(e.pointerId)`).
+   - Prevents dropped pointer events and text selection interference during rapid mouse drags.
+   - Verified double-click snap point cycling (55% -> 70% -> 35% -> 55%).
+4. **Step Scrubber Spatial Change Autolock (R-073, AC-186..AC-191)**:
+   - Navigating agent steps via arrows (`◀` / `▶`) automatically spotlights Hunk 1 and scrolls the left file viewer pane to the mutation coordinates (`stepToHunk(0, true)`).
+   - Suppresses toast noise during step scrubbing via quiet mode flag.
+5. **Host-Aware Multi-IDE Detection & Launch Engine (R-076..R-079, AC-198..AC-209)**:
+   - Implemented `tools/session-explorer/src/ide_detector.go`: probes `$PATH` and macOS application bundles (`/Applications`, `~/Applications`) across 13 IDE definitions (VS Code, Cursor, Windsurf, IntelliJ IDEA, GoLand, PyCharm, WebStorm, Sublime Text, VS Code Insiders, Antigravity IDE, Xcode, Zed, System Default).
+   - Added REST endpoints: `GET /api/ide/detected` and `POST /api/ide/open`.
+   - Automatically identified 9 installed editors on host: VS Code, IntelliJ IDEA, GoLand, PyCharm, WebStorm, Sublime Text, Antigravity IDE, Xcode, System Default.
+   - Dynamically renders dropdown menu with green glowing `● Installed` badges and uninstalled editors grouped under protocol links.
+   - Dual-vector execution: launches native process via Go CLI / macOS bundle `open -a`, falling back to custom browser URI schemes (`vscode://`, `subl://`, `idea://`, `file://`).
+   - Persists user preferences in `localStorage('se_preferred_ide')`, updating split-button icons and CLI launch preview (`code -g ...:1`).
+
+#### Automated & Verification Suite
+- **Go Unit Tests**: All 44 test suites pass (`make test-tool T=session-explorer`).
+- **Bun Bundle**: 2,128 modules bundled in 109ms (`dist/app.bundle.js`).
+- **Spec Validation**: `make validate-specs` passes with 0 errors and 0 warnings.
+- **Playwright Verification**:
+  - Captured `artifacts/ide-auto-detected-cockpit-and-sticky-gutter-verified.png`: showing detected IDEs with `● Installed` badges.
+  - Captured `artifacts/sticky-line-numbers-extreme-right-verified.png`: showing sticky line numbers pinned at `drift: 0.00px` during extreme horizontal scroll.

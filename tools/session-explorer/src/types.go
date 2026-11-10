@@ -572,4 +572,46 @@ type AgentStepDiff struct {
 	Deletions    int        `json:"deletions"`
 }
 
+// OpenInIDERequest represents a request to launch a desktop IDE.
+// Implements: R-077
+type OpenInIDERequest struct {
+	Editor string `json:"editor"` // "cursor", "vscode", "windsurf", "idea", "sublime", "system"
+	Path   string `json:"path"`
+	Line   int    `json:"line"`
+}
+
+// OpenInIDEResponse represents the result of an IDE launch attempt.
+// Implements: R-077
+type OpenInIDEResponse struct {
+	Success     bool   `json:"success"`
+	Message     string `json:"message"`
+	Editor      string `json:"editor,omitempty"`
+	Command     string `json:"command,omitempty"`
+	FallbackURI string `json:"fallback_uri,omitempty"`
+}
+
+// DetectedIDE represents an IDE discovered on the host system.
+// Implements: R-077, R-079
+type DetectedIDE struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Icon      string `json:"icon"`
+	Installed bool   `json:"installed"`
+	AppPath   string `json:"app_path,omitempty"`
+	AppName   string `json:"app_name,omitempty"`
+	CLIBinary string `json:"cli_binary,omitempty"`
+	URIScheme string `json:"uri_scheme"`
+	IsDefault bool   `json:"is_default"`
+}
+
+// DetectIDEsResponse represents the list of detected IDEs on the host.
+// Implements: R-079
+type DetectIDEsResponse struct {
+	Detected  []DetectedIDE `json:"detected"`
+	Preferred string        `json:"preferred"`
+	OS        string        `json:"os"`
+}
+
+
+
 
